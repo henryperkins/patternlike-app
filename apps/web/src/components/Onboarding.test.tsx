@@ -1,8 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { ReaderChartObservedAtContext, ReaderRefreshChartContext, ReaderScopeContext } from "./ReaderReadiness.js";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimezoneLookupResponse } from "@patternlike/shared";
-import { capturedFor, mockApiResponses } from "../test/api-mock.js";
+import { capturedFor, deferred, mockApiResponses } from "../test/api-mock.js";
 import {
   ACCOUNT_PROCESSING_CONSENT_PATH,
   accountProcessingGranted,
@@ -60,6 +62,7 @@ describe("birth onboarding", () => {
         birth_time_local: null,
       }),
       expect.stringMatching(/^web-birth-/),
+      expect.any(AbortSignal),
     );
   });
 
@@ -625,11 +628,66 @@ describe("historical timezone lookup", () => {
         birthplace: expect.objectContaining({ latitude: 34.0522, longitude: -118.2437 }),
       }),
       expect.stringMatching(/^web-birth-/),
+      expect.any(AbortSignal),
     );
   });
 });
 
 describe("chart correction", () => {
+  it.each(["expired", "unmounted", "scope_changed"] as const)("does not submit after a deferred grant when correction context is %s", async (change) => {
+    const gate = deferred();
+    mockApiResponses({
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: { status: 200, body: accountProcessingNotGranted },
+      [`PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: { status: 200, body: accountProcessingGranted, gate: gate.promise },
+    });
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const observedAt = Date.now();
+    const scope = { accountId: "account-a", sessionEpoch: 1, chartId: "chart-a", profileVersion: 1, source: null };
+    const { unmount, rerender } = render(<ReaderScopeContext value={scope}><ReaderChartObservedAtContext value={observedAt}><Onboarding mode="correct" onSubmit={onSubmit} /></ReaderChartObservedAtContext></ReaderScopeContext>);
+    await reachReviewStep(userEvent.setup());
+    await userEvent.click(screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Replace my chart/i }));
+    expect(capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH).filter(request => request.method === "PUT")).toHaveLength(1);
+    const now = vi.spyOn(Date, "now");
+    if (change === "unmounted") unmount();
+    else if (change === "scope_changed") rerender(<ReaderScopeContext value={{ ...scope, accountId: "account-b" }}><ReaderChartObservedAtContext value={observedAt}><Onboarding mode="correct" onSubmit={onSubmit} /></ReaderChartObservedAtContext></ReaderScopeContext>);
+    else now.mockReturnValue(observedAt + 60_001);
+    await act(async () => gate.release());
+    expect(onSubmit).not.toHaveBeenCalled();
+    now.mockRestore();
+  });
+
+  it("reloads stale chart evidence without discarding entered correction details", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    function Review() {
+      const [observedAt, setObservedAt] = useState(Date.now() - 60_001);
+      return <ReaderChartObservedAtContext value={observedAt}><ReaderRefreshChartContext value={async () => { setObservedAt(Date.now()); }}><Onboarding mode="correct" onSubmit={onSubmit} /></ReaderRefreshChartContext></ReaderChartObservedAtContext>;
+    }
+    render(<Review />);
+    await userEvent.type(screen.getByLabelText("Birth date"), "1985-11-02");
+    fireEvent.change(screen.getByLabelText("Local time"), { target: { value: "12:34:00" } });
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }));
+    expect(screen.getByRole("button", { name: /Replace my chart/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Reload current chart" }));
+    expect(screen.getByText(/previous Pattern and retained generation material are erased/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Replace my chart/i }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ birth_date: "1985-11-02", birth_time_local: "12:34:00" }), expect.any(String), expect.any(AbortSignal));
+  });
+
+  it("does not submit a correction with unavailable chart consequences", async () => {
+    const onSubmit = vi.fn();
+    render(<Onboarding mode="correct" onSubmit={onSubmit} />);
+    await userEvent.type(screen.getByLabelText("Birth date"), "1985-11-02");
+    await userEvent.type(screen.getByLabelText("Local time"), "12:34:00");
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }));
+    expect(screen.getByRole("button", { name: /Replace my chart/i })).toBeDisabled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("says the form cannot replay stored birth details", () => {
     render(<Onboarding mode="correct" onSubmit={vi.fn()} onCancel={vi.fn()} />);
 
@@ -652,7 +710,7 @@ describe("chart correction", () => {
   it("posts a replacement rather than a first chart", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<Onboarding mode="correct" onSubmit={onSubmit} onCancel={vi.fn()} />);
+    render(<ReaderChartObservedAtContext value={Date.now()}><Onboarding mode="correct" onSubmit={onSubmit} onCancel={vi.fn()} /></ReaderChartObservedAtContext>);
 
     await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
     await user.type(screen.getByLabelText("Local time"), "12:34:00");
@@ -671,6 +729,7 @@ describe("chart correction", () => {
         birth_date: "1985-11-02",
       }),
       expect.stringMatching(/^web-birth-/),
+      expect.any(AbortSignal),
     );
   });
 });

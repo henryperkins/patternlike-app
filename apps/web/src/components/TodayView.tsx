@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ensureTodayReading,
+  getTodayReading,
+  ApiError,
   type DailyReadingResponse,
 } from "../lib/api-client.js";
 import { NOT_IMPLEMENTED_MESSAGE, withRequestId } from "../lib/api-status.js";
@@ -9,6 +11,8 @@ import { formatLocalDate } from "../lib/reading-format.js";
 import { AiConsentGate } from "./AiConsentGate.js";
 import { PreferenceConfirm } from "./PreferenceConfirm.js";
 import { ReadingArticle } from "./ReadingArticle.js";
+import { selectReaderReadiness, type DailyObservation } from "../lib/reader-readiness.js";
+import { useReaderScope } from "./ReaderReadiness.js";
 import { Icon } from "./icons.js";
 
 type TodayState =
@@ -156,16 +160,29 @@ export function TodayView({
   onUnauthorized,
   preferenceSyncRevision,
 }: TodayViewProps) {
+  const scope = useReaderScope();
+  const ensureRequested = useRef(true);
+  const preparationStartedAt = useRef<number | null>(null);
+  const requestGeneration = useRef(0);
+  const [refreshUnavailable, setRefreshUnavailable] = useState(false);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [state, setState] = useState<TodayState>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  const reload = useCallback(() => setAttempt((value) => value + 1), []);
+  // Explicit status reloads never consume an unfinished generation intent.
+  const reload = useCallback(() => { ensureRequested.current = false; setAttempt(value => value + 1); }, []);
+  const continuePreparation = useCallback(() => { ensureRequested.current = true; setAttempt(value => value + 1); }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    const generation = ++requestGeneration.current;
+    const current = () => !controller.signal.aborted && generation === requestGeneration.current;
+    const shouldEnsure = ensureRequested.current;
+    // The desired-state PUT intent survives effect cancellation until a live
+    // response settles it. Reissuing this same initial intent is idempotent.
     let slowPreparationTimer: ReturnType<typeof setTimeout> | undefined;
-    let hasStartedPreparation = false;
+    let hasStartedPreparation = preparationStartedAt.current !== null;
 
     const clearSlowPreparationTimer = () => {
       if (slowPreparationTimer !== undefined) {
@@ -173,6 +190,12 @@ export function TodayView({
         slowPreparationTimer = undefined;
       }
     };
+
+    if (preparationStartedAt.current !== null) {
+      slowPreparationTimer = setTimeout(() => {
+        if (current()) setState(value => value.status === "preparing" ? { ...value, takingLonger: true } : value);
+      }, Math.max(0, preparationStartedAt.current + SLOW_PREPARATION_MS - Date.now()));
+    }
 
     // Deliberately not reset to `loading`: a refresh keeps whatever is on screen
     // and only marks it busy, so the control the reader just pressed stays
@@ -183,10 +206,28 @@ export function TodayView({
       let pollIndex = 0;
       try {
         while (!controller.signal.aborted) {
-          const response = await ensureTodayReading(controller.signal);
-          if (controller.signal.aborted) return;
+          let response;
+          try {
+            response = shouldEnsure && pollIndex === 0
+              ? await ensureTodayReading(controller.signal)
+              : await getTodayReading(controller.signal);
+          } catch (cause) {
+            if (!current()) return;
+            // GET proves only that publication has not happened. Continue an
+            // already observed preparation without reserving another command.
+            if (hasStartedPreparation && cause instanceof ApiError && cause.code === "reading_not_generated") {
+              await abortableDelay(POLL_DELAYS_MS[Math.min(pollIndex++, POLL_DELAYS_MS.length - 1)]!, controller.signal);
+              continue;
+            }
+            throw cause;
+          }
+          if (!current()) return;
+          if (shouldEnsure && pollIndex === 0) ensureRequested.current = false;
+          setObservedAt(Date.now());
+          setRefreshUnavailable(false);
 
           if ("reading" in response) {
+            preparationStartedAt.current = null;
             clearSlowPreparationTimer();
             setState({ status: "ready", response });
             return;
@@ -194,6 +235,7 @@ export function TodayView({
 
           if (!hasStartedPreparation) {
             hasStartedPreparation = true;
+            preparationStartedAt.current = Date.now();
             setState({
               status: "preparing",
               localDate: response.local_date,
@@ -201,7 +243,7 @@ export function TodayView({
               schemaVersion: response.schema_version,
             });
             slowPreparationTimer = setTimeout(() => {
-              if (controller.signal.aborted) return;
+              if (!current()) return;
               setState((current) =>
                 current.status === "preparing"
                   ? { ...current, takingLonger: true }
@@ -216,8 +258,12 @@ export function TodayView({
           await abortableDelay(delay, controller.signal);
         }
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (!current()) return;
+        ensureRequested.current = false;
+        preparationStartedAt.current = null;
         clearSlowPreparationTimer();
+        setObservedAt(Date.now());
+        setRefreshUnavailable(true);
         const failure = classifyTodayError(error);
         switch (failure.kind) {
           case "unauthorized":
@@ -240,15 +286,13 @@ export function TodayView({
             setState({ status: "not_implemented", requestId: failure.requestId });
             return;
           case "error":
-            setState({
-              status: "error",
-              message: failure.message,
-              requestId: failure.requestId,
-              retryable: failure.retryable,
-            });
+            setState(currentState => currentState.status === "ready" && !(error instanceof ApiError && [401, 403, 404, 409, 410].includes(error.status))
+              ? currentState : { status: "error", message: error instanceof ApiError && error.code === "reading_not_generated"
+                ? "No published reading is available yet. Check status again to see whether it has appeared." : failure.message,
+                requestId: failure.requestId, retryable: failure.retryable });
         }
       } finally {
-        if (!controller.signal.aborted) setBusy(false);
+        if (current()) setBusy(false);
       }
     };
 
@@ -259,15 +303,25 @@ export function TodayView({
     };
   }, [attempt, onUnauthorized, preferenceSyncRevision]);
 
+  const dailyValue: DailyObservation = state.status === "ready" ? { kind: "ready", edition: `${state.response.reading.reading_id}:${state.response.reading.revision}` }
+    : state.status === "needs_preference" ? { kind: "needs_preference", preference: state.preference }
+    : state.status === "needs_onboarding" || state.status === "needs_ai_consent" ? { kind: state.status }
+    : state.status === "preparing" ? { kind: "preparing" } : { kind: "unavailable" };
+  const readiness = selectReaderReadiness({ scope, requestGeneration: requestGeneration.current, now: Date.now(),
+    daily: observedAt === null ? null : { scope, requestGeneration: requestGeneration.current, observedAt, evidence: refreshUnavailable ? "unavailable" : "known", value: dailyValue } }).daily;
+
   switch (state.status) {
     case "ready":
       return (
+        <>
         <ReadingArticle
           response={state.response}
           showCheckIn
           onReload={reload}
           onUnauthorized={onUnauthorized}
         />
+        {refreshUnavailable ? <p role="status">{readiness.text} <button type="button" onClick={reload} disabled={busy}>Check again</button></p> : null}
+        </>
       );
 
     case "needs_preference":
@@ -283,7 +337,7 @@ export function TodayView({
           key={state.preference}
           kind={state.preference}
           requestId={state.requestId}
-          onSaved={reload}
+          onSaved={continuePreparation}
           onUnauthorized={onUnauthorized}
         />
       );
@@ -292,7 +346,7 @@ export function TodayView({
       return (
         <AiConsentGate
           requestId={state.requestId}
-          onGranted={reload}
+          onGranted={continuePreparation}
           onUnauthorized={onUnauthorized}
         />
       );
@@ -356,7 +410,7 @@ export function TodayView({
           // An exhausted generation and an unconfigured publisher both end here,
           // and a control that cannot succeed is worse than no control.
           action={
-            state.retryable ? { label: "Try again", onClick: reload } : undefined
+            { label: "Check again", onClick: reload }
           }
           busy={busy}
         >

@@ -1,0 +1,114 @@
+[
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "chapters": 3,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "chapters": 4,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "chapters": 5,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "chapters": 6,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "chapters": 3,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "chapters": 4,
+    "requests": 9,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "chapters": 5,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "chapters": 6,
+    "requests": 8,
+    "refreshReadsOnly": true,
+    "acceptedReadingRetained": true,
+    "contradictoryRetryBlocked": true,
+    "failedRefreshBlocksMutations": true,
+    "errors": [],
+    "unexpected": []
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "schema_version": "runtime-health-policy/v1",
+  "policy_id": "synthetic-local/v1",
+  "work_classes": [
+    {
+      "work_class": "text",
+      "pending_age_limit_ms": 1000,
+      "expired_lease_persistence_limit_ms": 1000
+    },
+    {
+      "work_class": "portrait",
+      "pending_age_limit_ms": 1000,
+      "expired_lease_persistence_limit_ms": 1000
+    },
+    {
+      "work_class": "mesh",
+      "pending_age_limit_ms": 1000,
+      "expired_lease_persistence_limit_ms": 1000
+    }
+  ],
+  "consecutive_breach_samples": 2,
+  "sampling_interval_ms": 1000,
+  "destination": "synthetic:local-only",
+  "baseline_ref": "synthetic:queue-fixture",
+  "provider_work_envelope_ref": "synthetic:timeout-fixture"
+}

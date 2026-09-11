@@ -1,0 +1,91 @@
+{
+  "schema_version": "runtime-health/v1",
+  "sampled_at": "2026-09-11T12:00:00.000Z",
+  "work_classes": [
+    {
+      "work_class": "text",
+      "observation": "known",
+      "reason": "observed",
+      "runner_enabled": null,
+      "retry_exhaustion_observation": "not_collected",
+      "pending_count": 0,
+      "scheduled_pending_count": 0,
+      "dispatchable_pending_count": 0,
+      "active_lease_count": 0,
+      "expired_lease_count": 0,
+      "failed_count": 0,
+      "retry_exhausted_count": null,
+      "oldest_pending_age_ms": null,
+      "oldest_dispatchable_pending_age_ms": null,
+      "completion_latency": {
+        "successful_count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "missing_timestamp_count": 0,
+        "measurement_started_at": "2026-09-11T12:00:00.000Z",
+        "window_started_at": "2026-09-10T12:00:00.000Z",
+        "coverage": "partial"
+      }
+    },
+    {
+      "work_class": "portrait",
+      "observation": "known",
+      "reason": "observed",
+      "runner_enabled": null,
+      "retry_exhaustion_observation": "known",
+      "pending_count": 0,
+      "scheduled_pending_count": 0,
+      "dispatchable_pending_count": 0,
+      "active_lease_count": 0,
+      "expired_lease_count": 0,
+      "failed_count": 0,
+      "retry_exhausted_count": 0,
+      "oldest_pending_age_ms": null,
+      "oldest_dispatchable_pending_age_ms": null,
+      "completion_latency": {
+        "successful_count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "missing_timestamp_count": 0,
+        "measurement_started_at": "2026-09-11T12:00:00.000Z",
+        "window_started_at": "2026-09-10T12:00:00.000Z",
+        "coverage": "partial"
+      }
+    },
+    {
+      "work_class": "mesh",
+      "observation": "known",
+      "reason": "observed",
+      "runner_enabled": null,
+      "retry_exhaustion_observation": "known",
+      "pending_count": 0,
+      "scheduled_pending_count": 0,
+      "dispatchable_pending_count": 0,
+      "active_lease_count": 0,
+      "expired_lease_count": 0,
+      "failed_count": 0,
+      "retry_exhausted_count": 0,
+      "oldest_pending_age_ms": null,
+      "oldest_dispatchable_pending_age_ms": null,
+      "completion_latency": {
+        "successful_count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "missing_timestamp_count": 0,
+        "measurement_started_at": "2026-09-11T12:00:00.000Z",
+        "window_started_at": "2026-09-10T12:00:00.000Z",
+        "coverage": "partial"
+      }
+    }
+  ],
+  "publication": {
+    "observation": "known",
+    "reason": "observed",
+    "publication_safety_failed_count": 0,
+    "retry_failures": {
+      "observation": "unavailable",
+      "reason": "not_collected",
+      "count": null
+    }
+  }
+}

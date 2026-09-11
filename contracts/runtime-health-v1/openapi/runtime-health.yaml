@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: Restricted runtime observations
+  version: 1.0.0
+  description: Additive aggregate and separately scoped diagnostic reads. Existing M7 contracts remain frozen.
+paths:
+  /admin/runtime-health:
+    get:
+      operationId: getRuntimeHealth
+      security:
+        - cloudflareAccess: []
+      description: Aggregate-only auditor read, separately audited with 13-calendar-month retention. No-store on every response. Exact single purpose required. Does not authorize artifact access.
+      parameters:
+        - in: query
+          name: purpose
+          required: true
+          schema:
+            const: incident_response
+      responses:
+        '200':
+          description: Per-class bounded observations, unavailable fields null. Publication count describes explicit durable safety failures only.
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/runtime-health-v1/runtime-health.schema.json
+        '400':
+          description: Missing, unsupported, or repeated purpose.
+        '401':
+          description: Cloudflare Access auditor authentication required; reader and runner credentials are insufficient.
+        '503':
+          description: Authentication or aggregate audit storage unavailable; no metrics released.
+  /admin/pattern-generations/{generation_id}/diagnostics:
+    get:
+      operationId: getPatternGenerationDiagnostics
+      security:
+        - cloudflareAccess: []
+      description: Separately authorized and audited scoped metadata. No artifact bodies are opened. No-store on every response.
+      parameters:
+        - in: path
+          name: generation_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: purpose
+          required: true
+          schema:
+            enum: [quality_review, safety_investigation, incident_response, retention_audit]
+      responses:
+        '200':
+          description: Authorized scoped diagnostic observation.
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/runtime-health-v1/pattern-diagnostics.schema.json
+        '400':
+          description: Exact supported purpose required.
+        '401':
+          description: Auditor authentication required.
+        '404':
+          description: Generation not found.
+        default:
+          description: Observation unavailable.
+components:
+  securitySchemes:
+    cloudflareAccess:
+      type: apiKey
+      in: header
+      name: Cf-Access-Jwt-Assertion

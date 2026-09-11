@@ -1,0 +1,182 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "work_classes",
+    "consecutive_breach_samples",
+    "sampling_interval_ms",
+    "responder",
+    "destination",
+    "baseline_ref",
+    "provider_work_envelope_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "runtime-health-policy/v1"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$"
+    },
+    "work_classes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "work_class",
+          "pending_age_limit_ms",
+          "expired_lease_persistence_limit_ms"
+        ],
+        "properties": {
+          "work_class": {
+            "enum": [
+              "text",
+              "portrait",
+              "mesh"
+            ]
+          },
+          "pending_age_limit_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "expired_lease_persistence_limit_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "work_class",
+              "pending_age_limit_ms",
+              "expired_lease_persistence_limit_ms"
+            ],
+            "properties": {
+              "work_class": {
+                "const": "text"
+              },
+              "pending_age_limit_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "expired_lease_persistence_limit_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "work_class",
+              "pending_age_limit_ms",
+              "expired_lease_persistence_limit_ms"
+            ],
+            "properties": {
+              "work_class": {
+                "const": "portrait"
+              },
+              "pending_age_limit_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "expired_lease_persistence_limit_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "work_class",
+              "pending_age_limit_ms",
+              "expired_lease_persistence_limit_ms"
+            ],
+            "properties": {
+              "work_class": {
+                "const": "mesh"
+              },
+              "pending_age_limit_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "expired_lease_persistence_limit_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "consecutive_breach_samples": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "sampling_interval_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "responder": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$"
+    },
+    "destination": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$"
+    },
+    "baseline_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$"
+    },
+    "provider_work_envelope_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/runtime-health-v1/runtime-health-policy.schema.json",
+  "title": "Inactive runtime health threshold policy, version 1"
+}

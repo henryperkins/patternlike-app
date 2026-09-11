@@ -9,6 +9,7 @@ import type {
 } from "@patternlike/shared";
 import { PATTERN_GENERATION_CONSENT_POLICY_VERSION } from "@patternlike/shared";
 import { capturedFor, deferred, mockApiResponses as apiResponses, type MockResponse } from "../test/api-mock.js";
+import { ReaderScopeContext } from "./ReaderReadiness.js";
 import { PatternExperience } from "./PatternExperience.js";
 
 // Missing artwork routes must not prevent the default observatory or reading.
@@ -97,6 +98,60 @@ const generated: PatternResponseV7 = {
 const noop = () => undefined;
 
 describe("PatternExperience", () => {
+  it("clears accepted content immediately when the account scope changes, even with the same chart key", async () => {
+    const ready = stateDoc({ state: "ready", pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy } });
+    const responses: Record<string, MockResponse> = { [STATE]: { status: 200, body: ready }, [PATTERN]: { status: 200, body: generated } };
+    apiResponses(responses);
+    const scope = { accountId: "account-a", sessionEpoch: 1, chartId: "cht_pattern_ai_0001", profileVersion: 1, source: null };
+    const { rerender } = render(<ReaderScopeContext value={scope}><PatternExperience chartId={scope.chartId} onUnauthorized={noop} /></ReaderScopeContext>);
+    await screen.findByRole("heading", { name: "A standing emphasis" });
+    const held = deferred(); responses[STATE] = { status: 200, body: ready, gate: held.promise };
+    rerender(<ReaderScopeContext value={{ ...scope, accountId: "account-b" }}><PatternExperience chartId={scope.chartId} onUnauthorized={noop} /></ReaderScopeContext>);
+    expect(screen.queryByRole("heading", { name: "A standing emphasis" })).not.toBeInTheDocument();
+    await act(async () => held.release());
+  });
+  it("expires a generation control without waiting for another render or status request", async () => {
+    vi.useFakeTimers();
+    try {
+      mockApiResponses({ [STATE]: { status: 200, body: stateDoc({ state: "available", consent: { ...consent, status: "granted" } }) } });
+      const { unmount } = render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByRole("button", { name: "Generate my Pattern" })).toBeEnabled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_001); });
+      expect(screen.queryByRole("button", { name: "Generate my Pattern" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+      expect(capturedFor(GENERATIONS)).toHaveLength(0);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("does not offer a retry when replacement failure contradicts eligibility", async () => {
+    mockApiResponses({ [STATE]: { status: 200, body: stateDoc({ state: "ready", consent: { ...consent, status: "granted" },
+      pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy },
+      regeneration: regeneration({ eligible: false, failure: { generation_id: "g", stage: "writing", status_updated_at: generated.generated_at, started_at: generated.generated_at, retryable: true, request_id: null } }),
+    }) }, [PATTERN]: { status: 200, body: generated } });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    await screen.findByRole("heading", { name: "A standing emphasis" });
+    expect(screen.queryByRole("button", { name: "Try the update again" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+  });
+  it("rechecks consent before a previously opened replacement confirmation can submit", async () => {
+    const initial = stateDoc({ state: "ready", consent: { ...consent, status: "granted" },
+      pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy },
+      regeneration: regeneration({ eligible: true }),
+    });
+    const responses = { [STATE]: { status: 200, body: initial }, [PATTERN]: { status: 200, body: generated } };
+    apiResponses(responses);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Review Pattern update" }));
+    await userEvent.type(screen.getByLabelText(/Type REGENERATE MY PATTERN/), "REGENERATE MY PATTERN");
+    responses[STATE] = { status: 200, body: { ...initial, consent } };
+    await userEvent.click(screen.getByRole("button", { name: "Replace my Pattern" }));
+    await waitFor(() => expect(capturedFor(STATE).length).toBeGreaterThanOrEqual(2));
+    expect(capturedFor(GENERATIONS)).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
+  });
+
   it("finishes saving a selected automation preference before enabling Pattern generation", async () => {
     const gate = deferred();
     const preference = { schema_version: "portrait-automation/v1", available: true, chart_id: "cht_pattern_ai_0001", enabled: false, consent_policy_version: "1.1.0" };
@@ -129,7 +184,7 @@ describe("PatternExperience", () => {
     });
 
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
-    expect(await screen.findByText("Your Pattern is not ready.")).toBeInTheDocument();
+    expect(await screen.findByText("Current status could not be checked. Reload status before starting more work.")).toBeInTheDocument();
     expect(screen.queryByText("Why this?")).toBeNull();
     expect(screen.queryByText("Holding a line under pressure")).toBeNull();
   });

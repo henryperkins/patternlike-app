@@ -1,0 +1,293 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generation_id",
+    "observed_at",
+    "stage",
+    "stage_generation",
+    "created_at",
+    "updated_at",
+    "finished_at",
+    "failure_class",
+    "public_failure_stage",
+    "cancellation_reason",
+    "reservation_reason",
+    "revision_reason",
+    "planner_attempts",
+    "writer_attempts",
+    "verifier_attempts",
+    "schedule",
+    "provider"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pattern-diagnostics/v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "pattern": "^pgen_[a-f0-9]{32}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+    },
+    "stage": {
+      "enum": [
+        "reserved",
+        "planning",
+        "plan_validating",
+        "writing",
+        "candidate_validating",
+        "semantic_verifying",
+        "publishing",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "unknown"
+      ]
+    },
+    "stage_generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "created_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "updated_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "failure_class": {
+      "anyOf": [
+        {
+          "enum": [
+            "plan_invalid",
+            "candidate_invalid",
+            "semantic_verification_failed",
+            "publication_safety_failed",
+            "planner_attempts_exhausted",
+            "writer_attempts_exhausted",
+            "verifier_attempts_exhausted",
+            "execution_error",
+            "unknown_failure"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "public_failure_stage": {
+      "anyOf": [
+        {
+          "enum": [
+            "organizing_evidence",
+            "writing",
+            "checking_claims",
+            "unknown"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cancellation_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "cancel_consent",
+            "cancel_stale",
+            "cancel_ontology",
+            "cancel_source_changed",
+            "unknown"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reservation_reason": {
+      "enum": [
+        "first_open",
+        "first_open_retry",
+        "failed_attempt_retry",
+        "chart_correction",
+        "source_update",
+        "unknown"
+      ]
+    },
+    "revision_reason": {
+      "type": "null"
+    },
+    "planner_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "writer_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "verifier_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "available_at",
+        "lease_expires_at"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "available_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lease_expires_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pass",
+            "status",
+            "lease_expires_at",
+            "available_at",
+            "completed_at"
+          ],
+          "properties": {
+            "pass": {
+              "enum": [
+                "planner",
+                "writer",
+                "verifier"
+              ]
+            },
+            "status": {
+              "enum": [
+                "pending",
+                "leased",
+                "completed",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "lease_expires_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "available_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "completed_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/runtime-health-v1/pattern-diagnostics.schema.json",
+  "title": "Separately authorized Pattern diagnostic facts, version 1"
+}

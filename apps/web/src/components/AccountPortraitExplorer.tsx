@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { PatternPortraitExplorerResponse, PatternResponseV7, PatternStatePattern } from "@patternlike/shared";
 import { ApiError, downloadPatternPortraitExplorer, getPatternPortraitExplorer, getPatternPortraitImage, getPatternPortraitModel } from "../lib/api-client.js";
 import { bindingsFor, validateResponse, verifyImage } from "../lib/account-portrait.js";
+import { selectReaderReadiness } from "../lib/reader-readiness.js";
+import { ReaderReadiness, useReaderScope } from "./ReaderReadiness.js";
 import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument, type PortraitObjectBinding } from "../lib/pattern-portrait.js";
 import type { PortraitSky } from "../lib/portrait-sky.js";
@@ -44,6 +46,9 @@ function validate(response: PatternPortraitExplorerResponse, chartId: string, do
 }
 
 export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthorized, children, sky, initialChapterIndex, defaultOpen }: Props) {
+  const accountScope = useReaderScope();
+  const [observedAt, setObservedAt] = useState<number | null>(null);
+  const requestGeneration = useRef(0);
   const sourceMatches = patternMatchesDocument(pattern, document);
   const canRender = sourceMatches && document.core_chapters.length >= 3 && document.core_chapters.length <= 6;
   // The v1 generated-artwork service is optional and supports four chapters.
@@ -92,10 +97,12 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
   }, [onUnauthorized, returnToReading]);
   useEffect(() => {
     if (!artworkEligible) return;
+    const generation = ++requestGeneration.current;
     const controller = new AbortController(); statusRequest.current = controller;
     void getPatternPortraitExplorer(controller.signal).then((next) => {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || generation !== requestGeneration.current) return;
       validate(next, chartId, document);
+      setObservedAt(Date.now());
       if (session.verified && session.verified.identity !== JSON.stringify(next)) session.verified = null;
       if (next.status !== "ready") discardArtifacts();
       else if (artifactIdentity.current && artifactIdentity.current !== JSON.stringify(next)) discardArtifacts();
@@ -203,10 +210,14 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
     pendingFocus.current = false;
   }, [open, showingExplorer, initialChapterIndex]);
 
+  const scope = { ...accountScope, chartId, source: `${document.pattern_id}:${document.generated_at}` };
+  const artwork = selectReaderReadiness({ scope, requestGeneration: requestGeneration.current, now: Date.now(), chapterCount: document.core_chapters.length,
+    artwork: response && observedAt !== null ? { scope, requestGeneration: requestGeneration.current, observedAt, evidence: "known", value: response } : null }).artwork;
   if (!canRender) return <>{children}</>;
   return <>
     {!open && <button type="button" className="button button--primary" onClick={() => { pendingFocus.current = true; openExplorer(); }}>Explore your 3D portrait</button>}
     <div ref={contentElement} tabIndex={-1}>{showingExplorer ? <PortraitExplorer source={source} objectBindings={verified?.bindings} meshBundle={verified?.bundle} navigation={navigation} sky={sky?.chartId === chartId ? sky : null} /> : children}</div>
+    {artwork.code !== "ready" && <ReaderReadiness presentation={artwork} onAction={artworkEligible ? () => refresh() : undefined} />}
     {error && <div className="account-portrait__status" role="alert"><p>{error}</p><button type="button" onClick={refresh}>Retry artwork</button></div>}
     {open && saved && !verified && (assetError
       ? <p className="account-portrait__status" role="alert">Your saved artwork could not be loaded. Reading stations are shown instead. <button type="button" onClick={() => setAssetAttempt((value) => value + 1)}>Retry portrait loading</button></p>

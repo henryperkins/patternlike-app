@@ -1,0 +1,409 @@
+{
+  "scope": "Actual application components, fictional contract-shaped browser API responses; no live account, provider or storage operation.",
+  "browser": "Browser plugin not available; existing temporary Playwright/Chromium reused.",
+  "reports": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "warnings": [],
+      "unknown": [],
+      "violations": [],
+      "requests": [
+        {
+          "path": "/v1/chart",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/chart",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/today",
+          "method": "PUT",
+          "body": null
+        },
+        {
+          "path": "/v1/preferences/timezone",
+          "method": "PUT",
+          "body": {
+            "timezone": "UTC",
+            "source": "device_derived"
+          }
+        },
+        {
+          "path": "/v1/preferences/locale",
+          "method": "PUT",
+          "body": {
+            "locale": "en-US",
+            "source": "device_derived"
+          }
+        },
+        {
+          "path": "/v1/readings/today",
+          "method": "PUT",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/today",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/context-sources",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/ai-synthesis",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-events",
+          "method": "POST",
+          "body": {
+            "schema_version": "reading-feedback-event/v1",
+            "category": "repetitive",
+            "revision": 1,
+            "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "paragraph_id": null,
+            "note": "A fictional QA note.",
+            "feedback_use_policy_version": "categorized-feedback-use/v1",
+            "expected_grant_state": "grant-qa",
+            "confirm_feedback_use": true
+          }
+        },
+        {
+          "path": "/v1/check-ins",
+          "method": "POST",
+          "body": {
+            "energy": "medium",
+            "expires_in_seconds": 86400
+          }
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/account-processing",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/account-processing",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/chart",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        }
+      ],
+      "checks": [
+        "Today categorical feedback and independent check-in",
+        "keyboard selection and optional note",
+        "correct reading ID feedback receipt",
+        "separate check-in request",
+        "unchanged reading",
+        "same edition receipt in actual History route",
+        "no overflow",
+        "History Axe A/AA",
+        "direct birth correction and browser Back without mutation",
+        "stale final consequences disable correction; GET refresh preserves date/time/consent draft and restores known consequences"
+      ],
+      "url": "http://127.0.0.1:5180/#history"
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "warnings": [],
+      "unknown": [],
+      "violations": [],
+      "requests": [
+        {
+          "path": "/v1/chart",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/chart",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/preferences/timezone",
+          "method": "PUT",
+          "body": {
+            "timezone": "UTC",
+            "source": "device_derived"
+          }
+        },
+        {
+          "path": "/v1/preferences/locale",
+          "method": "PUT",
+          "body": {
+            "locale": "en-US",
+            "source": "device_derived"
+          }
+        },
+        {
+          "path": "/v1/readings/today",
+          "method": "PUT",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/today",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/context-sources",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/ai-synthesis",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/context-sources",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/ai-synthesis",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-events",
+          "method": "POST",
+          "body": {
+            "schema_version": "reading-feedback-event/v1",
+            "category": "repetitive",
+            "revision": 1,
+            "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "paragraph_id": null,
+            "note": "A fictional QA note.",
+            "feedback_use_policy_version": "categorized-feedback-use/v1",
+            "expected_grant_state": "grant-qa",
+            "confirm_feedback_use": true
+          }
+        },
+        {
+          "path": "/v1/check-ins",
+          "method": "POST",
+          "body": {
+            "energy": "medium",
+            "expires_in_seconds": 86400
+          }
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/save",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings/rd_qa_today/feedback-options",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/account-processing",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/account-processing",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/chart",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/consents/geocoder",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/readings",
+          "method": "GET",
+          "body": null
+        }
+      ],
+      "checks": [
+        "Today categorical feedback and independent check-in",
+        "keyboard selection and optional note",
+        "correct reading ID feedback receipt",
+        "separate check-in request",
+        "unchanged reading",
+        "same edition receipt in actual History route",
+        "no overflow",
+        "History Axe A/AA",
+        "direct birth correction and browser Back without mutation",
+        "stale final consequences disable correction; GET refresh preserves date/time/consent draft and restores known consequences"
+      ],
+      "url": "http://127.0.0.1:5180/#history"
+    }
+  ]
+}

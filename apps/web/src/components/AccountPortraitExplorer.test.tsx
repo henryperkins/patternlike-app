@@ -100,7 +100,7 @@ describe("automated account portrait delivery", () => {
     const state = { schema_version: "0.9.0" as const, state: "ready" as const, chart: { chart_id: props.chartId, effective_accuracy: "exact" as const, feature_policy_version: "1.0.0" }, consent: null, generation: null, pattern, regeneration: null };
     vi.mocked(getPatternState).mockResolvedValue(state);
     vi.mocked(getGeneratedPattern).mockResolvedValue(document);
-    vi.mocked(deleteGeneratedPattern).mockResolvedValue(undefined);
+    vi.mocked(deleteGeneratedPattern).mockResolvedValue({ receipt: "accepted", erasureCompleted: null });
     render(<PortraitSessionProvider><CaptureSession /><PatternExperience chartId={props.chartId} onUnauthorized={unauthorized} /></PortraitSessionProvider>);
     const accountEntry = window.history.state;
     await hydrated();

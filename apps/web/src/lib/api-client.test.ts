@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiError,
+  deleteGeneratedPattern,
   createBirthProfile,
   ensureTodayReading,
   getAccountProcessingConsent,
@@ -525,5 +526,12 @@ describe("getTiming", () => {
     };
 
     expect(filters).toEqual({ domain: "work" });
+  });
+});
+
+describe("Pattern deletion receipts", () => {
+  it.each([[202, "accepted"], [204, "already_unavailable"]] as const)("distinguishes HTTP %s without asserting completed erasure", async (status, receipt) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
+    expect(await deleteGeneratedPattern("delete-intent")).toEqual({ receipt, erasureCompleted: null });
   });
 });

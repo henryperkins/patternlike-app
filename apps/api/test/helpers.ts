@@ -109,6 +109,8 @@ export const READING_CODEX_PUBLISHER_VARS = {
  * and makes tests pass for the wrong reason.
  */
 const TABLES = [
+  "runtime_health_access_events",
+  "runtime_health_capture",
   // M3/M8, children first: reading_sources/feedback/saves -> readings -> jobs, and
   // cycle_passes -> cycle_instances -> chart_snapshots.
   "daily_publication_receipts",

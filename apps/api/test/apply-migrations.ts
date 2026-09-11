@@ -25,6 +25,7 @@ const expectedTail = [
   "0029_daily_publication_receipts.sql",
   "0030_reader_relationship_supports.sql",
   "0031_reading_feedback_events.sql",
+  "0032_runtime_health.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -1461,3 +1462,17 @@ for (const [name, before] of beforeReceiptRows) {
   }
 }
 await assertDatabaseHealthy(upgradeDb, "0031 populated apply");
+
+// 0032 is additive to both clean and populated lanes. Historical completion
+// times are never synthesized from updated_at, and migration itself cannot
+// claim that instrumentation or an installed runner has been adopted.
+for (const db of [env.DB, upgradeDb]) {
+  for (const table of ["pattern_portrait_jobs", "portrait_mesh_jobs"]) {
+    const columns = await db.prepare(`PRAGMA table_info(${table})`).all<SchemaColumn>();
+    const column = columns.results.find(value=>value.name === "completed_at");
+    if (!column || column.notnull !== 0 || column.dflt_value !== null) throw new Error("0032 completion capture must be nullable without a historical default");
+  }
+  const capture = await db.prepare("SELECT * FROM runtime_health_capture").all();
+  if (capture.results.length) throw new Error("0032 must not predeclare runtime measurement adoption");
+  await assertDatabaseHealthy(db, "0032 additive apply");
+}

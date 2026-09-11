@@ -424,11 +424,15 @@ describe("private durable models", () => {
           })
         ).status,
       ).toBe(400);
+      const before = Date.now();
       const finish = await meshMachine(`/${claim.job_id}/complete`, input);
       expect(finish.status, await finish.clone().text()).toBe(200);
+      const first = await env.DB.prepare("SELECT completed_at FROM portrait_mesh_jobs WHERE id = ?").bind(claim.job_id).first<{completed_at: string}>();
+      expect(Date.parse(first!.completed_at)).toBeGreaterThanOrEqual(before);
       expect(
         (await meshMachine(`/${claim.job_id}/complete`, input)).status,
       ).toBe(200);
+      expect(await env.DB.prepare("SELECT completed_at FROM portrait_mesh_jobs WHERE id = ?").bind(claim.job_id).first()).toEqual(first);
       const state = (await (
         await user("/v1/pattern-portrait/explorer")
       ).json()) as {
@@ -875,6 +879,10 @@ it("preserves accepted partial images and models across automation withdrawal an
     .bind(portrait.portrait_id)
     .all();
   expect(before.success).toBe(true);
+  const capture = await env.DB.prepare("SELECT completed_at FROM portrait_mesh_jobs WHERE id=?").bind(mesh!.job_id).first<{completed_at:string}>();
+  const imageCapture = await env.DB.prepare("SELECT completed_at FROM pattern_portrait_jobs WHERE portrait_id=? AND status='complete'").bind(portrait.portrait_id).first<{completed_at:string}>();
+  expect(capture?.completed_at).toMatch(/Z$/);
+  expect(imageCapture?.completed_at).toMatch(/Z$/);
   await preference(false);
   expect(
     await env.DB.prepare(
@@ -901,6 +909,8 @@ it("preserves accepted partial images and models across automation withdrawal an
     .all();
   expect(after.success).toBe(true);
   expect(after.results).toEqual(before.results);
+  expect(await env.DB.prepare("SELECT completed_at FROM portrait_mesh_jobs WHERE id=?").bind(mesh!.job_id).first()).toEqual(capture);
+  expect(await env.DB.prepare("SELECT completed_at FROM pattern_portrait_jobs WHERE portrait_id=? AND status='complete'").bind(portrait.portrait_id).first()).toEqual(imageCapture);
 });
 it("resumes a cancelled mesh under the new grant without resetting its attempt budget", async () => {
   await images();

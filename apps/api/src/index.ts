@@ -30,6 +30,7 @@ import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { internalPatternRoutes } from "./routes/internal-pattern.js";
 import { internalOntologyPipelineRoutes } from "./routes/internal-ontology-pipeline.js";
 import { internalPatternReplayRoutes } from "./routes/internal-pattern-replay.js";
+import { adminRuntimeHealthRoutes } from "./routes/admin-runtime-health.js";
 import { adminPatternRoutes } from "./routes/admin-pattern.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
@@ -112,8 +113,10 @@ internal.route("/", internalOntologyPipelineRoutes);
 internal.route("/", internalPatternReplayRoutes);
 
 const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
+admin.use("*", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
 admin.use("*", configGuard);
 admin.use("*", adminAuth);
+admin.route("/", adminRuntimeHealthRoutes);
 admin.route("/", adminPatternRoutes);
 app.route("/admin", admin);
 

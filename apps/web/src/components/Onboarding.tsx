@@ -1,3 +1,5 @@
+import { sameReaderScope } from "../lib/reader-readiness.js";
+import { ReaderConsequences, useReaderChartObservedAt, useReaderRefreshChart, useReaderObservationFresh, useReaderScope } from "./ReaderReadiness.js";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   BirthProfileRequest,
@@ -19,7 +21,7 @@ import { Icon } from "./icons.js";
 import { PlaceAutocomplete } from "./PlaceAutocomplete.js";
 
 interface OnboardingProps {
-  onSubmit: (profile: BirthProfileRequest, idempotencyKey: string) => Promise<void>;
+  onSubmit: (profile: BirthProfileRequest, idempotencyKey: string, signal?: AbortSignal) => Promise<void>;
   /**
    * First-time calculation vs replacing an already-active chart. The API is
    * the same POST; this only changes the words, hides the local example, and
@@ -67,6 +69,22 @@ const accuracyOptions: Array<{
 ];
 
 export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingProps) {
+  const chartObservedAt = useReaderChartObservedAt();
+  const scope = useReaderScope();
+  const latestReview = useRef({ scope, observedAt: chartObservedAt });
+  latestReview.current = { scope, observedAt: chartObservedAt };
+  const submissionRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => submissionRequest.current?.abort(), [scope.accountId, scope.sessionEpoch, scope.chartId, scope.profileVersion]);
+  const chartFresh = useReaderObservationFresh(chartObservedAt);
+  const refreshChart = useReaderRefreshChart();
+  const [refreshingChart, setRefreshingChart] = useState(false);
+  const reloadChart = async () => {
+    if (!refreshChart || refreshingChart) return;
+    setRefreshingChart(true); setError(null);
+    try { await refreshChart(); }
+    catch { setError("The current chart could not be checked. Your entered correction is still here; reload the chart before continuing."); }
+    finally { setRefreshingChart(false); }
+  };
   const correcting = mode === "correct";
   const [step, setStep] = useState(1);
   const [accuracy, setAccuracy] = useState<BirthTimeAccuracy>("exact");
@@ -264,8 +282,12 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
       return;
     }
 
-    if (processingPolicy.status !== "ready") return;
+    if (processingPolicy.status !== "ready" || (correcting && (!chartFresh || chartObservedAt === null || Date.now() - chartObservedAt > 60_000))) return;
 
+    if (submitting || submissionRequest.current && !submissionRequest.current.signal.aborted) return;
+    const controller = new AbortController(); submissionRequest.current = controller;
+    const submissionScope = scope;
+    const current = () => !controller.signal.aborted && sameReaderScope(submissionScope, latestReview.current.scope);
     setSubmitting(true);
     setError(null);
     try {
@@ -274,7 +296,9 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
         processingPolicy.consent.policy_version,
         intentKeys.current.grant,
         "onboarding",
+        controller.signal,
       );
+      if (!current()) return;
       if (!isAccountProcessingConsentResponse(granted)) {
         throw new Error(
           "The calculation permission response could not be verified. Review it and try again.",
@@ -288,6 +312,12 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
         throw new Error(
           "The calculation permission was not granted. Review it and try again.",
         );
+      }
+
+      const currentObservedAt = latestReview.current.observedAt;
+      if (correcting && (currentObservedAt === null || !Number.isFinite(currentObservedAt)
+        || currentObservedAt > Date.now() || Date.now() - currentObservedAt > 60_000)) {
+        throw new Error("The chart observation expired while permission was being saved. Reload the current chart and review the correction again.");
       }
 
       const profile: BirthProfileRequest = {
@@ -310,8 +340,9 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
       };
 
       intentKeys.current.birth ??= newIdempotencyKey("web-birth");
-      await onSubmit(profile, intentKeys.current.birth);
+      await onSubmit(profile, intentKeys.current.birth, controller.signal);
     } catch (submissionError) {
+      if (!current()) return;
       if (
         submissionError instanceof ApiError &&
         (submissionError.code === "consent_policy_version_stale" ||
@@ -336,6 +367,8 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
             : "The chart could not be created.",
       );
       setSubmitting(false);
+    } finally {
+      if (submissionRequest.current === controller) submissionRequest.current = null;
     }
   };
 
@@ -589,10 +622,12 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
             <legend>Review the boundary.</legend>
             <p className="field-help">
               {correcting
-                ? "The previous chart is superseded, not deleted. Today readings pinned to it may be withheld until a successor exists. Pattern chapters follow the new facts once a reviewed release is active."
+                ? "Review what changes when these corrected birth details become active."
                 : "Your chart is a calculation, not a diagnosis or a prediction. You can revisit uncertainty and technical evidence at any time."}
             </p>
 
+            {correcting && <ReaderConsequences action="correct_birth" observedAt={chartObservedAt} evidence={chartFresh ? "known" : "unavailable"} />}
+            {correcting && !chartFresh && refreshChart && <button className="button button--secondary" type="button" onClick={() => void reloadChart()} disabled={refreshingChart}>Reload current chart</button>}
             <div className="consent-ledger">
               <div><span>Used now</span><strong>Birth details, chart calculation</strong></div>
               <div><span>Not connected</span><strong>Calendar, health, device, journal</strong></div>
@@ -685,7 +720,7 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
           <button
             className="button button--primary"
             type="submit"
-            disabled={submitting || (step === 3 && processingPolicy.status !== "ready")}
+            disabled={submitting || (step === 3 && (processingPolicy.status !== "ready" || (correcting && !chartFresh)))}
           >
             {step < 3
               ? "Continue"

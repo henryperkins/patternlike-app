@@ -267,7 +267,7 @@ export async function completePortrait(env: Env,jobId: string,completion: CodexP
   // completion; registered objects remain discoverable even when this aborts.
   try {
     const freshNow = new Date(Math.max(now.getTime(),Date.now()));
-    const result = await env.DB.batch([...guards(env,row,current,freshNow),env.DB.prepare(`UPDATE pattern_portrait_jobs SET status = 'complete', completion_hash = ?, image_asset_id = ?, sample_asset_id = ?, updated_at = ? WHERE id = ? AND status = 'running' AND lease_hash = ? AND lease_expires_at > ? AND EXISTS (SELECT 1 FROM pattern_portraits WHERE id = ? AND status != 'cancelled')`).bind(hash,imageAsset.id,sampleAsset.id,freshNow.toISOString(),job.id,tokenHash,freshNow.toISOString(),row.id)]);
+    const result = await env.DB.batch([...guards(env,row,current,freshNow),env.DB.prepare(`UPDATE pattern_portrait_jobs SET status = 'complete', completion_hash = ?, image_asset_id = ?, sample_asset_id = ?, completed_at = ?, updated_at = ? WHERE id = ? AND status = 'running' AND lease_hash = ? AND lease_expires_at > ? AND EXISTS (SELECT 1 FROM pattern_portraits WHERE id = ? AND status != 'cancelled')`).bind(hash,imageAsset.id,sampleAsset.id,freshNow.toISOString(),freshNow.toISOString(),job.id,tokenHash,freshNow.toISOString(),row.id)]);
     if (!result[result.length-1]!.meta.changes) {
       const accepted = await env.DB.prepare("SELECT completion_hash FROM pattern_portrait_jobs WHERE id = ? AND status = 'complete' AND lease_hash = ?").bind(job.id,tokenHash).first<{ completion_hash:string }>();
       if (accepted?.completion_hash !== hash) throw new Error("portrait lease changed");

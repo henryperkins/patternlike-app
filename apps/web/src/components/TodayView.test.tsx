@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -80,6 +81,90 @@ async function flushEffects() {
 }
 
 describe("TodayView", () => {
+  it("retains already observed preparation across a foreground effect restart using GET only", async () => {
+    vi.useFakeTimers();
+    try {
+      const responses: Record<string, MockResponse> = {
+        [`PUT ${TODAY}`]: preparing(),
+        [`GET ${TODAY}`]: { status: 404, body: errorBody("reading_not_generated", "No published reading") },
+      };
+      const { rerender, onUnauthorized, unmount } = renderToday(responses);
+      await flushEffects();
+      rerender(<TodayView onUnauthorized={onUnauthorized} preferenceSyncRevision={1} />);
+      await flushEffects();
+      expect(screen.getByRole("heading", { name: "Preparing your reading." })).toBeInTheDocument();
+      expect(capturedFor(TODAY).map(request => request.method)).toEqual(["PUT", "GET"]);
+      responses[`GET ${TODAY}`] = ok(todayResponse);
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(screen.getByText(todayResponse.reading.paragraphs[0]!.text)).toBeInTheDocument();
+      expect(capturedFor(TODAY).map(request => request.method)).toEqual(["PUT", "GET", "GET"]);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("finishes initial preparation intent after StrictMode aborts the first effect", async () => {
+    mockApiResponses({
+      [`PUT ${TODAY}`]: ok(todayResponse),
+      [`GET ${TODAY}`]: { status: 404, body: errorBody("reading_not_generated", "No reading is published") },
+      ...noFeedback(READING_ID),
+    });
+    render(<StrictMode><TodayView onUnauthorized={() => undefined} preferenceSyncRevision={0} /></StrictMode>);
+    await vi.waitFor(() => expect(capturedFor(TODAY)).toHaveLength(2));
+    expect(capturedFor(TODAY).map(request => request.method)).toEqual(["PUT", "PUT"]);
+    expect(await screen.findByText(todayResponse.reading.paragraphs[0]!.text)).toBeInTheDocument();
+  });
+  it("retains unfinished initial intent across preference sync but keeps later status reload GET-only", async () => {
+    const gate = deferred();
+    const responses: Record<string, MockResponse> = {
+      [`PUT ${TODAY}`]: { ...ok(todayResponse), gate: gate.promise },
+      [`GET ${TODAY}`]: { status: 404, body: errorBody("reading_not_generated", "No reading is published") },
+    };
+    const { rerender, onUnauthorized } = renderToday(responses);
+    await vi.waitFor(() => expect(capturedFor(TODAY)).toHaveLength(1));
+    const first = capturedFor(TODAY)[0]!;
+    responses[`PUT ${TODAY}`] = ok(todayResponse);
+    rerender(<TodayView onUnauthorized={onUnauthorized} preferenceSyncRevision={1} />);
+    await vi.waitFor(() => expect(capturedFor(TODAY)).toHaveLength(2));
+    expect(first.signal?.aborted).toBe(true);
+    expect(capturedFor(TODAY).map(request => request.method)).toEqual(["PUT", "PUT"]);
+    await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
+    await act(async () => gate.release());
+    rerender(<TodayView onUnauthorized={onUnauthorized} preferenceSyncRevision={2} />);
+    await vi.waitFor(() => expect(capturedFor(TODAY)).toHaveLength(3));
+    expect(capturedFor(TODAY)[2]!.method).toBe("GET");
+  });
+
+  it("uses GET for every status poll after the one intentional ensure", async () => {
+    vi.useFakeTimers();
+    try {
+      const responses: Record<string, MockResponse> = { [TODAY]: preparing() };
+      const { unmount } = renderToday(responses);
+      await flushEffects();
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(capturedFor(TODAY).map(request => request.method)).toEqual(["PUT", "GET"]);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+  it("retains an accepted reading and feedback draft during failed foreground GET refresh", async () => {
+    const responses: Record<string, MockResponse> = { [TODAY]: ok(todayResponse) };
+    const { rerender, onUnauthorized } = renderToday(responses);
+    const paragraph = await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
+    await userEvent.click(await screen.findByRole("radio", { name: "Not quite" }));
+    await userEvent.click(screen.getByRole("button", { name: "A sentence, if you want" }));
+    const note = screen.getByRole("textbox", { name: "A sentence, if you want" });
+    await userEvent.type(note, "Keep this draft through revalidation.");
+    note.focus();
+    responses[TODAY] = { status: 0, body: null, unreachable: true };
+    rerender(<TodayView onUnauthorized={onUnauthorized} preferenceSyncRevision={1} />);
+    await vi.waitFor(() => expect(capturedFor(TODAY)).toHaveLength(2));
+    await flushEffects();
+    expect(screen.getByText(todayResponse.reading.paragraphs[0]!.text)).toBe(paragraph);
+    expect(screen.getByRole("textbox", { name: "A sentence, if you want" })).toBe(note);
+    expect(note).toHaveValue("Keep this draft through revalidation.");
+    expect(note).toHaveFocus();
+    expect(capturedFor(TODAY).map(request => request.method)).toEqual(["PUT", "GET"]);
+  });
+
   it("renders every paragraph it was given, and nothing it was not", async () => {
     renderToday({ [TODAY]: ok(todayResponse) });
 
@@ -685,16 +770,15 @@ describe("TodayView", () => {
     message: string;
     requestId: string | null;
     retry: boolean;
-  }>)("stops polling after $label", async ({ response, message, requestId, retry }) => {
+  }>)("stops polling after $label", async ({ response, message, requestId }) => {
     vi.useFakeTimers();
     try {
       const { unmount, container } = renderToday({ [TODAY]: response });
       await flushEffects();
 
       expect(screen.getByRole("status")).toHaveTextContent(message);
-      expect(screen.queryAllByRole("button", { name: /Try again/i })).toHaveLength(
-        retry ? 1 : 0,
-      );
+      expect(screen.queryAllByRole("button", { name: /Check again/i })).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: /Generate/i })).not.toBeInTheDocument();
       if (requestId) expect(container).toHaveTextContent(`Request ${requestId}`);
 
       await act(async () => {
@@ -718,7 +802,7 @@ describe("TodayView", () => {
       await screen.findByText("The Pattern/Like API could not be reached."),
     ).toBeInTheDocument();
 
-    const retry = screen.getByRole("button", { name: /Try again/i });
+    const retry = screen.getByRole("button", { name: /Check again/i });
     retry.focus();
     await user.click(retry);
 

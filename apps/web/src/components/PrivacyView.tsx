@@ -24,6 +24,7 @@ import { PatternConsentTerms } from "./PatternConsent.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { ContextSourceControl } from "./ContextSourceControl.js";
 import { TopicExclusionsPanel } from "./TopicExclusionsPanel.js";
+import { ReaderConsequences, useReaderChartObservedAt } from "./ReaderReadiness.js";
 import { Icon } from "./icons.js";
 import type { PatternConsent } from "@patternlike/shared";
 import type { GeocoderConsentResponse } from "@patternlike/shared";
@@ -219,6 +220,9 @@ function AccountProcessingConsentPanel({
   const [reloads, setReloads] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const actionRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => actionRequest.current?.abort(), []);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const revokeKey = useRef<string | null>(null);
@@ -241,7 +245,8 @@ function AccountProcessingConsentPanel({
       .then((consent) => {
         if (controller.signal.aborted) return;
         if (isAccountProcessingConsentResponse(consent)) {
-          setState({ status: "ready", consent });
+          setObservedAt(Date.now());
+        setState({ status: "ready", consent });
         } else {
           setState({
             status: "unreadable",
@@ -265,20 +270,37 @@ function AccountProcessingConsentPanel({
 
   const revoke = async () => {
     if (!confirmed || busy) return;
+    if (busy || actionRequest.current && !actionRequest.current.signal.aborted) return;
+    const controller = new AbortController(); actionRequest.current = controller;
     setBusy(true);
     setProblem(null);
     revokeKey.current ??= newIdempotencyKey("web-account-processing");
     try {
-      const next = await revokeAccountProcessingConsent(revokeKey.current);
+      const current = await getAccountProcessingConsent(controller.signal);
+      if (controller.signal.aborted) return;
+      if (!isAccountProcessingConsentResponse(current)) throw new Error("The current calculation permission could not be verified.");
+      if (state.status !== "ready" || JSON.stringify(current) !== JSON.stringify(state.consent)) {
+        setObservedAt(Date.now());
+        setState({ status: "ready", consent: current });
+        setProblem("Permission changed. Review the current consequences and choose again to confirm your decision.");
+        return;
+      }
+      setObservedAt(Date.now());
+      const next = await revokeAccountProcessingConsent(revokeKey.current, controller.signal);
+      if (controller.signal.aborted) return;
       if (!isAccountProcessingConsentResponse(next)) {
         throw new Error("The updated calculation permission could not be read.");
       }
+      if (controller.signal.aborted) return;
       revokeKey.current = null;
-      setState({ status: "ready", consent: next });
+      setObservedAt(Date.now());
+        setState({ status: "ready", consent: next });
       setConfirming(false);
       setConfirmed(false);
       if (next.account_status === "frozen") onFrozen(next);
     } catch (error) {
+      if (controller.signal.aborted) return;
+      setObservedAt(null);
       setProblem(
         error instanceof ApiError
           ? withRequestId(error.message, error.requestId)
@@ -287,7 +309,8 @@ function AccountProcessingConsentPanel({
             : "The calculation permission could not be withdrawn.",
       );
     } finally {
-      setBusy(false);
+      if (actionRequest.current === controller) actionRequest.current = null;
+      if (!controller.signal.aborted) setBusy(false);
     }
   };
 
@@ -345,6 +368,7 @@ function AccountProcessingConsentPanel({
 
           {granted && confirming ? (
             <div className="privacy-action__confirm">
+              <ReaderConsequences action="withdraw_calculation" observedAt={observedAt} evidence={state.status === "ready" ? "known" : "unavailable"} />
               <p>
                 Withdrawing will freeze this account. Retained data will stop
                 being served until this permission is granted again.
@@ -427,6 +451,9 @@ function AccountProcessingConsentPanel({
  */
 function AiSynthesisConsentPanel() {
   const [state, setState] = useState<ConsentPanelState>({ status: "loading" });
+  const actionRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => actionRequest.current?.abort(), []);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
@@ -437,6 +464,7 @@ function AiSynthesisConsentPanel() {
       try {
         const consent = await getAiSynthesisConsent(controller.signal);
         if (controller.signal.aborted) return;
+        setObservedAt(Date.now());
         setState({ status: "ready", consent });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -461,26 +489,45 @@ function AiSynthesisConsentPanel() {
   });
 
   const mutate = async (intent: "grant" | "revoke", consent: AiSynthesisConsent) => {
+    if (busy || actionRequest.current && !actionRequest.current.signal.aborted) return;
+    const controller = new AbortController(); actionRequest.current = controller;
     setBusy(true);
     setProblem(null);
     try {
+      const current = await getAiSynthesisConsent(controller.signal);
+      if (controller.signal.aborted) return;
+      if (state.status !== "ready" || JSON.stringify(current) !== JSON.stringify(state.consent)) {
+        setObservedAt(Date.now());
+        setState({ status: "ready", consent: current });
+        setProblem("Permission changed. Review the current consequences and choose again to confirm your decision.");
+        return;
+      }
+      setObservedAt(Date.now());
       if (intent === "grant") {
         keys.current.grant ??= newIdempotencyKey("web-ai-synthesis");
         const next = await grantAiSynthesisConsent(
           consent.policy_version,
           keys.current.grant,
+          controller.signal,
         );
+        if (controller.signal.aborted) return;
         keys.current.grant = null;
         keys.current.revoke = null;
+        setObservedAt(Date.now());
         setState({ status: "ready", consent: next });
       } else {
         keys.current.revoke ??= newIdempotencyKey("web-ai-synthesis");
-        const next = await revokeAiSynthesisConsent(keys.current.revoke);
+        const next = await revokeAiSynthesisConsent(keys.current.revoke, controller.signal);
+        if (controller.signal.aborted) return;
         keys.current.revoke = null;
         keys.current.grant = null;
+        setObservedAt(Date.now());
         setState({ status: "ready", consent: next });
+        setProblem("Daily synthesis permission withdrawn. Published readings are retained. This confirms the saved permission, not completion of unfinished-work cancellation.");
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
+      setObservedAt(null);
       setProblem(
         error instanceof ApiError
           ? withRequestId(error.message, error.requestId)
@@ -489,7 +536,8 @@ function AiSynthesisConsentPanel() {
             : "That could not be saved in this session.",
       );
     } finally {
-      setBusy(false);
+      if (actionRequest.current === controller) actionRequest.current = null;
+      if (!controller.signal.aborted) setBusy(false);
     }
   };
 
@@ -524,6 +572,7 @@ function AiSynthesisConsentPanel() {
           ) : null}
 
           <AiConsentTerms consent={state.consent} />
+          {granted && <ReaderConsequences action="withdraw_daily" observedAt={observedAt} evidence={state.status === "ready" ? "known" : "unavailable"} />}
 
           <button
             className={`button ${granted ? "button--secondary" : "button--primary"}`}
@@ -571,6 +620,9 @@ function PatternGenerationConsentPanel({ chartId, onUnauthorized }: {
     | { status: "ready"; consent: PatternConsent }
     | { status: "unreadable"; message: string }
   >({ status: "loading" });
+  const actionRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => actionRequest.current?.abort(), []);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
@@ -582,6 +634,7 @@ function PatternGenerationConsentPanel({ chartId, onUnauthorized }: {
       try {
         const consent = await getPatternGenerationConsent(controller.signal);
         if (controller.signal.aborted) return;
+        setObservedAt(Date.now());
         setState({ status: "ready", consent });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -598,14 +651,32 @@ function PatternGenerationConsentPanel({ chartId, onUnauthorized }: {
   }, [reloads]);
 
   const revoke = async () => {
+    if (busy || actionRequest.current && !actionRequest.current.signal.aborted) return;
+    const controller = new AbortController(); actionRequest.current = controller;
     setBusy(true);
     setProblem(null);
     try {
+      const current = await getPatternGenerationConsent(controller.signal);
+      if (controller.signal.aborted) return;
+      if (state.status !== "ready" || JSON.stringify(current) !== JSON.stringify(state.consent)) {
+        setObservedAt(Date.now());
+        setState({ status: "ready", consent: current });
+        setProblem("Permission changed. Review the current consequences and choose again to confirm your decision.");
+        return;
+      }
+      setObservedAt(Date.now());
       revokeKey.current ??= newIdempotencyKey("web-pattern-consent");
-      const next = await revokePatternGenerationConsent(revokeKey.current);
+      const next = await revokePatternGenerationConsent(revokeKey.current, controller.signal);
+      if (controller.signal.aborted) return;
       revokeKey.current = null;
+      setObservedAt(Date.now());
       setState({ status: "ready", consent: next.consent });
+      setProblem(next.existing_pattern_retained === true
+        ? "Pattern permission withdrawn. Your existing Pattern is retained. This saved permission does not certify completion of every unfinished-work cancellation."
+        : "Pattern permission withdrawn. Existing Pattern retention was not confirmed by this response. This is not an erasure receipt.");
     } catch (error) {
+      if (controller.signal.aborted) return;
+      setObservedAt(null);
       setProblem(
         error instanceof ApiError
           ? withRequestId(error.message, error.requestId)
@@ -614,7 +685,8 @@ function PatternGenerationConsentPanel({ chartId, onUnauthorized }: {
             : "Pattern consent could not be updated.",
       );
     } finally {
-      setBusy(false);
+      if (actionRequest.current === controller) actionRequest.current = null;
+      if (!controller.signal.aborted) setBusy(false);
     }
   };
 
@@ -643,6 +715,7 @@ function PatternGenerationConsentPanel({ chartId, onUnauthorized }: {
             <p>Grant this from Your Pattern. This page only withdraws an existing grant.</p>
           )}
           <PatternConsentTerms consent={state.consent} />
+          {granted && <ReaderConsequences action="withdraw_pattern" observedAt={observedAt} evidence={state.status === "ready" ? "known" : "unavailable"} />}
           {granted ? (
             <button
               className="button button--secondary"
@@ -698,6 +771,7 @@ export function PrivacyView({
   onProcessingFrozen: (consent: AccountProcessingConsentDocument) => void;
   onUnauthorized?: () => void;
 }) {
+  const chartObservedAt = useReaderChartObservedAt();
   return (
     <div className="privacy-page page-enter">
       <header className="page-header privacy-page__header">
@@ -758,6 +832,7 @@ export function PrivacyView({
             </div>
             {hasChart && onCorrectBirth ? (
               <div className="source-row__actions">
+                <ReaderConsequences action="correct_birth" observedAt={chartObservedAt} evidence={chartObservedAt === null ? "unavailable" : "known"} />
                 <button type="button" onClick={onCorrectBirth} aria-label="Correct birth details">
                   Correct
                 </button>

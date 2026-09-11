@@ -13,6 +13,21 @@ beforeEach(() => {
 });
 
 describe("automatic portrait permission", () => {
+  it("requires a read-only status reload after an ambiguous save before another mutation", async () => {
+    vi.mocked(setPortraitAutomation).mockRejectedValue(new Error("Network outcome unknown"));
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    const choice = await screen.findByRole("checkbox");
+    await userEvent.click(choice);
+    await screen.findByText("Network outcome unknown");
+    expect(choice).toBeDisabled();
+    await userEvent.click(choice);
+    expect(setPortraitAutomation).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(choice).toBeEnabled());
+    expect(getPortraitAutomation).toHaveBeenCalledTimes(2);
+    expect(setPortraitAutomation).toHaveBeenCalledTimes(1);
+  });
+
   it("starts unchecked and records the explicit choice for this chart once", async () => {
     const changed = vi.fn();
     render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} onChanged={changed} />);

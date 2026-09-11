@@ -190,7 +190,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * Calling `response.json()` on an empty body throws, so the success path here
  * deliberately never reads it.
  */
-async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+async function requestNoContentStatus(path: string, init?: RequestInit): Promise<number> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {
@@ -216,6 +216,11 @@ async function requestNoContent(path: string, init?: RequestInit): Promise<void>
     }
     throw new ApiError(response.status, body);
   }
+  return response.status;
+}
+
+async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+  await requestNoContentStatus(path, init);
 }
 
 export interface SessionResponse {
@@ -282,6 +287,7 @@ export function lookupTimezone(
 export function createBirthProfile(
   profile: BirthProfileRequest,
   idempotencyKey: string,
+  signal?: AbortSignal,
 ): Promise<BirthWorkflowResponse> {
   return request<BirthWorkflowResponse>("/v1/birth-profiles", {
     method: "POST",
@@ -290,6 +296,7 @@ export function createBirthProfile(
       idempotencyKey,
     }),
     body: JSON.stringify(profile),
+    signal,
   });
 }
 
@@ -1549,16 +1556,18 @@ export function getPatternGeneration(
   );
 }
 
-export function deleteGeneratedPattern(
+export async function deleteGeneratedPattern(
   idempotencyKey: string,
   signal?: AbortSignal,
-): Promise<void> {
-  return requestNoContent("/v1/pattern", {
+): Promise<{ receipt: "accepted" | "already_unavailable"; erasureCompleted: null }> {
+  const status = await requestNoContentStatus("/v1/pattern", {
     method: "DELETE",
     headers: requestHeaders({ json: true, idempotencyKey }),
     body: JSON.stringify({ confirm: "DELETE PATTERN" }),
     signal,
   });
+  if (status !== 202 && status !== 204) throw new Error("The Pattern deletion response was not recognized. Check its status before trying again.");
+  return { receipt: status === 202 ? "accepted" : "already_unavailable", erasureCompleted: null };
 }
 
 export interface LifeEventListResponse {

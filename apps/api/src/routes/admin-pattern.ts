@@ -5,6 +5,7 @@ import type { AppVariables } from "../middleware/auth.js";
 import { loadUserIdentity } from "../db/users.js";
 import { readVerifiedOntologyRelease } from "../db/pattern-ontology.js";
 import { getArtifactById } from "../services/pattern-execute.js";
+import { readPatternDiagnostics } from "../services/pattern-diagnostics.js";
 
 export const adminPatternRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -91,6 +92,17 @@ adminPatternRoutes.use("*", async (c, next) => {
   }
   c.set("adminPurpose", purpose as AdminPurpose);
   await next();
+});
+
+adminPatternRoutes.get("/pattern-generations/:generation_id/diagnostics", async (c) => {
+  const generationId = c.req.param("generation_id");
+  if (!/^pgen_[a-f0-9]{32}$/.test(generationId)) {
+    return c.json(error(c.get("requestId"), "invalid_generation_id", "An exact generation identifier is required"), 400);
+  }
+  const result = await readPatternDiagnostics(c.env, generationId, new Date().toISOString());
+  await recordAccess(c.env, generationId, result?.userId ?? null, [], result ? "granted" : "not_found", c.get("adminSubject"), c.get("adminPurpose"));
+  if (!result) return c.json(error(c.get("requestId"), "not_found", "Generation not found"), 404);
+  return c.json(result.response, 200);
 });
 
 adminPatternRoutes.get("/pattern-generations/:generation_id", async (c) => {
