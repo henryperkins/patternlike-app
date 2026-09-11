@@ -1,0 +1,1586 @@
+{
+  "pass": "verifier",
+  "started_at": "2026-09-09T05:25:27.561Z",
+  "invocation_sha256": "sha256:10510c958e3230f2eabacc1d42b9a9a4e73892d20f1bf23ca8937fccdc843dd6",
+  "sample_file": "pinned-cli/samples/exact-02-after-verifier.json",
+  "completed_at": "2026-09-09T05:25:51.215Z",
+  "input_tokens": 14704,
+  "output_tokens": 1558,
+  "output_sha256": "sha256:9939612399a984d92acc0fda96c8cfeb39125fdea3b82d96a5584af12ae7db11",
+  "provider_request_sha256": "sha256:fee253852670cf7674e9a8e4e007c3aba2fef67296469427cfcdd5e9eb0163eb",
+  "status": "rejected",
+  "semantic_problem": null,
+  "semantic_verdict": {
+    "schema_version": "0.7.0",
+    "verdict": "pass",
+    "findings": []
+  },
+  "publication_findings": [
+    {
+      "code": "prohibited_claim",
+      "targetKey": "chapter_04"
+    }
+  ],
+  "request_document": {
+    "schema_version": "0.7.0",
+    "pass": "verifier",
+    "candidate": {
+      "schema_version": "0.7.0",
+      "title": "A Pattern of Deliberate Coordination",
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "title": "Coordination Without a Single Gear",
+          "summary": "You may move between expansion and caution while several combinations differ in how readily they can be directed.",
+          "sections": [
+            {
+              "section_key": "scale_and_restraint",
+              "text": "Jupiter points to where more can look reasonable, while Saturn favors slowing down and testing a commitment before accepting it. Their sextile suggests that these tendencies can cooperate when you deliberately call on them, but the cooperation may not begin automatically. You might find it useful to ask both questions together: what scale is justified, and what has been tested enough to last? This coordination remains an option rather than a constant setting.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f001",
+                "f008",
+                "f010"
+              ],
+              "ontology_rule_ids": [
+                "ont_5beb72d3f1d2b5d14996fd0ce7e21f26",
+                "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+                "ont_d3019387ea8ab332bc09a56a063ca386"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "coordination_without_supervision",
+              "text": "The Moon–Venus trine describes a combination that may run with little supervision. Because it produces little friction, you might rely on it without often examining how it works. That reliability can be useful, but smooth coordination does not announce its own assumptions. Occasional attention may reveal a familiar response that has been operating competently in the background rather than through conscious selection.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f013"
+              ],
+              "ontology_rule_ids": [
+                "ont_34df4017524ee85226b1135826c7e178"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "two_tendencies_one_instrument",
+              "text": "The Sun–Mercury conjunction suggests two tendencies that may arrive as one movement rather than as separate steps. You might recognize their fusion most clearly when a situation asks you to use one without the other. Selective use can be difficult because the joining is built into how the combination operates; it is less like switching between tools and more like handling one tool with two functions.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f014"
+              ],
+              "ontology_rule_ids": [
+                "ont_a0c08ea9e7f8e66086249705c4b24482"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "The Sun–Moon square describes two active tendencies working on the same material without a shared method. You may notice that resolving a matter according to one method does not necessarily satisfy the other. Repeated adjustment can be tiring, yet the friction is structural rather than evidence that either side is defective. A final method that permanently removes the difference may remain unavailable.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_ff567efea3064fdd78a608b849a3b1e6"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "The fused Sun–Mercury combination can also support concentration. Because its two tendencies do not need to be assembled separately each time, your attention may gather around their shared direction with unusual continuity. The same lack of selectivity that sometimes constrains the combination can make it effective when the whole instrument suits the task.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f014"
+            ],
+            "ontology_rule_ids": [
+              "ont_a0c08ea9e7f8e66086249705c4b24482"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_02",
+          "title": "What Travels Beyond Your Presence",
+          "summary": "Distant models, wider connections, visibility, and the version of you carried by others may serve different purposes.",
+          "sections": [
+            {
+              "section_key": "models_beyond_experience",
+              "text": "You may rely on models of territory you have not directly experienced. Such models make it possible to consider what lies beyond your immediate knowledge, but they can remain untested while that territory stays distant. Confidence alone cannot verify them. Their usefulness may increase when you remember the difference between a working map and direct contact, without expecting yourself to operate only inside what you already know.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f002"
+              ],
+              "ontology_rule_ids": [
+                "ont_b5682933021683ac6af97dc7d41c59b3"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "visibility_and_loose_connections",
+              "text": "The visible portion of your activity may be legible to people who do not know you, even when it is not the part you consider most important. Wider networks operate differently: their ties are partial and can be loosened by either side. You might find that these connections carry information or openings unavailable within closer circles, precisely because their knowledge does not completely overlap with yours. Their reach and their lightness come together.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f003",
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_33c1c0aee37c7bcf73b70b5cf5307538",
+                "ont_f8db91d1747a8890a0219838bcdf6393"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "the_portable_version",
+              "text": "Another feature concerns the version of you that gets recorded and repeated when you are absent. This portable account is necessarily compressed; it cannot contain the qualifications available in direct presence. You may sometimes notice a gap between what can be carried easily and what would require a longer encounter to understand. The portable version still has a practical reach that presence alone cannot provide.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f019"
+              ],
+              "ontology_rule_ids": [
+                "ont_c2fe94a44cd6effc5f9ae63737bb19f5"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "The strain in a portable public account is that its compression is performed by other people. Once an account is being passed along beyond your presence, its missing context may not be open to correction. You might want greater precision while also recognizing that a fully qualified version would no longer be portable. This is a limit of transmission, not proof that the account is entirely false.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f019"
+              ],
+              "ontology_rule_ids": [
+                "ont_c2fe94a44cd6effc5f9ae63737bb19f5"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "Models of distant territory also make action beyond direct experience possible. You do not need to treat a model as certain for it to extend your range of thought. Held provisionally, it can let you consider unfamiliar territory while remaining willing to revise the map if direct evidence becomes available.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f002"
+            ],
+            "ontology_rule_ids": [
+              "ont_b5682933021683ac6af97dc7d41c59b3"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_03",
+          "title": "What You Keep, Exchange, and Repeat",
+          "summary": "Your own holdings, everyday traffic, information methods, recurring effort, and routes toward steadiness may require different kinds of attention.",
+          "sections": [
+            {
+              "section_key": "holdings_and_information_flow",
+              "text": "What you hold on your own terms may be difficult to value precisely because it has remained continuously available. At the same time, routine contacts, errands, and exchanges can pass beneath notice even though much information enters through them. Mercury emphasizes the method by which you receive and pass information, not the amount you know. You may benefit from treating that method as adjustable to context rather than taking a poor fit in one setting as a verdict on your capacity.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f004",
+                "f005",
+                "f016"
+              ],
+              "ontology_rule_ids": [
+                "ont_7d6ca22dca5ffc3e56ab443f8e647ec5",
+                "ont_cda9c0e82adcd52fe9aebf7f112ba460",
+                "ont_0e7aff35a9064f2e9f08bb6ddf5e241d"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "maintenance_and_settling",
+              "text": "Recurring work has no ceremonial finish: it becomes visible mainly when it is not done. This can make the method of repetition more consequential than any single burst of effort. Separately, the Moon points to how you may seek steadiness and settle yourself. That route need not be impressive or easily explained to be practical. You might understand it best as something to recognize rather than something you consciously selected.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f017",
+                "f022"
+              ],
+              "ontology_rule_ids": [
+                "ont_19c8bc4df8018f5f505be625b51181e2",
+                "ont_b0c2fe281de54ee93b9f7a11b9e4cb63"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "widely_separated_claims",
+              "text": "The Mars–Jupiter opposition places two tendencies at a distance where each can be seen clearly. Their separation may make comparison easy while making simultaneous use more demanding. You might recognize both positions distinctly without finding a simple way to collapse them into one approach. The clarity between them is part of the structure, not an instruction to eliminate either end.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f020"
+              ],
+              "ontology_rule_ids": [
+                "ont_72572f458d45b900ddb1d9ffdcacff70"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "With the Mars–Jupiter opposition, the difficulty may lie in holding both ends at the same time. Alternating between them can seem simpler than allowing each to remain visible in a single decision. This does not require describing yourself as divided, and it does not mean a forced choice is coming; it names the strain of accommodating two legible but widely separated tendencies.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f020"
+              ],
+              "ontology_rule_ids": [
+                "ont_72572f458d45b900ddb1d9ffdcacff70"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "Repeated work offers a quieter resource: method compounds. A modest procedure that can be used again may matter more than an impressive effort that cannot be sustained. You might therefore find real value in reducing avoidable decisions around maintenance, even when nobody notices the procedure itself.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f017"
+            ],
+            "ontology_rule_ids": [
+              "ont_19c8bc4df8018f5f505be625b51181e2"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_04",
+          "title": "Standards, Shared Terms, and Unjustified Making",
+          "summary": "Standards of worth may meet joint commitments, equal-standing negotiation, quick initiative, and activity that needs no external reason.",
+          "sections": [
+            {
+              "section_key": "value_and_joint_terms",
+              "text": "Venus points to what registers as worth having and to the terms on which you meet other people. A standard can operate even when it has not been spoken, which may make its application look arbitrary from outside. Jointly held matters add another condition: they cannot be settled by one side alone. You may notice that clarity about your standards becomes especially useful when the terms also depend on another party's agreement.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f006",
+                "f007"
+              ],
+              "ontology_rule_ids": [
+                "ont_a882a18b1a5123338124edaecd684633",
+                "ont_a18fde50d93c6d80565f61a4bdbf6c3e"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "initiative_meets_negotiation",
+              "text": "Mars is associated with a low threshold for initiating action, including the friction of moving before everyone else is ready. In an equal-standing arrangement, however, movement still meets negotiation. You may be ready to begin while a counterpart is still establishing terms. That difference can chafe, but the same readiness to move may also shorten the distance to repair after friction. Neither speed nor deliberation has to become a moral judgment.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f011",
+                "f015"
+              ],
+              "ontology_rule_ids": [
+                "ont_a5e7c54a0915a69484edd873cae32f51",
+                "ont_028a01f54d3d1c48509d94552f8879c5"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "activity_without_a_defense",
+              "text": "Some activity in this Pattern is associated with making or doing something for its own sake. It may be hard to protect when time is scarce because any defense can turn it into a means toward an outside goal. You might notice a difference between what earns an explanation and what becomes thinner as soon as it must justify itself. The latter still has a legitimate place in the pattern.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f027"
+              ],
+              "ontology_rule_ids": [
+                "ont_2016462c30dd8de984f60241e4cf293c"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "Equal-standing arrangements expose what you will and will not concede because every important term remains open to negotiation. You may learn a limit only when another party asks you to cross it, making the information useful but unwelcome. The strain is not merely disagreement; it is having your own terms made visible through an exchange that neither side controls alone.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f015"
+              ],
+              "ontology_rule_ids": [
+                "ont_028a01f54d3d1c48509d94552f8879c5"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "Activity pursued for its own sake creates room to try something before a defensible reason exists. Its value may lie in allowing the attempt to precede the explanation. You do not have to predict what the attempt will become in order to recognize this experimental space as part of the Pattern.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f027"
+            ],
+            "ontology_rule_ids": [
+              "ont_2016462c30dd8de984f60241e4cf293c"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_05",
+          "title": "The Base Beneath Immediate Action",
+          "summary": "A sustaining base, an immediate approach, focused effort, private work, and interpretive accuracy each define a different kind of support.",
+          "sections": [
+            {
+              "section_key": "base_and_unwitnessed_work",
+              "text": "Your operating base may receive attention mainly when it does not hold, even though it sets practical limits on everything built above it. Another part of the Pattern concerns work done unwitnessed, where no account is given to anyone else. Such work can be difficult to verify from outside, yet observation is not always helpful. You might distinguish between neglecting the base and allowing some processes the privacy they require.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f018",
+                "f025"
+              ],
+              "ontology_rule_ids": [
+                "ont_cd5c065dcf02bdd70c56d2c204ab990c",
+                "ont_5453f9c9662a75bbe5c86999947b7b4e"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "approach_and_immediate_arena",
+              "text": "The Ascendant describes the approach you lead with, not the whole of who you are. Because an approach is what others meet first, it may sometimes be mistaken for a complete account. The first house adds the immediate arena from which you act before terms have been negotiated. You might experience this readiness as both limiting and useful: it establishes the conditions already available when there is no time to build a more tailored response.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f023",
+                "f026"
+              ],
+              "ontology_rule_ids": [
+                "ont_2dbfeda2c6a55d47f439ed3ba27e22e4",
+                "ont_c372306b41bb2de35e20803efdbaa1f4"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "effort_and_interpretive_discipline",
+              "text": "The Sun points to what you organize effort around, which need not be what comes most easily or receives the most recognition. Accuracy requires a different discipline: use what is actually supplied, and leave any absent factor absent rather than replacing it with language broad enough to fit anyone. You may therefore read the organizing focus as a tendency in the data, not as a total identity or a promised result.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f021",
+                "f024"
+              ],
+              "ontology_rule_ids": [
+                "ont_d8e7f799cb1329f38428263cd78f3aaa",
+                "ont_e3ad2684fc1fbe37d7306d9b275ef4ca"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "Even with a precise record, an interpretive gap can tempt someone to fill it with a general statement. That move may sound complete while saying nothing particular about you. The more honest limit is to identify what is absent and stop there. Resisting false completeness can feel less satisfying, but it preserves the difference between evidence and substitution.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f021"
+              ],
+              "ontology_rule_ids": [
+                "ont_d8e7f799cb1329f38428263cd78f3aaa"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "What you organize effort around may provide a dependable supply of energy even when it is not your easiest or most rewarded area. You might recognize this resource through the willingness to return and coordinate effort again, rather than through applause, mastery, or a claim that it defines your purpose.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f024"
+            ],
+            "ontology_rule_ids": [
+              "ont_e3ad2684fc1fbe37d7306d9b275ef4ca"
+            ],
+            "derived_synthesis_ids": []
+          }
+        }
+      ],
+      "additional_signatures": [],
+      "uncertainty_note": {
+        "text": "Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. The supplied record marks the time as exact, so none of those calculation classes was withheld here. Even so, exact timing does not authorize a guess wherever information is absent; a real gap should remain clearly named.",
+        "claim_class": "uncertainty",
+        "feature_aliases": [
+          "f021"
+        ],
+        "ontology_rule_ids": [
+          "ont_d8e7f799cb1329f38428263cd78f3aaa"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    "plan": {
+      "schema_version": "0.7.0",
+      "plan_hash": "sha256:f2e9751829722a8682ea53fdd7ba17090e32b5194d4f2dddcf0e5f6cb971aef1",
+      "sparse_pattern": false,
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "working_title": "Coordination Under Pressure",
+          "purpose": "Organize the main combinations of initiative, scale, restraint, and internal coordination.",
+          "feature_aliases": [
+            "f001",
+            "f008",
+            "f010",
+            "f012",
+            "f013",
+            "f014"
+          ],
+          "ontology_rule_ids": [
+            "ont_5beb72d3f1d2b5d14996fd0ce7e21f26",
+            "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+            "ont_d3019387ea8ab332bc09a56a063ca386",
+            "ont_ff567efea3064fdd78a608b849a3b1e6",
+            "ont_34df4017524ee85226b1135826c7e178",
+            "ont_a0c08ea9e7f8e66086249705c4b24482"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_ff567efea3064fdd78a608b849a3b1e6#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_a0c08ea9e7f8e66086249705c4b24482#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_02",
+          "working_title": "Horizons and Public Visibility",
+          "purpose": "Group distant models, public visibility, wider networks, and the portable public version.",
+          "feature_aliases": [
+            "f002",
+            "f003",
+            "f009",
+            "f019"
+          ],
+          "ontology_rule_ids": [
+            "ont_b5682933021683ac6af97dc7d41c59b3",
+            "ont_33c1c0aee37c7bcf73b70b5cf5307538",
+            "ont_f8db91d1747a8890a0219838bcdf6393",
+            "ont_c2fe94a44cd6effc5f9ae63737bb19f5"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_c2fe94a44cd6effc5f9ae63737bb19f5#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_b5682933021683ac6af97dc7d41c59b3#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_03",
+          "working_title": "Holdings, Exchange, and Maintenance",
+          "purpose": "Connect personal holdings, routine exchange, information method, recurring work, competing action, and settling needs.",
+          "feature_aliases": [
+            "f004",
+            "f005",
+            "f016",
+            "f017",
+            "f020",
+            "f022"
+          ],
+          "ontology_rule_ids": [
+            "ont_7d6ca22dca5ffc3e56ab443f8e647ec5",
+            "ont_cda9c0e82adcd52fe9aebf7f112ba460",
+            "ont_0e7aff35a9064f2e9f08bb6ddf5e241d",
+            "ont_19c8bc4df8018f5f505be625b51181e2",
+            "ont_72572f458d45b900ddb1d9ffdcacff70",
+            "ont_b0c2fe281de54ee93b9f7a11b9e4cb63"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_72572f458d45b900ddb1d9ffdcacff70#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_19c8bc4df8018f5f505be625b51181e2#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_04",
+          "working_title": "Values, Shared Terms, and Self-Directed Making",
+          "purpose": "Organize standards of value, joint holdings, initiative, equal-standing arrangements, and activity pursued for its own sake.",
+          "feature_aliases": [
+            "f006",
+            "f007",
+            "f011",
+            "f015",
+            "f027"
+          ],
+          "ontology_rule_ids": [
+            "ont_a882a18b1a5123338124edaecd684633",
+            "ont_a18fde50d93c6d80565f61a4bdbf6c3e",
+            "ont_a5e7c54a0915a69484edd873cae32f51",
+            "ont_028a01f54d3d1c48509d94552f8879c5",
+            "ont_2016462c30dd8de984f60241e4cf293c"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_028a01f54d3d1c48509d94552f8879c5#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_2016462c30dd8de984f60241e4cf293c#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_05",
+          "working_title": "Base, Approach, and Accuracy",
+          "purpose": "Frame the private base, immediate approach, organizing effort, unwitnessed work, and the limits of exact-data interpretation.",
+          "feature_aliases": [
+            "f018",
+            "f021",
+            "f023",
+            "f024",
+            "f025",
+            "f026"
+          ],
+          "ontology_rule_ids": [
+            "ont_cd5c065dcf02bdd70c56d2c204ab990c",
+            "ont_d8e7f799cb1329f38428263cd78f3aaa",
+            "ont_2dbfeda2c6a55d47f439ed3ba27e22e4",
+            "ont_e3ad2684fc1fbe37d7306d9b275ef4ca",
+            "ont_5453f9c9662a75bbe5c86999947b7b4e",
+            "ont_c372306b41bb2de35e20803efdbaa1f4"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_d8e7f799cb1329f38428263cd78f3aaa#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_e3ad2684fc1fbe37d7306d9b275ef4ca#counter"
+          ]
+        }
+      ],
+      "additional_signatures": [],
+      "omissions": []
+    },
+    "facts": [
+      {
+        "alias": "f001",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "jupiter",
+          "body_b": "saturn",
+          "aspect": "sextile",
+          "orb": 2.7
+        }
+      },
+      {
+        "alias": "f002",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 245,
+          "sign": 9,
+          "house": 9
+        }
+      },
+      {
+        "alias": "f003",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 275,
+          "sign": 10,
+          "house": 10
+        }
+      },
+      {
+        "alias": "f004",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 35,
+          "sign": 2,
+          "house": 2
+        }
+      },
+      {
+        "alias": "f005",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 65,
+          "sign": 3,
+          "house": 3
+        }
+      },
+      {
+        "alias": "f006",
+        "feature_class": "position",
+        "fact": {
+          "body": "venus",
+          "longitude": 151,
+          "sign": 6,
+          "house": 4
+        }
+      },
+      {
+        "alias": "f007",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 215,
+          "sign": 8,
+          "house": 8
+        }
+      },
+      {
+        "alias": "f008",
+        "feature_class": "position",
+        "fact": {
+          "body": "jupiter",
+          "longitude": 237,
+          "sign": 8,
+          "house": 6
+        }
+      },
+      {
+        "alias": "f009",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 305,
+          "sign": 11,
+          "house": 11
+        }
+      },
+      {
+        "alias": "f010",
+        "feature_class": "position",
+        "fact": {
+          "body": "saturn",
+          "longitude": 280,
+          "sign": 10,
+          "house": 7
+        }
+      },
+      {
+        "alias": "f011",
+        "feature_class": "position",
+        "fact": {
+          "body": "mars",
+          "longitude": 194,
+          "sign": 7,
+          "house": 5
+        }
+      },
+      {
+        "alias": "f012",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "sun",
+          "body_b": "moon",
+          "aspect": "square",
+          "orb": 2.1
+        }
+      },
+      {
+        "alias": "f013",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "moon",
+          "body_b": "venus",
+          "aspect": "trine",
+          "orb": 3.2
+        }
+      },
+      {
+        "alias": "f014",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "sun",
+          "body_b": "mercury",
+          "aspect": "conjunction",
+          "orb": 1.4
+        }
+      },
+      {
+        "alias": "f015",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 185,
+          "sign": 7,
+          "house": 7
+        }
+      },
+      {
+        "alias": "f016",
+        "feature_class": "position",
+        "fact": {
+          "body": "mercury",
+          "longitude": 108,
+          "sign": 4,
+          "house": 3
+        }
+      },
+      {
+        "alias": "f017",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 155,
+          "sign": 6,
+          "house": 6
+        }
+      },
+      {
+        "alias": "f018",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 95,
+          "sign": 4,
+          "house": 4
+        }
+      },
+      {
+        "alias": "f019",
+        "feature_class": "angle",
+        "fact": {
+          "longitude": 275,
+          "sign": 10,
+          "angle": "midheaven"
+        }
+      },
+      {
+        "alias": "f020",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "mars",
+          "body_b": "jupiter",
+          "aspect": "opposition",
+          "orb": 4.1
+        }
+      },
+      {
+        "alias": "f021",
+        "feature_class": "uncertainty",
+        "fact": {
+          "accuracy": "exact",
+          "suppressed_features": []
+        }
+      },
+      {
+        "alias": "f022",
+        "feature_class": "position",
+        "fact": {
+          "body": "moon",
+          "longitude": 65,
+          "sign": 3,
+          "house": 2
+        }
+      },
+      {
+        "alias": "f023",
+        "feature_class": "angle",
+        "fact": {
+          "longitude": 5,
+          "sign": 1,
+          "angle": "ascendant"
+        }
+      },
+      {
+        "alias": "f024",
+        "feature_class": "position",
+        "fact": {
+          "body": "sun",
+          "longitude": 22,
+          "sign": 1,
+          "house": 1
+        }
+      },
+      {
+        "alias": "f025",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 335,
+          "sign": 12,
+          "house": 12
+        }
+      },
+      {
+        "alias": "f026",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 5,
+          "sign": 1,
+          "house": 1
+        }
+      },
+      {
+        "alias": "f027",
+        "feature_class": "house_cusp",
+        "fact": {
+          "longitude": 125,
+          "sign": 5,
+          "house": 5
+        }
+      }
+    ],
+    "ontology_records": [
+      {
+        "id": "ont_2dbfeda2c6a55d47f439ed3ba27e22e4",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "angle",
+          "angle": "ascendant"
+        },
+        "normalized_proposition": "The ascendant is associated with the approach a person leads with, which is not the same as what they are like.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the approach is frequently mistaken for the whole, by other people and sometimes by the person using it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a reliable approach is a real asset rather than a mask."
+        ],
+        "prohibited_claims": [
+          "a false self",
+          "a personality disorder",
+          "how you really are"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 2,
+        "cluster_tags": [
+          "5"
+        ]
+      },
+      {
+        "id": "ont_a0c08ea9e7f8e66086249705c4b24482",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "conjunction"
+        },
+        "normalized_proposition": "A conjunction is associated with two tendencies that operate as a single instrument and are not experienced separately.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that fused material cannot be applied selectively."
+        ],
+        "counter_expressions": [
+          "The counter-expression is concentration.",
+          "Two tendencies acting as one produce more force in that direction than the same two acting independently, and the areas where a person is unusually effective are frequently built this way."
+        ],
+        "prohibited_claims": [
+          "an intensified problem",
+          "a powerful gift",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 5,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_a18fde50d93c6d80565f61a4bdbf6c3e",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 8
+        },
+        "normalized_proposition": "The eighth house is associated with what is held jointly, where nothing can be settled without the other party.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that merged holdings are entered for good reasons and are difficult to reverse."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that merging is what makes things possible at a scale no one reaches alone."
+        ],
+        "prohibited_claims": [
+          "an inheritance",
+          "a death in the family",
+          "your sex life"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 15,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_f8db91d1747a8890a0219838bcdf6393",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 11
+        },
+        "normalized_proposition": "The eleventh house is associated with the wider network of loose ties, where belonging is partial and revocable.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that loose ties are held loosely by both sides."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that loose ties carry information and opportunity that close ones structurally cannot, because close contacts mostly know what a person already knows."
+        ],
+        "prohibited_claims": [
+          "your true friends",
+          "a social circle will",
+          "a wish will be granted"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 16,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_2016462c30dd8de984f60241e4cf293c",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 5
+        },
+        "normalized_proposition": "The fifth house is associated with what is made or done for its own sake, without a justification outside itself.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that adults are poorly equipped to protect activity with no external warrant.",
+          "It is the first thing cut when time is short, and it is difficult to defend in a conversation, because any defence offered turns it into something with a purpose and quietly destroys it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that this is where things get tried before there is a reason to try them."
+        ],
+        "prohibited_claims": [
+          "whether you will have children",
+          "a romantic encounter",
+          "artistic talent"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 17,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_c372306b41bb2de35e20803efdbaa1f4",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 1
+        },
+        "normalized_proposition": "The first house is associated with the immediate arena a person acts from, before anything has been negotiated.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is exactly that."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that these conditions are also the most available."
+        ],
+        "prohibited_claims": [
+          "physical appearance",
+          "your body type",
+          "how you look"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 18,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_cd5c065dcf02bdd70c56d2c204ab990c",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 4
+        },
+        "normalized_proposition": "The fourth house is associated with the base a person operates from and returns to, rather than with what is done in view.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a base is judged only by whether it holds, which means it gets attention only when it does not."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the base sets the ceiling on everything else."
+        ],
+        "prohibited_claims": [
+          "your childhood",
+          "your parents",
+          "a family conflict"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 19,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "jupiter"
+        },
+        "normalized_proposition": "Jupiter is associated with the area where more seems reasonable, and with the judgment about how much is enough.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that generosity of estimate and poor judgment of scale are the same instrument."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the area is genuinely where growth is cheapest."
+        ],
+        "prohibited_claims": [
+          "financial gain",
+          "a period of luck",
+          "will expand your"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 22,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_a5e7c54a0915a69484edd873cae32f51",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "mars"
+        },
+        "normalized_proposition": "Mars is associated with initiating action and with the friction of moving before everyone else is ready.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "Reading only the friction misses that the same speed applies to getting over things.",
+          "Neither the speed nor the friction is a setting the person chose, and neither is a problem to be corrected."
+        ],
+        "counter_expressions": [
+          "The counterweight is that a low threshold for starting is also a low threshold for repair."
+        ],
+        "prohibited_claims": [
+          "anger management",
+          "a violent temper",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 25,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_0e7aff35a9064f2e9f08bb6ddf5e241d",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "mercury"
+        },
+        "normalized_proposition": "Mercury is associated with how information is taken in and passed on, rather than with how much is known.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a method that suits one setting reads as a deficiency in another."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that method is adjustable in a way that capacity is not."
+        ],
+        "prohibited_claims": [
+          "a learning disability",
+          "a high intelligence",
+          "an attention deficit"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 26,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_c2fe94a44cd6effc5f9ae63737bb19f5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "angle",
+          "angle": "midheaven"
+        },
+        "normalized_proposition": "The midheaven is associated with the version of a person that gets recorded and repeated by people who are not present.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the compression is done by other people and is not open to correction."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a portable version does work no amount of presence can do."
+        ],
+        "prohibited_claims": [
+          "your career path",
+          "professional success",
+          "your reputation will"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 27,
+        "cluster_tags": [
+          "5"
+        ]
+      },
+      {
+        "id": "ont_b0c2fe281de54ee93b9f7a11b9e4cb63",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "moon"
+        },
+        "normalized_proposition": "The Moon is associated with how a person settles, and with what gets reached for when steadiness is needed.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this material is rarely chosen and is often slightly embarrassing to state plainly."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that knowing the route is practical."
+        ],
+        "prohibited_claims": [
+          "emotional instability",
+          "a mood disorder",
+          "how you are feeling"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 28,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_b5682933021683ac6af97dc7d41c59b3",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 9
+        },
+        "normalized_proposition": "The ninth house is associated with the models a person holds about territory they have not directly experienced.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a model of unvisited territory is unfalsifiable while it stays unvisited.",
+          "It can be held with total confidence for decades at no cost, and it shapes decisions the whole time."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that models of this kind are how anyone acts beyond their own direct experience, which is where most of the interesting territory is."
+        ],
+        "prohibited_claims": [
+          "your religious beliefs",
+          "will travel abroad",
+          "a university degree"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 30,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_72572f458d45b900ddb1d9ffdcacff70",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "opposition"
+        },
+        "normalized_proposition": "An opposition is associated with two tendencies that see each other clearly across a distance and are difficult to hold at once.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "Unlike a square, where the friction is about method, here the two are legible to each other and the difficulty is holding both at the same time."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that separation this wide is what makes both ends visible in the first place."
+        ],
+        "prohibited_claims": [
+          "an internal conflict",
+          "a divided self",
+          "will be forced to choose"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 31,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_d3019387ea8ab332bc09a56a063ca386",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "saturn"
+        },
+        "normalized_proposition": "Saturn is associated with slowing down and testing a commitment before accepting it.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the checking is indistinguishable from avoidance while it is happening, both to the person and to anyone waiting on them."
+        ],
+        "counter_expressions": [
+          "The counter-expression is durability.",
+          "What is accepted slowly is frequently what is still being maintained years later, and the area that felt heaviest early is often the one described as solid in retrospect."
+        ],
+        "prohibited_claims": [
+          "a period of hardship",
+          "a karmic lesson",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 39,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_7d6ca22dca5ffc3e56ab443f8e647ec5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 2
+        },
+        "normalized_proposition": "The second house is associated with what a person holds on their own terms, without needing anyone else's agreement.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that anything held this way tends to be undervalued by the person holding it.",
+          "Something that has been available continuously is difficult to price, and people frequently discover the worth of a second-house holding only when a situation removes it or when someone outside offers to pay for it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that these holdings are the ones that survive a bad year."
+        ],
+        "prohibited_claims": [
+          "financial advice",
+          "your income will",
+          "a wealthy period"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 41,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_028a01f54d3d1c48509d94552f8879c5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 7
+        },
+        "normalized_proposition": "The seventh house is associated with what happens in one-to-one arrangements, where the other party has equal standing.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that everything in this house is negotiated, and negotiation exposes what a person will and will not concede.",
+          "People frequently report learning more about their own limits from a difficult arrangement than from any amount of solitude, and report it as unwelcome information arriving in an unwelcome way."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a counterpart supplies what cannot be self-supplied."
+        ],
+        "prohibited_claims": [
+          "your future spouse",
+          "a marriage will",
+          "relationship compatibility"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 42,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_5beb72d3f1d2b5d14996fd0ce7e21f26",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "sextile"
+        },
+        "normalized_proposition": "A sextile is associated with a combination that is available on request but does not engage on its own.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that anything requiring initiation is frequently never initiated."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that optional is a genuine advantage once the option is known."
+        ],
+        "prohibited_claims": [
+          "an easy opportunity",
+          "a natural gift",
+          "will come easily"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 43,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_19c8bc4df8018f5f505be625b51181e2",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 6
+        },
+        "normalized_proposition": "The sixth house is associated with work that is repeated rather than completed, and with the method used to get through it.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that recurring work is measured by nobody and noticed only in its absence."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that method here compounds more than anywhere else in a chart."
+        ],
+        "prohibited_claims": [
+          "a health condition",
+          "your physical health",
+          "an illness"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 44,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_ff567efea3064fdd78a608b849a3b1e6",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "square"
+        },
+        "normalized_proposition": "A square is associated with two active tendencies that work on the same material without a shared method.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The friction is structural, and it stays."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that squares are where work gets done."
+        ],
+        "prohibited_claims": [
+          "a source of suffering",
+          "a psychological conflict",
+          "will go wrong"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 45,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_e3ad2684fc1fbe37d7306d9b275ef4ca",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "sun"
+        },
+        "normalized_proposition": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this is frequently not the thing a person is most skilled at, and almost never the thing they are most rewarded for."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that it is the most reliable supply of energy available."
+        ],
+        "prohibited_claims": [
+          "your true purpose",
+          "what you were meant to do",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 46,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_33c1c0aee37c7bcf73b70b5cf5307538",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 10
+        },
+        "normalized_proposition": "The tenth house is associated with the part of a life that is visible to people who do not know the person.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that visible and important are different measurements and they come apart."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that visibility is also usable."
+        ],
+        "prohibited_claims": [
+          "your career will",
+          "professional advice",
+          "a guaranteed promotion"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 48,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_cda9c0e82adcd52fe9aebf7f112ba460",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 3
+        },
+        "normalized_proposition": "The third house is associated with the near circuit of routine exchange, the contacts and errands repeated without ceremony.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this traffic is beneath notice while it is working, so it is almost never attended to deliberately."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the near circuit is where most information enters."
+        ],
+        "prohibited_claims": [
+          "your siblings",
+          "a short journey will",
+          "communication problems"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 49,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_34df4017524ee85226b1135826c7e178",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "trine"
+        },
+        "normalized_proposition": "A trine is associated with a combination that runs without supervision, which makes it both reliable and unexamined.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "It requires no maintenance and produces no friction, which is why it is usually reported as a strength when it is reported at all.",
+          "The tension is that unsupervised material is unexamined material."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that reliability is not a small thing."
+        ],
+        "prohibited_claims": [
+          "a stroke of luck",
+          "an effortless success",
+          "a blessing"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 50,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_5453f9c9662a75bbe5c86999947b7b4e",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 12
+        },
+        "normalized_proposition": "The twelfth house is associated with what is done or worked out unwitnessed, where no account is given to anyone.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that unwitnessed work is unverifiable."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that some work only proceeds unobserved."
+        ],
+        "prohibited_claims": [
+          "hidden enemies",
+          "a mental health",
+          "a pattern of self-sabotage"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 52,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_d8e7f799cb1329f38428263cd78f3aaa",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "uncertainty",
+          "accuracy": "exact"
+        },
+        "normalized_proposition": "Where a factor is missing, the honest form is to name what is absent and stop, rather than to substitute a general statement that would be true of anyone.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The failure mode is filling the gap."
+        ],
+        "counter_expressions": [
+          "What remains is genuinely there."
+        ],
+        "prohibited_claims": [
+          "approximately noon",
+          "we can assume your birth time",
+          "your rising sign is likely"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 56,
+        "cluster_tags": [
+          "7"
+        ]
+      },
+      {
+        "id": "ont_a882a18b1a5123338124edaecd684633",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "venus"
+        },
+        "normalized_proposition": "Venus is associated with what registers as worth having, and with the terms on which a person meets other people.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a standard nobody has said out loud still gets applied, and the application looks arbitrary from outside."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a clear standard is efficient."
+        ],
+        "prohibited_claims": [
+          "your ideal partner",
+          "a romantic outcome",
+          "will meet someone"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 58,
+        "cluster_tags": [
+          "1"
+        ]
+      }
+    ],
+    "derived_synthesis_graph": [],
+    "uncertainty": {
+      "suppressed_classes": [],
+      "required_language_rule_ids": [
+        "ont_d8e7f799cb1329f38428263cd78f3aaa"
+      ]
+    }
+  },
+  "output": "{\"schema_version\":\"0.7.0\",\"verdict\":\"pass\",\"findings\":[]}"
+}

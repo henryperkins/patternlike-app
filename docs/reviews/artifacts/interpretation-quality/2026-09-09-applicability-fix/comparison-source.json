@@ -1,0 +1,16 @@
+{
+  "base_commit": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+  "pattern_creation_source_hash": "sha256:b1c8ff83924dfc7010c86fcfba37e2bb0f2eb09c0022dd5ee5169dfbc3fdce39",
+  "pattern_creation_source_recomputed_current": true,
+  "source_scope": "Existing Pattern source fingerprint; does not bind builder, chart fixtures, frontend, all files, or provider binary. Inputs/candidates are separately retained.",
+  "candidate_sha256": {
+    "before": "ab3a7643dde5b490983d382eb31a8d2674ba67a6ec0c0809dfcf2ea1a388662c",
+    "after": "dc1303d454406cd8ef7bfdf5747f19b5b832f2d0f100815ba797e47ec17d9c61"
+  },
+  "policies_unchanged": {
+    "selection": "1.0.0",
+    "validation": "1.0.0",
+    "publication_safety": "1.0.0"
+  },
+  "source_files_changed_note": "Uncommitted builder/tests, local preview and documentation; no Pattern runtime policy/prompt edits for this comparison."
+}

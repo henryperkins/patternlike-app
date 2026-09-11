@@ -1,18 +1,16 @@
 /**
- * Build a signed-ready `synthetic_internal` ontology from the registered corpus.
+ * Build an unsigned, compilable `synthetic_internal` candidate from the
+ * registered corpus, deterministically and without a provider call. Historical
+ * machine candidates failed at validation, configuration, and regression
+ * boundaries; the rollout runbook records each execution separately.
  *
- * The machine pipeline's `regressing` stage rehearsed thirty full Pattern
- * generations per candidate -- about four hours and 130 provider calls -- and
- * was terminal on the first hard-gate failure anywhere. Sixteen candidates died
- * there and none ever passed. This path produces the same artifact the reader
- * needs, deterministically, from the same authorized corpus, with no provider
- * call at all.
- *
- * Every record is `source_supported` and cites exactly the corpus fragment its
- * proposition came from, so the release is as traceable as a generated one. The
- * twelve sign fragments are deliberately skipped: `PatternFeaturePredicate` has
- * `body`, `aspect`, `angle`, `house` and `accuracy` but no `sign`, so a sign
- * record could only attach to every position indiscriminately.
+ * Every record is `source_supported` and cites its prepared corpus fragment.
+ * The supplied 60-fragment corpus yields 36 records from 35 fragments. The
+ * predicate grammar has no `sign` field or verified match for §6.3–6.5, sparse
+ * charts, or qualified locations; this builder defines no §8 mapping. §7.1 also
+ * supplies separate methodological guidance for the exact-time uncertainty fact.
+ * Sentence matching and normalized-proposition fallback are traceable
+ * transformations of prepared material, not editorial adjudication.
  *
  *   npx tsx apps/api/scripts/build-internal-ontology.ts <corpus.json> <out.json>
  */
@@ -26,7 +24,8 @@ import type {
   PatternSalienceBand,
 } from "@patternlike/shared";
 
-const ONTOLOGY_VERSION = process.env.ONTOLOGY_VERSION ?? "pattern-ontology-en-us-internal-0.1.0";
+// Changed extraction content gets a new default candidate identity.
+const ONTOLOGY_VERSION = process.env.ONTOLOGY_VERSION ?? "pattern-ontology-en-us-internal-0.1.2";
 
 interface CorpusFragment {
   id: string;
@@ -55,6 +54,11 @@ const HOUSE_BY_SECTION: Record<string, number> = Object.fromEntries(
 const ACCURACY_BY_SECTION: Record<string, string> = {
   "7.1": "unknown", "7.2": "approximate",
 };
+const EXACT_TIME_METHODOLOGY = {
+  normalized_proposition: "Where a factor is missing, the honest form is to name what is absent and stop, rather than to substitute a general statement that would be true of anyone.",
+  tensions: ["The failure mode is filling the gap."],
+  counter_expressions: ["What remains is genuinely there."],
+};
 
 function sectionOf(location: string): string {
   return location.replace(/^§/, "").split(" ")[0]!;
@@ -65,12 +69,10 @@ function predicateFor(section: string): PatternFeaturePredicate | null {
   if (ASPECT_BY_SECTION[section]) return { type: "aspect", aspect: ASPECT_BY_SECTION[section] };
   if (ANGLE_BY_SECTION[section]) return { type: "angle", angle: ANGLE_BY_SECTION[section] };
   if (HOUSE_BY_SECTION[section]) return { type: "house_cusp", house: HOUSE_BY_SECTION[section] };
-  if (section.startsWith("6.")) return { type: "pattern" };
-  if (section.startsWith("7.")) {
-    const accuracy = ACCURACY_BY_SECTION[section];
-    return accuracy ? { type: "uncertainty", accuracy } : { type: "uncertainty" };
-  }
-  return null; // §2 signs: no `sign` field exists in the predicate grammar.
+  if (section === "6.2") return { type: "pattern", pattern: "stellium" };
+  const accuracy = ACCURACY_BY_SECTION[section];
+  if (accuracy) return { type: "uncertainty", accuracy };
+  return null; // Omit meanings whose specific applicability is not established.
 }
 
 function salienceFor(section: string): PatternSalienceBand {
@@ -83,7 +85,7 @@ function sentences(text: string): string[] {
   return text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
-/** Traceable to source: both lists are corpus sentences, never new claims. */
+/** Select matching corpus sentences; the caller falls back to the proposition. */
 function tensionsFor(fragment: CorpusFragment): string[] {
   const found = sentences(fragment.excerpt).filter((s) =>
     /\b(tension|friction|cost|risk|difficult|strain|pressure|misread)\b/i.test(s));
@@ -91,14 +93,27 @@ function tensionsFor(fragment: CorpusFragment): string[] {
 }
 
 function counterExpressionsFor(fragment: CorpusFragment): string[] {
-  const found = sentences(fragment.excerpt).filter((s) =>
+  const source = sentences(fragment.excerpt);
+  const marker = /^The counter(?:-expression|weight) is\b/i;
+  const index = source.findIndex((sentence) => marker.test(sentence));
+  if (index !== -1) {
+    const counter = source[index]!;
+    // The source uses "is that ..." for a complete assertion. Bare labels
+    // such as "is durability" need the following explanatory sentence.
+    // Do not clip a longer contrast by appending only its opposing setup.
+    return /^The counter(?:-expression|weight) is that\b/i.test(counter)
+      ? [counter]
+      : source.slice(index, index + 2);
+  }
+  // Preserve the existing sentence/proposition fallback for unmarked sources.
+  const found = source.filter((s) =>
     /\b(counterweight|counterbalance|the same|also|equally|other side|reading only)\b/i.test(s));
   return found.slice(0, 2);
 }
 
-function ruleId(fragmentId: string): string {
+function ruleId(fragmentId: string, variant = ""): string {
   const digest = createHash("sha256")
-    .update(`${ONTOLOGY_VERSION}:${fragmentId}`)
+    .update(`${ONTOLOGY_VERSION}:${fragmentId}${variant}`)
     .digest("hex");
   return `ont_${digest.slice(0, 32)}`;
 }
@@ -125,7 +140,7 @@ for (const [index, fragment] of corpus.fragments.entries()) {
   }
   const tensions = tensionsFor(fragment);
   const counters = counterExpressionsFor(fragment);
-  records.push({
+  const record: PatternOntologyRecord = {
     id: ruleId(fragment.id),
     meaning_class: "source_supported",
     locale: fragment.locale,
@@ -142,7 +157,27 @@ for (const [index, fragment] of corpus.fragments.entries()) {
     salience_band: salienceFor(section),
     presentation_priority: index,
     cluster_tags: [section.split(".")[0]!],
-  });
+  };
+  records.push(record);
+  if (section === "7.1") {
+    // Exact accuracy still carries a mandatory uncertainty fact. Use only the
+    // source's general guidance, without claiming this birth time is unknown.
+    const sourceSentences = new Set(sentences(fragment.excerpt));
+    const methodologySentences = [
+      EXACT_TIME_METHODOLOGY.normalized_proposition,
+      ...EXACT_TIME_METHODOLOGY.tensions,
+      ...EXACT_TIME_METHODOLOGY.counter_expressions,
+    ];
+    if (methodologySentences.some((sentence) => !sourceSentences.has(sentence))) {
+      throw new Error("exact-time methodology requires its prepared source sentences");
+    }
+    records.push({
+      ...record,
+      ...EXACT_TIME_METHODOLOGY,
+      id: ruleId(fragment.id, ":exact-methodology"),
+      feature_predicate: { type: "uncertainty", accuracy: "exact" },
+    });
+  }
 }
 
 const release: PatternOntologyRelease = {
@@ -157,6 +192,11 @@ const release: PatternOntologyRelease = {
   // design, not an oversight.
   status: "candidate",
   records,
+  // For this synthetic_internal origin, compiler_passed is checked by the
+  // actual compile below. evaluator_passed=true and unevaluated_fixture_count=0
+  // are compatibility fields, not an independent evaluation or coverage receipt.
+  // No machine evaluator or regression rehearsal runs; regression_passed=false
+  // records that distinction. These values do not certify editorial quality.
   evaluation: {
     schema_version: "0.7.0",
     ontology_version: ONTOLOGY_VERSION,

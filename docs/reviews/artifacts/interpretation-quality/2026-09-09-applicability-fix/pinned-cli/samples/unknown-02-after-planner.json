@@ -1,0 +1,1329 @@
+{
+  "pass": "planner",
+  "started_at": "2026-09-09T05:29:25.678Z",
+  "invocation_sha256": "sha256:93bec4e258f458e791a62583b41597d22d816db3dce6a4ce37930fa41461cbe6",
+  "sample_file": "pinned-cli/samples/unknown-02-after-planner.json",
+  "completed_at": "2026-09-09T05:29:54.980Z",
+  "input_tokens": 11686,
+  "output_tokens": 2213,
+  "output_sha256": "sha256:c4b4aec11ade936aa5a6060bcaee5a55bc41fd99cb22b5821bf06425b9da13b3",
+  "provider_request_sha256": "sha256:4b246e2b25202b6d0836d9d2a587e5d6aa324b81ad23e6cdb147818638397d30",
+  "status": "accepted",
+  "findings": [],
+  "request_document": {
+    "schema_version": "0.7.0",
+    "pass": "planner",
+    "packet": {
+      "schema_version": "0.7.0",
+      "locale": "en-US",
+      "effective_accuracy": "unknown",
+      "uncertainty": {
+        "suppressed_classes": [
+          "angle_transits",
+          "angles",
+          "houses",
+          "moon_time_sensitive"
+        ],
+        "required_language_rule_ids": [
+          "ont_3c839c4b6707649344462582940ed7d5"
+        ]
+      },
+      "features": [
+        {
+          "alias": "f001",
+          "feature_class": "position",
+          "fact": {
+            "body": "mercury",
+            "longitude": 108,
+            "sign": 4,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_0e7aff35a9064f2e9f08bb6ddf5e241d"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f002",
+          "feature_class": "position",
+          "fact": {
+            "body": "jupiter",
+            "longitude": 237,
+            "sign": 8,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_f747b567f2cd8c175bfc35d4d1336a6d"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f003",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "sun",
+            "body_b": "mercury",
+            "aspect": "conjunction",
+            "orb": 1.4
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_a0c08ea9e7f8e66086249705c4b24482"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f004",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "moon",
+            "body_b": "venus",
+            "aspect": "trine",
+            "orb": 3.2
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_34df4017524ee85226b1135826c7e178"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f005",
+          "feature_class": "uncertainty",
+          "fact": {
+            "accuracy": "unknown",
+            "suppressed_features": [
+              "angle_transits",
+              "angles",
+              "houses",
+              "moon_time_sensitive"
+            ]
+          },
+          "coverage": "mandatory_any",
+          "ontology_rule_ids": [
+            "ont_3c839c4b6707649344462582940ed7d5"
+          ],
+          "cluster_ids": [
+            "clu_a797a8bc"
+          ]
+        },
+        {
+          "alias": "f006",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "jupiter",
+            "body_b": "saturn",
+            "aspect": "sextile",
+            "orb": 2.7
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_5beb72d3f1d2b5d14996fd0ce7e21f26"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f007",
+          "feature_class": "position",
+          "fact": {
+            "body": "mars",
+            "longitude": 194,
+            "sign": 7,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_a5e7c54a0915a69484edd873cae32f51"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f008",
+          "feature_class": "position",
+          "fact": {
+            "body": "sun",
+            "longitude": 22,
+            "sign": 1,
+            "house": null
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_e3ad2684fc1fbe37d7306d9b275ef4ca"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f009",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "square",
+            "orb": 2.1
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_ff567efea3064fdd78a608b849a3b1e6"
+          ],
+          "cluster_ids": [
+            "clu_7c892513"
+          ]
+        },
+        {
+          "alias": "f010",
+          "feature_class": "position",
+          "fact": {
+            "body": "venus",
+            "longitude": 151,
+            "sign": 6,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_a882a18b1a5123338124edaecd684633"
+          ],
+          "cluster_ids": [
+            "clu_1186137b"
+          ]
+        },
+        {
+          "alias": "f011",
+          "feature_class": "position",
+          "fact": {
+            "body": "moon",
+            "longitude": 65,
+            "sign": 3,
+            "house": null
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_b0c2fe281de54ee93b9f7a11b9e4cb63"
+          ],
+          "cluster_ids": [
+            "clu_1186137b"
+          ]
+        },
+        {
+          "alias": "f012",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "mars",
+            "body_b": "jupiter",
+            "aspect": "opposition",
+            "orb": 4.1
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_72572f458d45b900ddb1d9ffdcacff70"
+          ],
+          "cluster_ids": [
+            "clu_1186137b"
+          ]
+        },
+        {
+          "alias": "f013",
+          "feature_class": "position",
+          "fact": {
+            "body": "saturn",
+            "longitude": 280,
+            "sign": 10,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_d3019387ea8ab332bc09a56a063ca386"
+          ],
+          "cluster_ids": [
+            "clu_1186137b"
+          ]
+        }
+      ],
+      "clusters": [
+        {
+          "cluster_id": "clu_7c892513",
+          "feature_aliases": [
+            "f001",
+            "f002",
+            "f003",
+            "f004",
+            "f006",
+            "f007",
+            "f008",
+            "f009"
+          ],
+          "compatible_with": [
+            "clu_1186137b",
+            "clu_a797a8bc"
+          ]
+        },
+        {
+          "cluster_id": "clu_1186137b",
+          "feature_aliases": [
+            "f010",
+            "f011",
+            "f012",
+            "f013"
+          ],
+          "compatible_with": [
+            "clu_7c892513",
+            "clu_a797a8bc"
+          ]
+        },
+        {
+          "cluster_id": "clu_a797a8bc",
+          "feature_aliases": [
+            "f005"
+          ],
+          "compatible_with": [
+            "clu_1186137b",
+            "clu_7c892513"
+          ]
+        }
+      ],
+      "selection_constraints": {
+        "core_chapters_min": 4,
+        "core_chapters_max": 6,
+        "additional_signatures_max": 8,
+        "sparse_pattern": false
+      }
+    },
+    "ontology_records": [
+      {
+        "id": "ont_2dbfeda2c6a55d47f439ed3ba27e22e4",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "angle",
+          "angle": "ascendant"
+        },
+        "normalized_proposition": "The ascendant is associated with the approach a person leads with, which is not the same as what they are like.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the approach is frequently mistaken for the whole, by other people and sometimes by the person using it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a reliable approach is a real asset rather than a mask."
+        ],
+        "prohibited_claims": [
+          "a false self",
+          "a personality disorder",
+          "how you really are"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 2,
+        "cluster_tags": [
+          "5"
+        ]
+      },
+      {
+        "id": "ont_a0c08ea9e7f8e66086249705c4b24482",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "conjunction"
+        },
+        "normalized_proposition": "A conjunction is associated with two tendencies that operate as a single instrument and are not experienced separately.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that fused material cannot be applied selectively."
+        ],
+        "counter_expressions": [
+          "The counter-expression is concentration.",
+          "Two tendencies acting as one produce more force in that direction than the same two acting independently, and the areas where a person is unusually effective are frequently built this way."
+        ],
+        "prohibited_claims": [
+          "an intensified problem",
+          "a powerful gift",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 5,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_155506e1f4a1d5968b53fc9109e3e249",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "angle",
+          "angle": "descendant"
+        },
+        "normalized_proposition": "The descendant is associated with the qualities a person reliably meets in others rather than supplies themselves.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that anything met repeatedly gets attributed to the people supplying it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that reliably meeting a quality is a form of access to it."
+        ],
+        "prohibited_claims": [
+          "you attract people who",
+          "the kind of partner you",
+          "relationship problems"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 14,
+        "cluster_tags": [
+          "5"
+        ]
+      },
+      {
+        "id": "ont_a18fde50d93c6d80565f61a4bdbf6c3e",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 8
+        },
+        "normalized_proposition": "The eighth house is associated with what is held jointly, where nothing can be settled without the other party.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that merged holdings are entered for good reasons and are difficult to reverse."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that merging is what makes things possible at a scale no one reaches alone."
+        ],
+        "prohibited_claims": [
+          "an inheritance",
+          "a death in the family",
+          "your sex life"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 15,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_f8db91d1747a8890a0219838bcdf6393",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 11
+        },
+        "normalized_proposition": "The eleventh house is associated with the wider network of loose ties, where belonging is partial and revocable.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that loose ties are held loosely by both sides."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that loose ties carry information and opportunity that close ones structurally cannot, because close contacts mostly know what a person already knows."
+        ],
+        "prohibited_claims": [
+          "your true friends",
+          "a social circle will",
+          "a wish will be granted"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 16,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_2016462c30dd8de984f60241e4cf293c",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 5
+        },
+        "normalized_proposition": "The fifth house is associated with what is made or done for its own sake, without a justification outside itself.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that adults are poorly equipped to protect activity with no external warrant.",
+          "It is the first thing cut when time is short, and it is difficult to defend in a conversation, because any defence offered turns it into something with a purpose and quietly destroys it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that this is where things get tried before there is a reason to try them."
+        ],
+        "prohibited_claims": [
+          "whether you will have children",
+          "a romantic encounter",
+          "artistic talent"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 17,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_c372306b41bb2de35e20803efdbaa1f4",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 1
+        },
+        "normalized_proposition": "The first house is associated with the immediate arena a person acts from, before anything has been negotiated.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is exactly that."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that these conditions are also the most available."
+        ],
+        "prohibited_claims": [
+          "physical appearance",
+          "your body type",
+          "how you look"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 18,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_cd5c065dcf02bdd70c56d2c204ab990c",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 4
+        },
+        "normalized_proposition": "The fourth house is associated with the base a person operates from and returns to, rather than with what is done in view.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a base is judged only by whether it holds, which means it gets attention only when it does not."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the base sets the ceiling on everything else."
+        ],
+        "prohibited_claims": [
+          "your childhood",
+          "your parents",
+          "a family conflict"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 19,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_00cdd057c0fdb50bf53f9708ba8d878a",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "angle",
+          "angle": "imum_coeli"
+        },
+        "normalized_proposition": "The imum coeli is associated with the private floor a person stands on, which is not shown and not explained.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that an unexamined floor is still a floor."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the footing is what makes exposure survivable."
+        ],
+        "prohibited_claims": [
+          "your early home",
+          "your parents",
+          "a buried memory"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 21,
+        "cluster_tags": [
+          "5"
+        ]
+      },
+      {
+        "id": "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "jupiter"
+        },
+        "normalized_proposition": "Jupiter is associated with the area where more seems reasonable, and with the judgment about how much is enough.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that generosity of estimate and poor judgment of scale are the same instrument."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the area is genuinely where growth is cheapest."
+        ],
+        "prohibited_claims": [
+          "financial gain",
+          "a period of luck",
+          "will expand your"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 22,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_a5e7c54a0915a69484edd873cae32f51",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "mars"
+        },
+        "normalized_proposition": "Mars is associated with initiating action and with the friction of moving before everyone else is ready.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "Reading only the friction misses that the same speed applies to getting over things.",
+          "Neither the speed nor the friction is a setting the person chose, and neither is a problem to be corrected."
+        ],
+        "counter_expressions": [
+          "The counterweight is that a low threshold for starting is also a low threshold for repair."
+        ],
+        "prohibited_claims": [
+          "anger management",
+          "a violent temper",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 25,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_0e7aff35a9064f2e9f08bb6ddf5e241d",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "mercury"
+        },
+        "normalized_proposition": "Mercury is associated with how information is taken in and passed on, rather than with how much is known.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a method that suits one setting reads as a deficiency in another."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that method is adjustable in a way that capacity is not."
+        ],
+        "prohibited_claims": [
+          "a learning disability",
+          "a high intelligence",
+          "an attention deficit"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 26,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_c2fe94a44cd6effc5f9ae63737bb19f5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "angle",
+          "angle": "midheaven"
+        },
+        "normalized_proposition": "The midheaven is associated with the version of a person that gets recorded and repeated by people who are not present.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the compression is done by other people and is not open to correction."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a portable version does work no amount of presence can do."
+        ],
+        "prohibited_claims": [
+          "your career path",
+          "professional success",
+          "your reputation will"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 27,
+        "cluster_tags": [
+          "5"
+        ]
+      },
+      {
+        "id": "ont_b0c2fe281de54ee93b9f7a11b9e4cb63",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "moon"
+        },
+        "normalized_proposition": "The Moon is associated with how a person settles, and with what gets reached for when steadiness is needed.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this material is rarely chosen and is often slightly embarrassing to state plainly."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that knowing the route is practical."
+        ],
+        "prohibited_claims": [
+          "emotional instability",
+          "a mood disorder",
+          "how you are feeling"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 28,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_bfa198c2c40942ef0bf9f00979436067",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "neptune"
+        },
+        "normalized_proposition": "Neptune is associated with the area where edges are least distinct, which serves imagination and complicates accounting.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is bookkeeping.",
+          "Where edges are indistinct, it is difficult to say what was agreed, what was assumed, and where one person's responsibility ended."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that indistinct edges are the working condition for imagination and for sympathy."
+        ],
+        "prohibited_claims": [
+          "substance use",
+          "a tendency to deceive",
+          "losing touch with reality"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 29,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_b5682933021683ac6af97dc7d41c59b3",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 9
+        },
+        "normalized_proposition": "The ninth house is associated with the models a person holds about territory they have not directly experienced.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a model of unvisited territory is unfalsifiable while it stays unvisited.",
+          "It can be held with total confidence for decades at no cost, and it shapes decisions the whole time."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that models of this kind are how anyone acts beyond their own direct experience, which is where most of the interesting territory is."
+        ],
+        "prohibited_claims": [
+          "your religious beliefs",
+          "will travel abroad",
+          "a university degree"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 30,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_72572f458d45b900ddb1d9ffdcacff70",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "opposition"
+        },
+        "normalized_proposition": "An opposition is associated with two tendencies that see each other clearly across a distance and are difficult to hold at once.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "Unlike a square, where the friction is about method, here the two are legible to each other and the difficulty is holding both at the same time."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that separation this wide is what makes both ends visible in the first place."
+        ],
+        "prohibited_claims": [
+          "an internal conflict",
+          "a divided self",
+          "will be forced to choose"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 31,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_b90f942c891109ffe1e33a75c710b951",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "pattern",
+          "pattern": "stellium"
+        },
+        "normalized_proposition": "A concentration of several bodies in one area is associated with disproportionate attention going to that area.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is proportion."
+        ],
+        "counter_expressions": [
+          "The counter-expression is depth.",
+          "Attention that keeps returning to one place accumulates, and what accumulates is competence that thinner attention does not produce."
+        ],
+        "prohibited_claims": [
+          "an obsession",
+          "a special talent",
+          "you are destined"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 33,
+        "cluster_tags": [
+          "6"
+        ]
+      },
+      {
+        "id": "ont_26b67cd1bb2eddebf6ba08738250c372",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "pluto"
+        },
+        "normalized_proposition": "Pluto is associated with the area that refuses to stay casual, whatever level of involvement was intended.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is proportion again, from a different direction."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that depth of this kind is not distributed evenly and is not purchasable."
+        ],
+        "prohibited_claims": [
+          "a traumatic experience",
+          "a destructive pattern",
+          "a crisis will"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 37,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_d3019387ea8ab332bc09a56a063ca386",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "saturn"
+        },
+        "normalized_proposition": "Saturn is associated with slowing down and testing a commitment before accepting it.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the checking is indistinguishable from avoidance while it is happening, both to the person and to anyone waiting on them."
+        ],
+        "counter_expressions": [
+          "The counter-expression is durability.",
+          "What is accepted slowly is frequently what is still being maintained years later, and the area that felt heaviest early is often the one described as solid in retrospect."
+        ],
+        "prohibited_claims": [
+          "a period of hardship",
+          "a karmic lesson",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 39,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_7d6ca22dca5ffc3e56ab443f8e647ec5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 2
+        },
+        "normalized_proposition": "The second house is associated with what a person holds on their own terms, without needing anyone else's agreement.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that anything held this way tends to be undervalued by the person holding it.",
+          "Something that has been available continuously is difficult to price, and people frequently discover the worth of a second-house holding only when a situation removes it or when someone outside offers to pay for it."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that these holdings are the ones that survive a bad year."
+        ],
+        "prohibited_claims": [
+          "financial advice",
+          "your income will",
+          "a wealthy period"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 41,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_028a01f54d3d1c48509d94552f8879c5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 7
+        },
+        "normalized_proposition": "The seventh house is associated with what happens in one-to-one arrangements, where the other party has equal standing.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that everything in this house is negotiated, and negotiation exposes what a person will and will not concede.",
+          "People frequently report learning more about their own limits from a difficult arrangement than from any amount of solitude, and report it as unwelcome information arriving in an unwelcome way."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a counterpart supplies what cannot be self-supplied."
+        ],
+        "prohibited_claims": [
+          "your future spouse",
+          "a marriage will",
+          "relationship compatibility"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 42,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_5beb72d3f1d2b5d14996fd0ce7e21f26",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "sextile"
+        },
+        "normalized_proposition": "A sextile is associated with a combination that is available on request but does not engage on its own.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that anything requiring initiation is frequently never initiated."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that optional is a genuine advantage once the option is known."
+        ],
+        "prohibited_claims": [
+          "an easy opportunity",
+          "a natural gift",
+          "will come easily"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 43,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_19c8bc4df8018f5f505be625b51181e2",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 6
+        },
+        "normalized_proposition": "The sixth house is associated with work that is repeated rather than completed, and with the method used to get through it.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that recurring work is measured by nobody and noticed only in its absence."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that method here compounds more than anywhere else in a chart."
+        ],
+        "prohibited_claims": [
+          "a health condition",
+          "your physical health",
+          "an illness"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 44,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_ff567efea3064fdd78a608b849a3b1e6",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "square"
+        },
+        "normalized_proposition": "A square is associated with two active tendencies that work on the same material without a shared method.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The friction is structural, and it stays."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that squares are where work gets done."
+        ],
+        "prohibited_claims": [
+          "a source of suffering",
+          "a psychological conflict",
+          "will go wrong"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 45,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_e3ad2684fc1fbe37d7306d9b275ef4ca",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "sun"
+        },
+        "normalized_proposition": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this is frequently not the thing a person is most skilled at, and almost never the thing they are most rewarded for."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that it is the most reliable supply of energy available."
+        ],
+        "prohibited_claims": [
+          "your true purpose",
+          "what you were meant to do",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 46,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_33c1c0aee37c7bcf73b70b5cf5307538",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 10
+        },
+        "normalized_proposition": "The tenth house is associated with the part of a life that is visible to people who do not know the person.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that visible and important are different measurements and they come apart."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that visibility is also usable."
+        ],
+        "prohibited_claims": [
+          "your career will",
+          "professional advice",
+          "a guaranteed promotion"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 48,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_cda9c0e82adcd52fe9aebf7f112ba460",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 3
+        },
+        "normalized_proposition": "The third house is associated with the near circuit of routine exchange, the contacts and errands repeated without ceremony.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this traffic is beneath notice while it is working, so it is almost never attended to deliberately."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the near circuit is where most information enters."
+        ],
+        "prohibited_claims": [
+          "your siblings",
+          "a short journey will",
+          "communication problems"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 49,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_34df4017524ee85226b1135826c7e178",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "trine"
+        },
+        "normalized_proposition": "A trine is associated with a combination that runs without supervision, which makes it both reliable and unexamined.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "It requires no maintenance and produces no friction, which is why it is usually reported as a strength when it is reported at all.",
+          "The tension is that unsupervised material is unexamined material."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that reliability is not a small thing."
+        ],
+        "prohibited_claims": [
+          "a stroke of luck",
+          "an effortless success",
+          "a blessing"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 50,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_0fb3ee2d53fe2b521e7a08ed7624f5f1",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "true_node"
+        },
+        "normalized_proposition": "The lunar node is associated with a direction that stays slightly unfamiliar however often it is approached.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that permanent unfamiliarity is easy to read as unsuitability.",
+          "The cost is that it stays effortful."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that attention is the point."
+        ],
+        "prohibited_claims": [
+          "your soul purpose",
+          "a past life",
+          "you are meant to"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 51,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_5453f9c9662a75bbe5c86999947b7b4e",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "house_cusp",
+          "house": 12
+        },
+        "normalized_proposition": "The twelfth house is associated with what is done or worked out unwitnessed, where no account is given to anyone.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that unwitnessed work is unverifiable."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that some work only proceeds unobserved."
+        ],
+        "prohibited_claims": [
+          "hidden enemies",
+          "a mental health",
+          "a pattern of self-sabotage"
+        ],
+        "salience_band": "medium",
+        "presentation_priority": 52,
+        "cluster_tags": [
+          "3"
+        ]
+      },
+      {
+        "id": "ont_ff2236cc34aa0f4c793fb483762e1335",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "uncertainty",
+          "accuracy": "approximate"
+        },
+        "normalized_proposition": "An approximate birth time supports some house and angle material but not the parts that move within the stated range.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a range invites rounding to its middle."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a range honestly worked is more informative than a false point."
+        ],
+        "prohibited_claims": [
+          "we have used noon",
+          "the most likely time",
+          "close enough for"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 53,
+        "cluster_tags": [
+          "7"
+        ]
+      },
+      {
+        "id": "ont_3c839c4b6707649344462582940ed7d5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "uncertainty",
+          "accuracy": "unknown"
+        },
+        "normalized_proposition": "When the birth time is unknown, houses and angles are not calculated, and their absence is not a defect in the reading.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "When the birth time is unknown, houses and angles are not calculated, and their absence is not a defect in the reading."
+        ],
+        "counter_expressions": [
+          "A reading built only on what is calculable is shorter and says less about arenas, meaning where something plays out, while saying the same amount about tendencies."
+        ],
+        "prohibited_claims": [
+          "approximately noon",
+          "we can assume your birth time",
+          "your rising sign is likely"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 56,
+        "cluster_tags": [
+          "7"
+        ]
+      },
+      {
+        "id": "ont_d8e7f799cb1329f38428263cd78f3aaa",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "uncertainty",
+          "accuracy": "exact"
+        },
+        "normalized_proposition": "Where a factor is missing, the honest form is to name what is absent and stop, rather than to substitute a general statement that would be true of anyone.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The failure mode is filling the gap."
+        ],
+        "counter_expressions": [
+          "What remains is genuinely there."
+        ],
+        "prohibited_claims": [
+          "approximately noon",
+          "we can assume your birth time",
+          "your rising sign is likely"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 56,
+        "cluster_tags": [
+          "7"
+        ]
+      },
+      {
+        "id": "ont_1a0a8e7b5c9c0372c151263d0a9c9ce2",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "uranus"
+        },
+        "normalized_proposition": "Uranus is associated with the point at which an established arrangement stops being acceptable to continue.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that abruptness reads as instability from outside and as overdue from inside."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the low ceiling prevents a specific and expensive failure, which is staying in something workable for a decade past the point of interest."
+        ],
+        "prohibited_claims": [
+          "a sudden upheaval",
+          "an unexpected event will",
+          "your life will change"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 57,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_a882a18b1a5123338124edaecd684633",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "venus"
+        },
+        "normalized_proposition": "Venus is associated with what registers as worth having, and with the terms on which a person meets other people.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a standard nobody has said out loud still gets applied, and the application looks arbitrary from outside."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a clear standard is efficient."
+        ],
+        "prohibited_claims": [
+          "your ideal partner",
+          "a romantic outcome",
+          "will meet someone"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 58,
+        "cluster_tags": [
+          "1"
+        ]
+      }
+    ]
+  },
+  "output": "{\"schema_version\":\"0.7.0\",\"chapters\":[{\"chapter_key\":\"chapter_01\",\"working_title\":\"Information, Scale, and Concentration\",\"purpose\":\"Group information handling and judgments of scale with the concentrated operation of joined tendencies.\",\"feature_aliases\":[\"f001\",\"f002\",\"f003\"],\"ontology_rule_ids\":[\"ont_0e7aff35a9064f2e9f08bb6ddf5e241d\",\"ont_f747b567f2cd8c175bfc35d4d1336a6d\",\"ont_a0c08ea9e7f8e66086249705c4b24482\"],\"derived_synthesis_ids\":[],\"required_tension_ids\":[\"ont_0e7aff35a9064f2e9f08bb6ddf5e241d#tension\",\"ont_f747b567f2cd8c175bfc35d4d1336a6d#tension\",\"ont_a0c08ea9e7f8e66086249705c4b24482#tension\"],\"required_resource_ids\":[],\"required_counter_expression_ids\":[\"ont_0e7aff35a9064f2e9f08bb6ddf5e241d#counter\",\"ont_f747b567f2cd8c175bfc35d4d1336a6d#counter\",\"ont_a0c08ea9e7f8e66086249705c4b24482#counter\"]},{\"chapter_key\":\"chapter_02\",\"working_title\":\"Reliable and Available Combinations\",\"purpose\":\"Organize contrasting forms of cooperative operation while explicitly carrying the limits imposed by unknown birth time.\",\"feature_aliases\":[\"f004\",\"f005\",\"f006\"],\"ontology_rule_ids\":[\"ont_34df4017524ee85226b1135826c7e178\",\"ont_3c839c4b6707649344462582940ed7d5\",\"ont_5beb72d3f1d2b5d14996fd0ce7e21f26\"],\"derived_synthesis_ids\":[],\"required_tension_ids\":[\"ont_34df4017524ee85226b1135826c7e178#tension\",\"ont_3c839c4b6707649344462582940ed7d5#tension\",\"ont_5beb72d3f1d2b5d14996fd0ce7e21f26#tension\"],\"required_resource_ids\":[],\"required_counter_expression_ids\":[\"ont_34df4017524ee85226b1135826c7e178#counter\",\"ont_3c839c4b6707649344462582940ed7d5#counter\",\"ont_5beb72d3f1d2b5d14996fd0ce7e21f26#counter\"]},{\"chapter_key\":\"chapter_03\",\"working_title\":\"Initiative, Organizing Effort, and Friction\",\"purpose\":\"Connect the initiation of action with the organizing center of effort and the structural friction between active tendencies.\",\"feature_aliases\":[\"f007\",\"f008\",\"f009\"],\"ontology_rule_ids\":[\"ont_a5e7c54a0915a69484edd873cae32f51\",\"ont_e3ad2684fc1fbe37d7306d9b275ef4ca\",\"ont_ff567efea3064fdd78a608b849a3b1e6\"],\"derived_synthesis_ids\":[],\"required_tension_ids\":[\"ont_a5e7c54a0915a69484edd873cae32f51#tension\",\"ont_e3ad2684fc1fbe37d7306d9b275ef4ca#tension\",\"ont_ff567efea3064fdd78a608b849a3b1e6#tension\"],\"required_resource_ids\":[],\"required_counter_expression_ids\":[\"ont_a5e7c54a0915a69484edd873cae32f51#counter\",\"ont_e3ad2684fc1fbe37d7306d9b275ef4ca#counter\",\"ont_ff567efea3064fdd78a608b849a3b1e6#counter\"]},{\"chapter_key\":\"chapter_04\",\"working_title\":\"Standards, Steadiness, Polarity, and Durability\",\"purpose\":\"Group standards of value and routes to steadiness with the demands of holding opposed tendencies and testing commitments over time.\",\"feature_aliases\":[\"f010\",\"f011\",\"f012\",\"f013\"],\"ontology_rule_ids\":[\"ont_a882a18b1a5123338124edaecd684633\",\"ont_b0c2fe281de54ee93b9f7a11b9e4cb63\",\"ont_72572f458d45b900ddb1d9ffdcacff70\",\"ont_d3019387ea8ab332bc09a56a063ca386\"],\"derived_synthesis_ids\":[],\"required_tension_ids\":[\"ont_a882a18b1a5123338124edaecd684633#tension\",\"ont_b0c2fe281de54ee93b9f7a11b9e4cb63#tension\",\"ont_72572f458d45b900ddb1d9ffdcacff70#tension\",\"ont_d3019387ea8ab332bc09a56a063ca386#tension\"],\"required_resource_ids\":[],\"required_counter_expression_ids\":[\"ont_a882a18b1a5123338124edaecd684633#counter\",\"ont_b0c2fe281de54ee93b9f7a11b9e4cb63#counter\",\"ont_72572f458d45b900ddb1d9ffdcacff70#counter\",\"ont_d3019387ea8ab332bc09a56a063ca386#counter\"]}],\"additional_signatures\":[],\"omissions\":[]}"
+}

@@ -1,0 +1,29 @@
+{
+  "algorithm": "sha256",
+  "unchanged_file_count": 22,
+  "all_original_bytes_unchanged": true,
+  "files": {
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/README.md": "3a85681bda533cbc7f381af59b517115fa154f2b320487efe351508b9cc2c5ca",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/applicability-changes.md": "16bfacea73e0f1ff8d35f1a3c7213dcaf7d0c388477652fb2ddaed5b969cb3c9",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/candidate.json": "dc1303d454406cd8ef7bfdf5747f19b5b832f2d0f100815ba797e47ec17d9c61",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/chart-panel.json": "624537730301761eda0792d57cb9a21b311dc374f73e9e2bcc796c7122ce39ea",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/comparison-bounds.json": "e79820c364241440517cc806111f2bec38950bdf8b10367f43339a74a915cb06",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/comparison-source.json": "096d863ab2d965ac71cf57fc8b8c2f9706719cb9202cec4bece558c554578e14",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/comparison.json": "d8f779d4e52630877151a69007709f842880fcd1db3d36e7467a0a811bddc51d",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/comparison-bounds.json": "099e667585bef6d2a8ded2216e0ff82adf37e62110c3b3a3d41f198c806f01e7",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/comparison.json": "8bfaa3853656205e34c16fc05cca3de06a37da9c84b765bfa6e19f9c386d3dc7",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-after-planner.json": "fca96e0eec95fbc0cecf679b2adb7f16ea0ba9ceabb794b876a9120293d1ce42",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-after-verifier.json": "7b12d378d047b4ed2a6b06247b887a9472bbd4b6b0c650653f8898f0a1620247",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-after-writer.json": "87a478558a8786e4119eec3d1a4bd14a216f35d8361ed610a3d20943f0bf27fc",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-before-planner.json": "3adb6c3ffc8944193cdcf47401ada89195dd8868978bccbdb0dbae09875d4465",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-before-writer.json": "a290290d982602fe1d24a71a2e7684b3e851619cdc7e4ddc9608890c1b93bdc2",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-after-planner.json": "eb4e61adb88c9771c1d2fadf74823ee4039e4e8726c9b422da19279b9c9da497",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-after-verifier.json": "dc723d3457ce93fcc1dc886b92919f20de0fe6d0582efcedd39f212954949a3f",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-after-writer.json": "e26aeffb981df1a5e99411a4f5f70347aa0fb095c3a7d48acc945df80c0130cd",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-before-planner.json": "00e616d9c42af30b668eba5fa7b4e0f3a90c2588f0f01a48b01e208214065f52",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-before-verifier.json": "1f8363d86d781ed6f9b364831eb3e452e3352b996e8701b6e7804d366741450c",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-before-writer.json": "65f860cfecf3d323fde3469c7548d1341c5ed1e00a3b17da755e785fe1b687d4",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/provider-comparison.md": "ca0f2c4afd7c517fb01534c3e49048a19b99f4524644d91d5af8d3f3e18db739",
+    "docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/samples/exact-02-before-planner.json": "e44031ac8953e5d5789f535f81f922ab605fbf988c6732786904f141486c72d0"
+  }
+}

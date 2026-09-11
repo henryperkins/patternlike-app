@@ -1,0 +1,389 @@
+{
+  "recorded_at": "2026-09-09",
+  "input_origin": "synthetic_controls_not_provider_outputs",
+  "ontology_version": "pattern-ontology-en-us-internal-0.1.0",
+  "ontology_bundle_hash": "sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84",
+  "corpus_hash": "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c",
+  "publication_safety_verdict_input": "hypothetical pass to isolate deterministic checks; not an observed semantic approval",
+  "hash_convention": "sha256 of canonical JSON; plan_hash follows the existing contentHash(JSON.stringify(planner)) convention",
+  "baselines": [
+    {
+      "case_id": "exact-01",
+      "writer_hash": "sha256:07608d2056c62bbc53c6b90f62e1ce5b070e4f4e9d213a2bfa8dbe998f25f19b",
+      "plan_hash": "sha256:552d798d24c977b503d78f0aacb3e00f852c4e26cd50272f6d5e17867f643e2f",
+      "structural": {
+        "ok": true,
+        "failures": []
+      },
+      "deterministic_safety": {
+        "policyVersion": "1.0.0",
+        "failures": []
+      }
+    },
+    {
+      "case_id": "exact-02",
+      "writer_hash": "sha256:47e3b1ae3e0934cbd5e83033cb769e9ee665f32bbed43d18dbe8a893562215ed",
+      "plan_hash": "sha256:51f19dc38c36e7d451c5ca8822feaa994e2a1e5f9928da2ad063db1dddb4f47f",
+      "structural": {
+        "ok": true,
+        "failures": []
+      },
+      "deterministic_safety": {
+        "policyVersion": "1.0.0",
+        "failures": []
+      }
+    },
+    {
+      "case_id": "unknown-01",
+      "writer_hash": "sha256:4341aea0dcb7dc9379205d8a4d6f31b32e081c4803becd265d35c8d863869377",
+      "plan_hash": "sha256:5c938c0c9c087ffff4aa5383d40d010012303ec92803231b791998203471cdff",
+      "structural": {
+        "ok": true,
+        "failures": []
+      },
+      "deterministic_safety": {
+        "policyVersion": "1.0.0",
+        "failures": []
+      }
+    }
+  ],
+  "controls": [
+    {
+      "id": "C1",
+      "case_id": "exact-01",
+      "input_origin": "explicit_synthetic_mutation_of_existing_deterministic_writer_with_current_internal_ontology",
+      "base_writer_hash": "sha256:07608d2056c62bbc53c6b90f62e1ce5b070e4f4e9d213a2bfa8dbe998f25f19b",
+      "writer_hash": "sha256:b9e5ba0df16123236970cfb37a0d3f684e11ba7f95b4d96312244fbe4613f3bf",
+      "plan_hash": "sha256:552d798d24c977b503d78f0aacb3e00f852c4e26cd50272f6d5e17867f643e2f",
+      "feature_set_hash": "d72e69aafc61392af8aa173a5e3d34155ba8731637455076292b979ad63b16b3",
+      "expected": {
+        "support": "unsupported_by_selected_citation",
+        "quality": "reject_wrong_citation"
+      },
+      "targets": [
+        {
+          "coordinate": "chapter_02/chapter_02_section_01",
+          "mutation": "Keep Sun-derived prose but replace unit attribution with the allowed Moon alias and Moon rule only.",
+          "original_references": {
+            "feature_aliases": [
+              "f004",
+              "f005"
+            ],
+            "ontology_rule_ids": [
+              "ont_37133d0a0084f6a8aafc27a701afc53b",
+              "ont_17a22b5f6cc69fa0ca43c025f7169683"
+            ]
+          },
+          "section_key": "chapter_02_section_01",
+          "text": "The calculated evidence points to The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f005"
+          ],
+          "ontology_rule_ids": [
+            "ont_17a22b5f6cc69fa0ca43c025f7169683"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "observed": {
+        "structural": {
+          "ok": true,
+          "failures": []
+        },
+        "deterministic_safety": {
+          "policyVersion": "1.0.0",
+          "failures": []
+        }
+      },
+      "semantic_provider_run": false,
+      "human_review": "pending"
+    },
+    {
+      "id": "C2",
+      "case_id": "exact-01",
+      "input_origin": "explicit_synthetic_mutation_of_existing_deterministic_writer_with_current_internal_ontology",
+      "base_writer_hash": "sha256:07608d2056c62bbc53c6b90f62e1ce5b070e4f4e9d213a2bfa8dbe998f25f19b",
+      "writer_hash": "sha256:156775d5afa370cab89d0e029ea35bf953b980205b11207e1ced5bd0f6d0793c",
+      "plan_hash": "sha256:552d798d24c977b503d78f0aacb3e00f852c4e26cd50272f6d5e17867f643e2f",
+      "feature_set_hash": "d72e69aafc61392af8aa173a5e3d34155ba8731637455076292b979ad63b16b3",
+      "expected": {
+        "support": "contradicted_by_chart",
+        "quality": "reject_wrong_participant"
+      },
+      "targets": [
+        {
+          "coordinate": "chapter_02/chapter_02_section_01",
+          "mutation": "Assert the Sun’s Aries placement for the Moon; bind only Sun attribution.",
+          "actual_moon": {
+            "body": "moon",
+            "longitude": 62.5,
+            "sign": 3,
+            "house": null
+          },
+          "actual_sun": {
+            "body": "sun",
+            "longitude": 19.5,
+            "sign": 1,
+            "house": null
+          },
+          "section_key": "chapter_02_section_01",
+          "text": "The Moon is in Aries. The calculated evidence points to The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f004"
+          ],
+          "ontology_rule_ids": [
+            "ont_37133d0a0084f6a8aafc27a701afc53b"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "observed": {
+        "structural": {
+          "ok": true,
+          "failures": []
+        },
+        "deterministic_safety": {
+          "policyVersion": "1.0.0",
+          "failures": []
+        }
+      },
+      "semantic_provider_run": false,
+      "human_review": "pending"
+    },
+    {
+      "id": "C3",
+      "case_id": "unknown-01",
+      "input_origin": "explicit_synthetic_mutation_of_existing_deterministic_writer_with_current_internal_ontology",
+      "base_writer_hash": "sha256:4341aea0dcb7dc9379205d8a4d6f31b32e081c4803becd265d35c8d863869377",
+      "writer_hash": "sha256:172d7d84353053221cdf29730415d4b00c55dd7a5ceead5d8663bb714b909544",
+      "plan_hash": "sha256:5c938c0c9c087ffff4aa5383d40d010012303ec92803231b791998203471cdff",
+      "feature_set_hash": "98922518e1b46f8bf36dcd45608699992982d021eff21ce1cb793c1dba5bba6a",
+      "expected": {
+        "support": "unsupported_suppressed_calculation",
+        "quality": "reject_withheld_angle_assertion"
+      },
+      "targets": [
+        {
+          "coordinate": "chapter_01/chapter_01_section_01",
+          "mutation": "Prepend an asserted angle placement while houses/angles are suppressed.",
+          "suppressed": [
+            "angle_transits",
+            "angles",
+            "houses",
+            "moon_time_sensitive"
+          ],
+          "section_key": "chapter_01_section_01",
+          "text": "Your Ascendant is in Aries. The calculated evidence points to The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f001",
+            "f004"
+          ],
+          "ontology_rule_ids": [
+            "ont_37133d0a0084f6a8aafc27a701afc53b",
+            "ont_8563a483d077048b29fe10fb63e4983b",
+            "ont_e3af08a193f2cd2d728f672cd2b529d7",
+            "ont_f004dcf4e331ce89bc8a2aec5df8a5d7"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "observed": {
+        "structural": {
+          "ok": true,
+          "failures": []
+        },
+        "deterministic_safety": {
+          "policyVersion": "1.0.0",
+          "failures": [
+            {
+              "code": "suppressed_feature_leak",
+              "targetKey": "chapter_01_section_01"
+            }
+          ]
+        }
+      },
+      "semantic_provider_run": false,
+      "human_review": "pending"
+    },
+    {
+      "id": "C4",
+      "case_id": "exact-01",
+      "input_origin": "explicit_synthetic_mutation_of_existing_deterministic_writer_with_current_internal_ontology",
+      "base_writer_hash": "sha256:07608d2056c62bbc53c6b90f62e1ce5b070e4f4e9d213a2bfa8dbe998f25f19b",
+      "writer_hash": "sha256:c7ef80dc982c40b01886b495a1afb4b429962a998d8e66b558e8b26dbedbf74b",
+      "plan_hash": "sha256:552d798d24c977b503d78f0aacb3e00f852c4e26cd50272f6d5e17867f643e2f",
+      "feature_set_hash": "d72e69aafc61392af8aa173a5e3d34155ba8731637455076292b979ad63b16b3",
+      "expected": {
+        "support": "unsupported_sign_meaning",
+        "quality": "reject_omitted_sign_attached_to_broad_body_rule"
+      },
+      "targets": [
+        {
+          "coordinate": "chapter_03/chapter_03_section_01",
+          "mutation": "Attach the omitted Virgo improvement meaning to the selected general Mercury rule and a Cancer placement.",
+          "omitted_source_ref": "virgo-sign-improvement",
+          "actual_mercury": {
+            "body": "mercury",
+            "longitude": 105.5,
+            "sign": 4,
+            "house": null
+          },
+          "section_key": "chapter_03_section_01",
+          "text": "Because Mercury is in Cancer, its method is improvement: attention goes to the gap between a thing and its better version. The calculated evidence points to Mercury is associated with how information is taken in and passed on, rather than with how much is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f003"
+          ],
+          "ontology_rule_ids": [
+            "ont_c9e9ad5cfa36728e7d8c46b15a462862"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "observed": {
+        "structural": {
+          "ok": true,
+          "failures": []
+        },
+        "deterministic_safety": {
+          "policyVersion": "1.0.0",
+          "failures": []
+        }
+      },
+      "semantic_provider_run": false,
+      "human_review": "pending"
+    },
+    {
+      "id": "C5",
+      "case_id": "exact-01",
+      "input_origin": "explicit_synthetic_mutation_of_existing_deterministic_writer_with_current_internal_ontology",
+      "base_writer_hash": "sha256:07608d2056c62bbc53c6b90f62e1ce5b070e4f4e9d213a2bfa8dbe998f25f19b",
+      "writer_hash": "sha256:806ff64c9707b6eb9cd6962bae579451be9967fac600505e4f58db0d73cc462f",
+      "plan_hash": "sha256:552d798d24c977b503d78f0aacb3e00f852c4e26cd50272f6d5e17867f643e2f",
+      "feature_set_hash": "d72e69aafc61392af8aa173a5e3d34155ba8731637455076292b979ad63b16b3",
+      "expected": {
+        "support": "bounded_generic_reflection",
+        "quality": "low_specificity_despite_valid_attribution"
+      },
+      "targets": [
+        {
+          "coordinate": "chapter_02/chapter_02_section_02",
+          "mutation": "Use byte-identical generic prose for the two contrasting charts; keep each chart’s own source attribution.",
+          "section_key": "chapter_02_section_02",
+          "text": "You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f004",
+            "f005"
+          ],
+          "ontology_rule_ids": [
+            "ont_37133d0a0084f6a8aafc27a701afc53b",
+            "ont_17a22b5f6cc69fa0ca43c025f7169683"
+          ],
+          "derived_synthesis_ids": []
+        },
+        {
+          "case_id": "exact-02",
+          "coordinate": "chapter_02/chapter_02_section_02",
+          "writer_hash": "sha256:2295cff34f7c35626f64a6478316296fe1cb4a81e11f625d593c47ddc7f671ba",
+          "observed": {
+            "structural": {
+              "ok": true,
+              "failures": []
+            },
+            "deterministic_safety": {
+              "policyVersion": "1.0.0",
+              "failures": []
+            }
+          },
+          "section_key": "chapter_02_section_02",
+          "text": "You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand. You can notice a familiar tendency and decide how to respond in the situation at hand.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f016",
+            "f020",
+            "f022",
+            "f024"
+          ],
+          "ontology_rule_ids": [
+            "ont_c9e9ad5cfa36728e7d8c46b15a462862",
+            "ont_3e3374a7b49a2e42ef19aa354ff0d33d",
+            "ont_17a22b5f6cc69fa0ca43c025f7169683",
+            "ont_37133d0a0084f6a8aafc27a701afc53b"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "observed": {
+        "structural": {
+          "ok": true,
+          "failures": []
+        },
+        "deterministic_safety": {
+          "policyVersion": "1.0.0",
+          "failures": []
+        }
+      },
+      "semantic_provider_run": false,
+      "human_review": "pending"
+    },
+    {
+      "id": "C6",
+      "case_id": "exact-01",
+      "input_origin": "explicit_synthetic_mutation_of_existing_deterministic_writer_with_current_internal_ontology",
+      "base_writer_hash": "sha256:07608d2056c62bbc53c6b90f62e1ce5b070e4f4e9d213a2bfa8dbe998f25f19b",
+      "writer_hash": "sha256:afb27dbf906d715c1c092a087708712c1fc4a0ddcb533fcd5dc3d4e2c856a6fa",
+      "plan_hash": "sha256:552d798d24c977b503d78f0aacb3e00f852c4e26cd50272f6d5e17867f643e2f",
+      "feature_set_hash": "d72e69aafc61392af8aa173a5e3d34155ba8731637455076292b979ad63b16b3",
+      "expected": {
+        "support": "source_supported_repetition",
+        "quality": "low_contrast_between_tension_and_counter_expression"
+      },
+      "targets": [
+        {
+          "coordinate": "chapter_02/tensions/0",
+          "mutation": "Repeat the same normalized proposition under both opposing field labels.",
+          "source_proposition": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+          "text": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+          "claim_class": "tension",
+          "feature_aliases": [
+            "f004"
+          ],
+          "ontology_rule_ids": [
+            "ont_37133d0a0084f6a8aafc27a701afc53b"
+          ],
+          "derived_synthesis_ids": []
+        },
+        {
+          "coordinate": "chapter_02/counter_expression",
+          "mutation": "Repeat the same normalized proposition under both opposing field labels.",
+          "source_proposition": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+          "text": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. The Sun is associated with what a person organizes effort around, which is not the same as what they are best at. The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+          "claim_class": "counter_expression",
+          "feature_aliases": [
+            "f004"
+          ],
+          "ontology_rule_ids": [
+            "ont_37133d0a0084f6a8aafc27a701afc53b"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "observed": {
+        "structural": {
+          "ok": true,
+          "failures": []
+        },
+        "deterministic_safety": {
+          "policyVersion": "1.0.0",
+          "failures": []
+        }
+      },
+      "semantic_provider_run": false,
+      "human_review": "pending"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "started_at": "2026-09-09T05:18:15.456Z",
+  "input_origin": "same two fictional snapshots rederived and selected per actual candidate",
+  "execution_kind": "explicitly_configured_local_codex_process",
+  "codex_bin": "/home/henry/.nvm/versions/node/v24.21.0/bin/codex",
+  "codex_version": "0.153.4",
+  "authentication": "existing ChatGPT login",
+  "provider_identity_note": "Local CLI process observation, not an independently attested provider receipt.",
+  "pin": {
+    "publisher": "codex",
+    "planner_model": "gpt-5.6-sol",
+    "planner_reasoning": "xhigh",
+    "planner_prompt_version": "1.0.1",
+    "planner_max_output_tokens": 32000,
+    "writer_model": "gpt-5.6-sol",
+    "writer_reasoning": "xhigh",
+    "writer_prompt_version": "1.0.3",
+    "writer_max_output_tokens": 32000,
+    "verifier_model": "gpt-5.6-sol",
+    "verifier_reasoning": "xhigh",
+    "verifier_prompt_version": "1.0.0-verifier",
+    "verifier_max_output_tokens": 32000,
+    "input_max_bytes": 98304,
+    "selection_policy_version": "1.0.0",
+    "validation_policy_version": "1.0.0"
+  },
+  "text_isolation_version": "1.0.0",
+  "provider_call_ceiling": 12,
+  "attempts_per_stage": 1,
+  "retries": 0,
+  "planned_chains": 4,
+  "comparison_limits": "Two cases; first-attempt sampled outputs with fixed pins, not production retries, durable publication, causal quality proof, or human adjudication.",
+  "production_account_exercised": false,
+  "candidate_activated": false,
+  "calls_attempted": 1,
+  "cases": [
+    {
+      "case_id": "exact-02",
+      "variant": "before",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.1",
+      "ontology_hash": "sha256:98297b1d7a45e7a5fc89807bcc0fe311fa882bb978b0340c472fc7deadc4b0c4",
+      "input_sha256": "sha256:6ffa98af2d034688d93146d26d89e10b1cbd19f8aeb02f0eb6769e67fae2c0a6",
+      "selection_packet_sha256": "sha256:6dfee1bc2483fd49a7a0b7622308165960980f4b2336b7fabbe2f389957831b5",
+      "status": "transport_failed",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-09T05:18:15.460Z",
+          "invocation_sha256": "sha256:4d557308ab4344559d9229cacd99b1a4d3ef504ed17ed11256660c89e50f7f93",
+          "sample_file": "samples/exact-02-before-planner.json",
+          "completed_at": "2026-09-09T05:18:15.502Z",
+          "status": "transport_failed",
+          "failure": {
+            "ok": false,
+            "code": "publisher_auth_failed",
+            "safeDetailCode": "authentication_failed",
+            "fatal": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "exact-02",
+      "variant": "after",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.2",
+      "ontology_hash": "sha256:4fd1e939a53ad2eef59e95463b2ed3ac4132261e3449c9087bb2b64062e08c57",
+      "input_sha256": "sha256:6ffa98af2d034688d93146d26d89e10b1cbd19f8aeb02f0eb6769e67fae2c0a6",
+      "selection_packet_sha256": "sha256:5a3719fc3ac929d707e6841050ecefbc21a3f7cd3e0a7f532bf65494c863f254",
+      "status": "not_attempted",
+      "stages": []
+    },
+    {
+      "case_id": "unknown-02",
+      "variant": "before",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.1",
+      "ontology_hash": "sha256:98297b1d7a45e7a5fc89807bcc0fe311fa882bb978b0340c472fc7deadc4b0c4",
+      "input_sha256": "sha256:f98248fb4a0d3c2c9ad6ad97bcf4de8e432698fa33651e5feed47910d9a6ade6",
+      "selection_packet_sha256": "sha256:2bc6d028220625ee7e70275ac71cbc1ed699f091edc8c27727b6faab5900bfcc",
+      "status": "not_attempted",
+      "stages": []
+    },
+    {
+      "case_id": "unknown-02",
+      "variant": "after",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.2",
+      "ontology_hash": "sha256:4fd1e939a53ad2eef59e95463b2ed3ac4132261e3449c9087bb2b64062e08c57",
+      "input_sha256": "sha256:f98248fb4a0d3c2c9ad6ad97bcf4de8e432698fa33651e5feed47910d9a6ade6",
+      "selection_packet_sha256": "sha256:82b8efa13b4f08a565f94384d69f3251243336c2fbabbd1d117465e50263267f",
+      "status": "not_attempted",
+      "stages": []
+    }
+  ],
+  "completed_at": "2026-09-09T05:18:15.503Z",
+  "accepted_chains": 0,
+  "generated_writer_samples": 0
+}

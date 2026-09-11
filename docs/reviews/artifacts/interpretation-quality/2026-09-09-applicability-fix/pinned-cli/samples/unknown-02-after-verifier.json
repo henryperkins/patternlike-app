@@ -1,0 +1,1081 @@
+{
+  "pass": "verifier",
+  "started_at": "2026-09-09T05:32:26.081Z",
+  "invocation_sha256": "sha256:ecf74280b9308d0738957f44739e426fced72d0336b5ae1f2807a91effc30c35",
+  "sample_file": "pinned-cli/samples/unknown-02-after-verifier.json",
+  "completed_at": "2026-09-09T05:32:37.360Z",
+  "input_tokens": 11999,
+  "output_tokens": 480,
+  "output_sha256": "sha256:9939612399a984d92acc0fda96c8cfeb39125fdea3b82d96a5584af12ae7db11",
+  "provider_request_sha256": "sha256:9fb007ad49a64c985b2b7921919721b008fa29d464f533f7de9b9b1f5925477d",
+  "status": "accepted",
+  "semantic_problem": null,
+  "semantic_verdict": {
+    "schema_version": "0.7.0",
+    "verdict": "pass",
+    "findings": []
+  },
+  "publication_findings": [],
+  "request_document": {
+    "schema_version": "0.7.0",
+    "pass": "verifier",
+    "candidate": {
+      "schema_version": "0.7.0",
+      "title": "A Pattern of Method, Momentum, and Measure",
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "title": "Information and the Sense of Enough",
+          "summary": "You may move through information by method, judge scale by what seems reasonable, and experience two joined tendencies as a concentrated channel rather than separate controls.",
+          "sections": [
+            {
+              "section_key": "chapter_01_section_01",
+              "text": "Your Mercury record points to method rather than the amount you know. You may notice that you take in, sort, or pass along information in a way that works cleanly in some settings and less cleanly in others. That contrast does not establish a fixed capacity. It suggests that format, pace, and audience can matter, and that changing the method may change what becomes expressible.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f001"
+              ],
+              "ontology_rule_ids": [
+                "ont_0e7aff35a9064f2e9f08bb6ddf5e241d"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_01_section_02",
+              "text": "Your Jupiter record concerns judgments of scale: where more seems reasonable and how you decide what counts as enough. You may make a generous estimate because you can see room for development, yet that same estimate can sometimes exceed what the situation can carry. The feature describes the measuring instrument rather than declaring every larger choice wise or unwise.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f002"
+              ],
+              "ontology_rule_ids": [
+                "ont_f747b567f2cd8c175bfc35d4d1336a6d"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_01_section_03",
+              "text": "The Sun–Mercury conjunction describes two tendencies that may operate as one instrument. You might experience them less as separate controls than as a single channel: when one is engaged, the other arrives with it. This can create concentration and additional force in that direction, although the record does not determine whether any particular use will be helpful.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f003"
+              ],
+              "ontology_rule_ids": [
+                "ont_a0c08ea9e7f8e66086249705c4b24482"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "A method can suit one context and still be read as a shortcoming in another. If that happens, you might question your capacity when the actual mismatch concerns how information is being exchanged.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f001"
+              ],
+              "ontology_rule_ids": [
+                "ont_0e7aff35a9064f2e9f08bb6ddf5e241d"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "The same generous estimate that makes room for more can also lose track of enough. You may find it difficult to distinguish an accurately sensed opening from a judgment of scale that has moved beyond the material.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f002"
+              ],
+              "ontology_rule_ids": [
+                "ont_f747b567f2cd8c175bfc35d4d1336a6d"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "Because the joined tendencies act together, you may not be able to call on one while setting the other aside. Concentration can therefore reduce selectivity even when it makes the combined operation more forceful.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f003"
+              ],
+              "ontology_rule_ids": [
+                "ont_a0c08ea9e7f8e66086249705c4b24482"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "Other expressions remain possible. Your information method can be adjusted when a setting calls for a different pace or format. The area described by Jupiter may genuinely be one where development asks less of you, so a generous estimate is not automatically misplaced. The joined Sun–Mercury operation may also support unusual effectiveness through concentration. These possibilities do not erase poor fit, excess, or reduced selectivity; they show why the same instruments cannot be judged by strain alone.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f001",
+              "f002",
+              "f003"
+            ],
+            "ontology_rule_ids": [
+              "ont_0e7aff35a9064f2e9f08bb6ddf5e241d",
+              "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+              "ont_a0c08ea9e7f8e66086249705c4b24482"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_02",
+          "title": "What Runs Quietly and What Waits for You",
+          "summary": "Some combinations in your pattern may remain dependable without your attention, while another becomes useful only when deliberately engaged. The available record also requires restraint about contextual and timing detail.",
+          "sections": [
+            {
+              "section_key": "chapter_02_section_01",
+              "text": "The Moon–Venus trine is described here through its manner of operating. The pairing may run without supervision, making it reliable but easy to overlook. You might use it without pausing to examine how it works or where its limits lie. This describes an unattended combination, not a promise about the exact form it takes in your life.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f004"
+              ],
+              "ontology_rule_ids": [
+                "ont_34df4017524ee85226b1135826c7e178"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_02_section_02",
+              "text": "Some calculations depend on precision the birth record does not provide, so they are withheld rather than reconstructed. This narrows contextual detail and prevents claims that require an exact time. You may find the account less specific about where a tendency shows up, but that restraint keeps it aligned with what can actually be calculated.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f005"
+              ],
+              "ontology_rule_ids": [
+                "ont_3c839c4b6707649344462582940ed7d5"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_02_section_03",
+              "text": "The Jupiter–Saturn sextile describes a combination that may be available when you request it without starting by itself. You might need to recognize a use for it and make the first move before the two tendencies cooperate. Its optional quality means it need not run constantly in the background, but it can remain unused when no deliberate invitation occurs.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f006"
+              ],
+              "ontology_rule_ids": [
+                "ont_5beb72d3f1d2b5d14996fd0ce7e21f26"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "What runs without maintenance may also escape examination. Because the Moon–Venus combination creates little friction, you might treat its familiar operation as self-explanatory and notice neither the assumptions inside it nor the situations it does not suit.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f004"
+              ],
+              "ontology_rule_ids": [
+                "ont_34df4017524ee85226b1135826c7e178"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "A narrower account may feel incomplete because it says less about life context. Even so, filling the gap with estimates would create detail the record cannot support. The limit has to remain visible rather than being treated as a defect or quietly guessed away.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f005"
+              ],
+              "ontology_rule_ids": [
+                "ont_3c839c4b6707649344462582940ed7d5"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "Anything that requires initiation can remain dormant. You may possess access to the Jupiter–Saturn combination yet rarely call on it, especially when its availability is quiet enough that nothing reminds you to begin.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f006"
+              ],
+              "ontology_rule_ids": [
+                "ont_5beb72d3f1d2b5d14996fd0ce7e21f26"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "The unattended pairing may offer real reliability even when you have not studied it closely. Working only with calculable material also creates a cleaner boundary: the account says less about context while retaining what can be said about supported tendencies. The optional Jupiter–Saturn combination may be useful precisely because it does not operate constantly; once recognized, you can choose whether to engage it. Reliability, restraint, and choice are distinct advantages, though none removes the accompanying limits.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f004",
+              "f005",
+              "f006"
+            ],
+            "ontology_rule_ids": [
+              "ont_34df4017524ee85226b1135826c7e178",
+              "ont_3c839c4b6707649344462582940ed7d5",
+              "ont_5beb72d3f1d2b5d14996fd0ce7e21f26"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_03",
+          "title": "Starting, Sustaining, and Working Through Friction",
+          "summary": "Your pattern places a quick threshold for beginning beside a steady organizing focus and an enduring difference in method. Effort may start readily while still having to negotiate how it proceeds.",
+          "sections": [
+            {
+              "section_key": "chapter_03_section_01",
+              "text": "Your Mars record is associated with initiating action and with the friction of moving before everyone else is ready. You may cross the threshold into action quickly, without that speed being a decision you consciously make each time. The same tempo can also apply to getting past a snag and beginning repair, so friction is only one possible result of moving early.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f007"
+              ],
+              "ontology_rule_ids": [
+                "ont_a5e7c54a0915a69484edd873cae32f51"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_03_section_02",
+              "text": "Your Sun record describes what you may organize effort around, which is not necessarily what you do most skillfully or what earns the clearest response from others. You might keep returning energy to something because it provides a dependable center for effort, even when another activity comes more easily. The feature concerns where effort gathers, not a prescribed direction for your life.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f008"
+              ],
+              "ontology_rule_ids": [
+                "ont_e3ad2684fc1fbe37d7306d9b275ef4ca"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_03_section_03",
+              "text": "The Sun–Moon square describes two active tendencies working on the same material without sharing a method. Both may remain engaged, yet each approaches the work differently. The resulting friction concerns how something gets done rather than proving that either tendency is defective. Because the difference is structural, it may require repeated handling rather than a final resolution.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_ff567efea3064fdd78a608b849a3b1e6"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "Moving before others are ready can create friction, but reading only that friction misses the same quickness in recovery and repair. Neither the speed nor its rough edges are settings you selected. You may still need to handle their effects, but the record does not frame your basic tempo as a flaw to correct.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f007"
+              ],
+              "ontology_rule_ids": [
+                "ont_a5e7c54a0915a69484edd873cae32f51"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "What reliably gathers your effort may not be where you feel most capable or receive the strongest acknowledgment. That difference can make sustained investment difficult to explain, especially when visible competence seems to point elsewhere.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f008"
+              ],
+              "ontology_rule_ids": [
+                "ont_e3ad2684fc1fbe37d7306d9b275ef4ca"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "The two methods in the Sun–Moon square may continue to interfere with one another because the friction is built into their arrangement. Work can proceed, but not necessarily through a smooth or permanently settled process.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_ff567efea3064fdd78a608b849a3b1e6"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "The same low threshold that begins action may also help you start repairing what has been disrupted. The focus described by the Sun can remain a dependable supply of energy even when it is not your most polished ability. The square's persistent friction may keep the shared material active and make sustained work possible. These expressions do not remove haste, uneven recognition, or disagreement over method; they show how effort can continue alongside them.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f007",
+              "f008",
+              "f009"
+            ],
+            "ontology_rule_ids": [
+              "ont_a5e7c54a0915a69484edd873cae32f51",
+              "ont_e3ad2684fc1fbe37d7306d9b275ef4ca",
+              "ont_ff567efea3064fdd78a608b849a3b1e6"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_04",
+          "title": "Standards, Steadiness, and What Lasts",
+          "summary": "Standards, routes toward steadiness, widely separated tendencies, and careful testing of commitment may all shape what you can accept and sustain without making every demand compatible.",
+          "sections": [
+            {
+              "section_key": "chapter_04_section_01",
+              "text": "Your Venus record concerns what registers as worth having and the terms on which you meet other people. You may apply a standard before you have put it into words. This can make your choices feel coherent from within while leaving their basis unclear to someone outside the decision. The feature describes valuation and terms, not any particular personal outcome.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f010"
+              ],
+              "ontology_rule_ids": [
+                "ont_a882a18b1a5123338124edaecd684633"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_04_section_02",
+              "text": "The available Moon record is used here in a deliberately limited way. It supports the general association with how you may settle and what you might reach for when steadiness is needed. That route may be ordinary, private, or difficult to explain. The record does not establish one response that you always use, and it does not describe your present state.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f011"
+              ],
+              "ontology_rule_ids": [
+                "ont_b0c2fe281de54ee93b9f7a11b9e4cb63"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_04_section_03",
+              "text": "The Mars–Jupiter opposition describes two tendencies that may see each other clearly across a wide distance while remaining difficult to hold at once. Each end can be legible without becoming easy to combine with the other. The difficulty lies in simultaneous inclusion, not in a failure to recognize what either end is doing.",
+              "claim_class": "structural_description",
+              "feature_aliases": [
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_72572f458d45b900ddb1d9ffdcacff70"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_04_section_04",
+              "text": "Your Saturn record is associated with slowing down and testing a commitment before accepting it. You may need time to check whether something can bear continued effort. While that checking is underway, it can resemble avoidance both to you and to anyone waiting for an answer. The distinction between careful testing and delay may become clear only after the process has unfolded.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f013"
+              ],
+              "ontology_rule_ids": [
+                "ont_d3019387ea8ab332bc09a56a063ca386"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "An unspoken standard still shapes what you accept, yet its application can look arbitrary from outside. You may assume the terms are evident when the other person has never been given a way to understand them.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f010"
+              ],
+              "ontology_rule_ids": [
+                "ont_a882a18b1a5123338124edaecd684633"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "What helps you settle may not feel chosen, impressive, or easy to state plainly. You might hesitate to name a simple need because it feels awkward, even when recognizing it would be useful.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f011"
+              ],
+              "ontology_rule_ids": [
+                "ont_b0c2fe281de54ee93b9f7a11b9e4cb63"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "The ends of the Mars–Jupiter opposition may be quite readable to each other while still resisting simultaneous use. Seeing both clearly does not necessarily make enough room to accommodate both at the same moment.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_72572f458d45b900ddb1d9ffdcacff70"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "text": "Careful checking and avoidance can look identical while they are happening. You may not immediately know whether delay is protecting a durable commitment or postponing an answer, and people waiting on you may have even less information.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f013"
+              ],
+              "ontology_rule_ids": [
+                "ont_d3019387ea8ab332bc09a56a063ca386"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [],
+          "counter_expression": {
+            "text": "Other expressions are also possible. A clear standard can save time when you state it plainly. Knowing your usual route toward steadiness can be practical even if it feels unpolished. The distance in the Mars–Jupiter pairing may help you see both ends distinctly without requiring simultaneous use. Slow testing can also support durability: what you accept carefully may be easier to maintain. None of these possibilities removes the accompanying strain.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f010",
+              "f011",
+              "f012",
+              "f013"
+            ],
+            "ontology_rule_ids": [
+              "ont_a882a18b1a5123338124edaecd684633",
+              "ont_b0c2fe281de54ee93b9f7a11b9e4cb63",
+              "ont_72572f458d45b900ddb1d9ffdcacff70",
+              "ont_d3019387ea8ab332bc09a56a063ca386"
+            ],
+            "derived_synthesis_ids": []
+          }
+        }
+      ],
+      "additional_signatures": [],
+      "uncertainty_note": {
+        "text": "Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. Those calculations are withheld rather than estimated. The document therefore stays with tendencies supported by the available record and does not assign them to particular life arenas or use them for timing. This limitation narrows scope; it does not make the remaining interpretations certain.",
+        "claim_class": "uncertainty",
+        "feature_aliases": [
+          "f005"
+        ],
+        "ontology_rule_ids": [
+          "ont_3c839c4b6707649344462582940ed7d5"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    "plan": {
+      "schema_version": "0.7.0",
+      "plan_hash": "sha256:c4b4aec11ade936aa5a6060bcaee5a55bc41fd99cb22b5821bf06425b9da13b3",
+      "sparse_pattern": false,
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "working_title": "Information, Scale, and Concentration",
+          "purpose": "Group information handling and judgments of scale with the concentrated operation of joined tendencies.",
+          "feature_aliases": [
+            "f001",
+            "f002",
+            "f003"
+          ],
+          "ontology_rule_ids": [
+            "ont_0e7aff35a9064f2e9f08bb6ddf5e241d",
+            "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+            "ont_a0c08ea9e7f8e66086249705c4b24482"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_0e7aff35a9064f2e9f08bb6ddf5e241d#tension",
+            "ont_f747b567f2cd8c175bfc35d4d1336a6d#tension",
+            "ont_a0c08ea9e7f8e66086249705c4b24482#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_0e7aff35a9064f2e9f08bb6ddf5e241d#counter",
+            "ont_f747b567f2cd8c175bfc35d4d1336a6d#counter",
+            "ont_a0c08ea9e7f8e66086249705c4b24482#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_02",
+          "working_title": "Reliable and Available Combinations",
+          "purpose": "Organize contrasting forms of cooperative operation while explicitly carrying the limits imposed by unknown birth time.",
+          "feature_aliases": [
+            "f004",
+            "f005",
+            "f006"
+          ],
+          "ontology_rule_ids": [
+            "ont_34df4017524ee85226b1135826c7e178",
+            "ont_3c839c4b6707649344462582940ed7d5",
+            "ont_5beb72d3f1d2b5d14996fd0ce7e21f26"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_34df4017524ee85226b1135826c7e178#tension",
+            "ont_3c839c4b6707649344462582940ed7d5#tension",
+            "ont_5beb72d3f1d2b5d14996fd0ce7e21f26#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_34df4017524ee85226b1135826c7e178#counter",
+            "ont_3c839c4b6707649344462582940ed7d5#counter",
+            "ont_5beb72d3f1d2b5d14996fd0ce7e21f26#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_03",
+          "working_title": "Initiative, Organizing Effort, and Friction",
+          "purpose": "Connect the initiation of action with the organizing center of effort and the structural friction between active tendencies.",
+          "feature_aliases": [
+            "f007",
+            "f008",
+            "f009"
+          ],
+          "ontology_rule_ids": [
+            "ont_a5e7c54a0915a69484edd873cae32f51",
+            "ont_e3ad2684fc1fbe37d7306d9b275ef4ca",
+            "ont_ff567efea3064fdd78a608b849a3b1e6"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_a5e7c54a0915a69484edd873cae32f51#tension",
+            "ont_e3ad2684fc1fbe37d7306d9b275ef4ca#tension",
+            "ont_ff567efea3064fdd78a608b849a3b1e6#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_a5e7c54a0915a69484edd873cae32f51#counter",
+            "ont_e3ad2684fc1fbe37d7306d9b275ef4ca#counter",
+            "ont_ff567efea3064fdd78a608b849a3b1e6#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_04",
+          "working_title": "Standards, Steadiness, Polarity, and Durability",
+          "purpose": "Group standards of value and routes to steadiness with the demands of holding opposed tendencies and testing commitments over time.",
+          "feature_aliases": [
+            "f010",
+            "f011",
+            "f012",
+            "f013"
+          ],
+          "ontology_rule_ids": [
+            "ont_a882a18b1a5123338124edaecd684633",
+            "ont_b0c2fe281de54ee93b9f7a11b9e4cb63",
+            "ont_72572f458d45b900ddb1d9ffdcacff70",
+            "ont_d3019387ea8ab332bc09a56a063ca386"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_a882a18b1a5123338124edaecd684633#tension",
+            "ont_b0c2fe281de54ee93b9f7a11b9e4cb63#tension",
+            "ont_72572f458d45b900ddb1d9ffdcacff70#tension",
+            "ont_d3019387ea8ab332bc09a56a063ca386#tension"
+          ],
+          "required_resource_ids": [],
+          "required_counter_expression_ids": [
+            "ont_a882a18b1a5123338124edaecd684633#counter",
+            "ont_b0c2fe281de54ee93b9f7a11b9e4cb63#counter",
+            "ont_72572f458d45b900ddb1d9ffdcacff70#counter",
+            "ont_d3019387ea8ab332bc09a56a063ca386#counter"
+          ]
+        }
+      ],
+      "additional_signatures": [],
+      "omissions": []
+    },
+    "facts": [
+      {
+        "alias": "f001",
+        "feature_class": "position",
+        "fact": {
+          "body": "mercury",
+          "longitude": 108,
+          "sign": 4,
+          "house": null
+        }
+      },
+      {
+        "alias": "f002",
+        "feature_class": "position",
+        "fact": {
+          "body": "jupiter",
+          "longitude": 237,
+          "sign": 8,
+          "house": null
+        }
+      },
+      {
+        "alias": "f003",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "sun",
+          "body_b": "mercury",
+          "aspect": "conjunction",
+          "orb": 1.4
+        }
+      },
+      {
+        "alias": "f004",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "moon",
+          "body_b": "venus",
+          "aspect": "trine",
+          "orb": 3.2
+        }
+      },
+      {
+        "alias": "f005",
+        "feature_class": "uncertainty",
+        "fact": {
+          "accuracy": "unknown",
+          "suppressed_features": [
+            "angle_transits",
+            "angles",
+            "houses",
+            "moon_time_sensitive"
+          ]
+        }
+      },
+      {
+        "alias": "f006",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "jupiter",
+          "body_b": "saturn",
+          "aspect": "sextile",
+          "orb": 2.7
+        }
+      },
+      {
+        "alias": "f007",
+        "feature_class": "position",
+        "fact": {
+          "body": "mars",
+          "longitude": 194,
+          "sign": 7,
+          "house": null
+        }
+      },
+      {
+        "alias": "f008",
+        "feature_class": "position",
+        "fact": {
+          "body": "sun",
+          "longitude": 22,
+          "sign": 1,
+          "house": null
+        }
+      },
+      {
+        "alias": "f009",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "sun",
+          "body_b": "moon",
+          "aspect": "square",
+          "orb": 2.1
+        }
+      },
+      {
+        "alias": "f010",
+        "feature_class": "position",
+        "fact": {
+          "body": "venus",
+          "longitude": 151,
+          "sign": 6,
+          "house": null
+        }
+      },
+      {
+        "alias": "f011",
+        "feature_class": "position",
+        "fact": {
+          "body": "moon",
+          "longitude": 65,
+          "sign": 3,
+          "house": null
+        }
+      },
+      {
+        "alias": "f012",
+        "feature_class": "aspect",
+        "fact": {
+          "body_a": "mars",
+          "body_b": "jupiter",
+          "aspect": "opposition",
+          "orb": 4.1
+        }
+      },
+      {
+        "alias": "f013",
+        "feature_class": "position",
+        "fact": {
+          "body": "saturn",
+          "longitude": 280,
+          "sign": 10,
+          "house": null
+        }
+      }
+    ],
+    "ontology_records": [
+      {
+        "id": "ont_a0c08ea9e7f8e66086249705c4b24482",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "conjunction"
+        },
+        "normalized_proposition": "A conjunction is associated with two tendencies that operate as a single instrument and are not experienced separately.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that fused material cannot be applied selectively."
+        ],
+        "counter_expressions": [
+          "The counter-expression is concentration.",
+          "Two tendencies acting as one produce more force in that direction than the same two acting independently, and the areas where a person is unusually effective are frequently built this way."
+        ],
+        "prohibited_claims": [
+          "an intensified problem",
+          "a powerful gift",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 5,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_f747b567f2cd8c175bfc35d4d1336a6d",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "jupiter"
+        },
+        "normalized_proposition": "Jupiter is associated with the area where more seems reasonable, and with the judgment about how much is enough.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that generosity of estimate and poor judgment of scale are the same instrument."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that the area is genuinely where growth is cheapest."
+        ],
+        "prohibited_claims": [
+          "financial gain",
+          "a period of luck",
+          "will expand your"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 22,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_a5e7c54a0915a69484edd873cae32f51",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "mars"
+        },
+        "normalized_proposition": "Mars is associated with initiating action and with the friction of moving before everyone else is ready.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "Reading only the friction misses that the same speed applies to getting over things.",
+          "Neither the speed nor the friction is a setting the person chose, and neither is a problem to be corrected."
+        ],
+        "counter_expressions": [
+          "The counterweight is that a low threshold for starting is also a low threshold for repair."
+        ],
+        "prohibited_claims": [
+          "anger management",
+          "a violent temper",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 25,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_0e7aff35a9064f2e9f08bb6ddf5e241d",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "mercury"
+        },
+        "normalized_proposition": "Mercury is associated with how information is taken in and passed on, rather than with how much is known.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a method that suits one setting reads as a deficiency in another."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that method is adjustable in a way that capacity is not."
+        ],
+        "prohibited_claims": [
+          "a learning disability",
+          "a high intelligence",
+          "an attention deficit"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 26,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_b0c2fe281de54ee93b9f7a11b9e4cb63",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "moon"
+        },
+        "normalized_proposition": "The Moon is associated with how a person settles, and with what gets reached for when steadiness is needed.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this material is rarely chosen and is often slightly embarrassing to state plainly."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that knowing the route is practical."
+        ],
+        "prohibited_claims": [
+          "emotional instability",
+          "a mood disorder",
+          "how you are feeling"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 28,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_72572f458d45b900ddb1d9ffdcacff70",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "opposition"
+        },
+        "normalized_proposition": "An opposition is associated with two tendencies that see each other clearly across a distance and are difficult to hold at once.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "Unlike a square, where the friction is about method, here the two are legible to each other and the difficulty is holding both at the same time."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that separation this wide is what makes both ends visible in the first place."
+        ],
+        "prohibited_claims": [
+          "an internal conflict",
+          "a divided self",
+          "will be forced to choose"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 31,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_d3019387ea8ab332bc09a56a063ca386",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "saturn"
+        },
+        "normalized_proposition": "Saturn is associated with slowing down and testing a commitment before accepting it.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that the checking is indistinguishable from avoidance while it is happening, both to the person and to anyone waiting on them."
+        ],
+        "counter_expressions": [
+          "The counter-expression is durability.",
+          "What is accepted slowly is frequently what is still being maintained years later, and the area that felt heaviest early is often the one described as solid in retrospect."
+        ],
+        "prohibited_claims": [
+          "a period of hardship",
+          "a karmic lesson",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 39,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_5beb72d3f1d2b5d14996fd0ce7e21f26",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "sextile"
+        },
+        "normalized_proposition": "A sextile is associated with a combination that is available on request but does not engage on its own.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that anything requiring initiation is frequently never initiated."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that optional is a genuine advantage once the option is known."
+        ],
+        "prohibited_claims": [
+          "an easy opportunity",
+          "a natural gift",
+          "will come easily"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 43,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_ff567efea3064fdd78a608b849a3b1e6",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "square"
+        },
+        "normalized_proposition": "A square is associated with two active tendencies that work on the same material without a shared method.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The friction is structural, and it stays."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that squares are where work gets done."
+        ],
+        "prohibited_claims": [
+          "a source of suffering",
+          "a psychological conflict",
+          "will go wrong"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 45,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_e3ad2684fc1fbe37d7306d9b275ef4ca",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "sun"
+        },
+        "normalized_proposition": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that this is frequently not the thing a person is most skilled at, and almost never the thing they are most rewarded for."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that it is the most reliable supply of energy available."
+        ],
+        "prohibited_claims": [
+          "your true purpose",
+          "what you were meant to do",
+          "a guaranteed outcome"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 46,
+        "cluster_tags": [
+          "1"
+        ]
+      },
+      {
+        "id": "ont_34df4017524ee85226b1135826c7e178",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "aspect",
+          "aspect": "trine"
+        },
+        "normalized_proposition": "A trine is associated with a combination that runs without supervision, which makes it both reliable and unexamined.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "It requires no maintenance and produces no friction, which is why it is usually reported as a strength when it is reported at all.",
+          "The tension is that unsupervised material is unexamined material."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that reliability is not a small thing."
+        ],
+        "prohibited_claims": [
+          "a stroke of luck",
+          "an effortless success",
+          "a blessing"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 50,
+        "cluster_tags": [
+          "4"
+        ]
+      },
+      {
+        "id": "ont_3c839c4b6707649344462582940ed7d5",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "uncertainty",
+          "accuracy": "unknown"
+        },
+        "normalized_proposition": "When the birth time is unknown, houses and angles are not calculated, and their absence is not a defect in the reading.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "When the birth time is unknown, houses and angles are not calculated, and their absence is not a defect in the reading."
+        ],
+        "counter_expressions": [
+          "A reading built only on what is calculable is shorter and says less about arenas, meaning where something plays out, while saying the same amount about tendencies."
+        ],
+        "prohibited_claims": [
+          "approximately noon",
+          "we can assume your birth time",
+          "your rising sign is likely"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 56,
+        "cluster_tags": [
+          "7"
+        ]
+      },
+      {
+        "id": "ont_a882a18b1a5123338124edaecd684633",
+        "meaning_class": "source_supported",
+        "locale": "en-US",
+        "feature_predicate": {
+          "type": "position",
+          "body": "venus"
+        },
+        "normalized_proposition": "Venus is associated with what registers as worth having, and with the terms on which a person meets other people.",
+        "input_meaning_ids": [],
+        "transformation_class": null,
+        "tensions": [
+          "The tension is that a standard nobody has said out loud still gets applied, and the application looks arbitrary from outside."
+        ],
+        "counter_expressions": [
+          "The counter-expression is that a clear standard is efficient."
+        ],
+        "prohibited_claims": [
+          "your ideal partner",
+          "a romantic outcome",
+          "will meet someone"
+        ],
+        "salience_band": "high",
+        "presentation_priority": 58,
+        "cluster_tags": [
+          "1"
+        ]
+      }
+    ],
+    "derived_synthesis_graph": [],
+    "uncertainty": {
+      "suppressed_classes": [
+        "angle_transits",
+        "angles",
+        "houses",
+        "moon_time_sensitive"
+      ],
+      "required_language_rule_ids": [
+        "ont_3c839c4b6707649344462582940ed7d5"
+      ]
+    }
+  },
+  "output": "{\"schema_version\":\"0.7.0\",\"verdict\":\"pass\",\"findings\":[]}"
+}

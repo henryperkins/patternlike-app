@@ -1,0 +1,256 @@
+{
+  "started_at": "2026-09-09T05:19:38.685Z",
+  "input_origin": "same two fictional snapshots rederived and selected per actual candidate",
+  "execution_kind": "explicitly_configured_local_codex_process",
+  "codex_bin": "/tmp/patternlike-ontology-comparison-tools/node_modules/.bin/codex",
+  "codex_version": "0.153.3",
+  "authentication": "existing ChatGPT login",
+  "provider_identity_note": "Local CLI process observation, not an independently attested provider receipt.",
+  "pin": {
+    "publisher": "codex",
+    "planner_model": "gpt-5.6-sol",
+    "planner_reasoning": "xhigh",
+    "planner_prompt_version": "1.0.1",
+    "planner_max_output_tokens": 32000,
+    "writer_model": "gpt-5.6-sol",
+    "writer_reasoning": "xhigh",
+    "writer_prompt_version": "1.0.3",
+    "writer_max_output_tokens": 32000,
+    "verifier_model": "gpt-5.6-sol",
+    "verifier_reasoning": "xhigh",
+    "verifier_prompt_version": "1.0.0-verifier",
+    "verifier_max_output_tokens": 32000,
+    "input_max_bytes": 98304,
+    "selection_policy_version": "1.0.0",
+    "validation_policy_version": "1.0.0"
+  },
+  "text_isolation_version": "1.0.0",
+  "provider_call_ceiling": 12,
+  "attempts_per_stage": 1,
+  "retries": 0,
+  "planned_chains": 4,
+  "comparison_limits": "Two cases; first-attempt sampled outputs with fixed pins, not production retries, durable publication, causal quality proof, or human adjudication.",
+  "production_account_exercised": false,
+  "candidate_activated": false,
+  "calls_attempted": 11,
+  "cases": [
+    {
+      "case_id": "exact-02",
+      "variant": "before",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.1",
+      "ontology_hash": "sha256:98297b1d7a45e7a5fc89807bcc0fe311fa882bb978b0340c472fc7deadc4b0c4",
+      "input_sha256": "sha256:6ffa98af2d034688d93146d26d89e10b1cbd19f8aeb02f0eb6769e67fae2c0a6",
+      "selection_packet_sha256": "sha256:6dfee1bc2483fd49a7a0b7622308165960980f4b2336b7fabbe2f389957831b5",
+      "status": "writer_rejected",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-09T05:19:38.688Z",
+          "invocation_sha256": "sha256:4d557308ab4344559d9229cacd99b1a4d3ef504ed17ed11256660c89e50f7f93",
+          "sample_file": "pinned-cli/samples/exact-02-before-planner.json",
+          "completed_at": "2026-09-09T05:20:21.922Z",
+          "input_tokens": 13663,
+          "output_tokens": 3397,
+          "output_sha256": "sha256:85bfa9047eecbe864974df31fae1b4ee5c458f884fdc59f7fdc9f34a7a8d32c1",
+          "provider_request_sha256": "sha256:2ff0e8883fefbc05b37241f6ee31e8b5301cb84b08b4ec502ff94de08d1582c8",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "writer",
+          "started_at": "2026-09-09T05:20:21.926Z",
+          "invocation_sha256": "sha256:a906a22e3ce112d60a1c3684fe0061fac3e56a16394c960147c3c3c19a2df4d2",
+          "sample_file": "pinned-cli/samples/exact-02-before-writer.json",
+          "completed_at": "2026-09-09T05:22:32.217Z",
+          "input_tokens": 12850,
+          "output_tokens": 9076,
+          "output_sha256": "sha256:03f107f87df036cfc56f602fb4add6bcd7352b4b62c533c6440167fe45a9b7ee",
+          "provider_request_sha256": "sha256:91055f6d04c0b77bbd8215bdeb9d99de022e80484b06e4571357fa77356a410c",
+          "status": "rejected",
+          "findings": [
+            {
+              "code": "chapter_word_count",
+              "message": "chapter_04:245"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "exact-02",
+      "variant": "after",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.2",
+      "ontology_hash": "sha256:4fd1e939a53ad2eef59e95463b2ed3ac4132261e3449c9087bb2b64062e08c57",
+      "input_sha256": "sha256:6ffa98af2d034688d93146d26d89e10b1cbd19f8aeb02f0eb6769e67fae2c0a6",
+      "selection_packet_sha256": "sha256:5a3719fc3ac929d707e6841050ecefbc21a3f7cd3e0a7f532bf65494c863f254",
+      "status": "verifier_rejected",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-09T05:22:32.222Z",
+          "invocation_sha256": "sha256:2f2d4bd546f6ea209b65744655eb5afba3976c661b9c22a6b6be1182cad45a9d",
+          "sample_file": "pinned-cli/samples/exact-02-after-planner.json",
+          "completed_at": "2026-09-09T05:23:09.123Z",
+          "input_tokens": 12969,
+          "output_tokens": 2851,
+          "output_sha256": "sha256:f2e9751829722a8682ea53fdd7ba17090e32b5194d4f2dddcf0e5f6cb971aef1",
+          "provider_request_sha256": "sha256:070f1530a85fd766796be448a5e09110e5a76323173e183534b60c8493afcba0",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "writer",
+          "started_at": "2026-09-09T05:23:09.126Z",
+          "invocation_sha256": "sha256:1fec79292c1272a515567947a8e392a928530cf64e29e0dc5151cb1c8b1ca2b3",
+          "sample_file": "pinned-cli/samples/exact-02-after-writer.json",
+          "completed_at": "2026-09-09T05:25:27.558Z",
+          "input_tokens": 12596,
+          "output_tokens": 10375,
+          "output_sha256": "sha256:6fb7293409f2d36438ff962b70651ab0ce143f4a3b770d23e8432dd818f91be3",
+          "provider_request_sha256": "sha256:3672d240e85eb6ce9848a06552b1cc357a34bebaf4ae00f8db17a7e3a2f3d2c9",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "verifier",
+          "started_at": "2026-09-09T05:25:27.561Z",
+          "invocation_sha256": "sha256:10510c958e3230f2eabacc1d42b9a9a4e73892d20f1bf23ca8937fccdc843dd6",
+          "sample_file": "pinned-cli/samples/exact-02-after-verifier.json",
+          "completed_at": "2026-09-09T05:25:51.215Z",
+          "input_tokens": 14704,
+          "output_tokens": 1558,
+          "output_sha256": "sha256:9939612399a984d92acc0fda96c8cfeb39125fdea3b82d96a5584af12ae7db11",
+          "provider_request_sha256": "sha256:fee253852670cf7674e9a8e4e007c3aba2fef67296469427cfcdd5e9eb0163eb",
+          "status": "rejected",
+          "semantic_problem": null,
+          "semantic_verdict": {
+            "schema_version": "0.7.0",
+            "verdict": "pass",
+            "findings": []
+          },
+          "publication_findings": [
+            {
+              "code": "prohibited_claim",
+              "targetKey": "chapter_04"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "unknown-02",
+      "variant": "before",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.1",
+      "ontology_hash": "sha256:98297b1d7a45e7a5fc89807bcc0fe311fa882bb978b0340c472fc7deadc4b0c4",
+      "input_sha256": "sha256:f98248fb4a0d3c2c9ad6ad97bcf4de8e432698fa33651e5feed47910d9a6ade6",
+      "selection_packet_sha256": "sha256:2bc6d028220625ee7e70275ac71cbc1ed699f091edc8c27727b6faab5900bfcc",
+      "status": "accepted",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-09T05:25:51.221Z",
+          "invocation_sha256": "sha256:1abbc703a775e180bae989d4a756d3f8d4e147b3d1717235e9f3ce0ecf0c0f24",
+          "sample_file": "pinned-cli/samples/unknown-02-before-planner.json",
+          "completed_at": "2026-09-09T05:26:24.341Z",
+          "input_tokens": 12427,
+          "output_tokens": 2442,
+          "output_sha256": "sha256:a6abd25eacdc4a72e372c13f31cea27766daefca68fb7d64a21e22606612ecc6",
+          "provider_request_sha256": "sha256:f244148b34bc5cfac6bf744ec9b52d3f7f07e17e6529baaa5a799aa3bea8b284",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "writer",
+          "started_at": "2026-09-09T05:26:24.343Z",
+          "invocation_sha256": "sha256:93cdaff1cfbe3739a668ce562d2b0ab85dc98f9616bbd3bd67a52e3c8404a2ae",
+          "sample_file": "pinned-cli/samples/unknown-02-before-writer.json",
+          "completed_at": "2026-09-09T05:29:04.795Z",
+          "input_tokens": 10434,
+          "output_tokens": 10727,
+          "output_sha256": "sha256:cce15701613a8da0584d09c62b74c4920bc99e5f978dd38a098a121f38f50bc8",
+          "provider_request_sha256": "sha256:06dec595b1c270e1aec36dda7c31a85b56b5c9025279cf69a8b9bbad5762483a",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "verifier",
+          "started_at": "2026-09-09T05:29:04.797Z",
+          "invocation_sha256": "sha256:5349d7e1d41806b88dc8617d8b447bdbc262e456e54987d8eb60724523f7a2a2",
+          "sample_file": "pinned-cli/samples/unknown-02-before-verifier.json",
+          "completed_at": "2026-09-09T05:29:25.673Z",
+          "input_tokens": 13211,
+          "output_tokens": 1184,
+          "output_sha256": "sha256:9939612399a984d92acc0fda96c8cfeb39125fdea3b82d96a5584af12ae7db11",
+          "provider_request_sha256": "sha256:ac4d9e7ae56b1707358184b5869208d49a32e147e326135c5db2c16e0a742b32",
+          "status": "accepted",
+          "semantic_problem": null,
+          "semantic_verdict": {
+            "schema_version": "0.7.0",
+            "verdict": "pass",
+            "findings": []
+          },
+          "publication_findings": []
+        }
+      ]
+    },
+    {
+      "case_id": "unknown-02",
+      "variant": "after",
+      "ontology_version": "pattern-ontology-en-us-internal-0.1.2",
+      "ontology_hash": "sha256:4fd1e939a53ad2eef59e95463b2ed3ac4132261e3449c9087bb2b64062e08c57",
+      "input_sha256": "sha256:f98248fb4a0d3c2c9ad6ad97bcf4de8e432698fa33651e5feed47910d9a6ade6",
+      "selection_packet_sha256": "sha256:82b8efa13b4f08a565f94384d69f3251243336c2fbabbd1d117465e50263267f",
+      "status": "accepted",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-09T05:29:25.678Z",
+          "invocation_sha256": "sha256:93bec4e258f458e791a62583b41597d22d816db3dce6a4ce37930fa41461cbe6",
+          "sample_file": "pinned-cli/samples/unknown-02-after-planner.json",
+          "completed_at": "2026-09-09T05:29:54.980Z",
+          "input_tokens": 11686,
+          "output_tokens": 2213,
+          "output_sha256": "sha256:c4b4aec11ade936aa5a6060bcaee5a55bc41fd99cb22b5821bf06425b9da13b3",
+          "provider_request_sha256": "sha256:4b246e2b25202b6d0836d9d2a587e5d6aa324b81ad23e6cdb147818638397d30",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "writer",
+          "started_at": "2026-09-09T05:29:54.981Z",
+          "invocation_sha256": "sha256:73a1587bd40dc760e68783e7e9b737d0f1bad693fbee6a98b39c6ee7d4a9b32a",
+          "sample_file": "pinned-cli/samples/unknown-02-after-writer.json",
+          "completed_at": "2026-09-09T05:32:26.079Z",
+          "input_tokens": 9772,
+          "output_tokens": 10537,
+          "output_sha256": "sha256:c2b3a766dcbfd8d7c6294284e47886159109906c3d2aef9abba812393d199dbe",
+          "provider_request_sha256": "sha256:c913834ff447b4296c4221d92dbdee99da8bbc4b05d9597ef546cf5beb06951a",
+          "status": "accepted",
+          "findings": []
+        },
+        {
+          "pass": "verifier",
+          "started_at": "2026-09-09T05:32:26.081Z",
+          "invocation_sha256": "sha256:ecf74280b9308d0738957f44739e426fced72d0336b5ae1f2807a91effc30c35",
+          "sample_file": "pinned-cli/samples/unknown-02-after-verifier.json",
+          "completed_at": "2026-09-09T05:32:37.360Z",
+          "input_tokens": 11999,
+          "output_tokens": 480,
+          "output_sha256": "sha256:9939612399a984d92acc0fda96c8cfeb39125fdea3b82d96a5584af12ae7db11",
+          "provider_request_sha256": "sha256:9fb007ad49a64c985b2b7921919721b008fa29d464f533f7de9b9b1f5925477d",
+          "status": "accepted",
+          "semantic_problem": null,
+          "semantic_verdict": {
+            "schema_version": "0.7.0",
+            "verdict": "pass",
+            "findings": []
+          },
+          "publication_findings": []
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-09T05:32:37.364Z",
+  "accepted_chains": 2,
+  "generated_writer_samples": 4
+}
