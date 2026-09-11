@@ -56,7 +56,7 @@ describe("Pattern portrait reader", () => {
     }));
     render(<PatternPortrait source={ready} objectBindings={wrong} graph={savedGraph} />);
     expect(screen.queryByTestId("sculpture")).not.toBeInTheDocument();
-    expect(screen.getByText(/Four chapter images are needed/)).toBeInTheDocument();
+    expect(screen.getByText(/An image for every chapter is needed/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Closeness, with room to breathe/ })).toBeEnabled();
   });
 
@@ -136,7 +136,7 @@ describe("Pattern portrait reader", () => {
 
   it("keeps reading but withholds the sculpture when any image binding is missing", async () => {
     render(<PatternPortrait source={ready} objectBindings={imageStudyBindings.slice(0, 3)} />);
-    expect(screen.getByText(/Four chapter images are needed/)).toBeInTheDocument();
+    expect(screen.getByText(/An image for every chapter is needed/)).toBeInTheDocument();
     expect(screen.queryByTestId("sculpture")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rotate left" })).toBeDisabled();
   });

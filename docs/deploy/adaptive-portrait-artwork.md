@@ -39,6 +39,19 @@ assets remain readable without renewal or new provider calls.
    transaction. It rebuilds the constrained seven-table portrait family while
    preserving v1 rows, leases, grants, object references and completion times.
    Recheck foreign keys and integrity. Never disable foreign-key enforcement.
+
+   **This step happens before the merge, not before a later deploy step.** A
+   push to `main` builds and deploys within about a minute, so merging is the
+   deploy. Confirm the live ledger first rather than trusting this document:
+   `MIGRATIONS.json` records apply receipts unevenly, and 0029-0032 have no
+   `APPLIED` note in it even though they are applied. Query `d1_migrations`.
+
+   The Worker no longer destroys artwork if the order is wrong --
+   `adaptivePortraitSchema` stands the maintenance lanes down and `matches()`
+   reads an absent column as the v1 shape -- but reservation, claiming and
+   assembly still reference the new columns, so artwork generation is simply
+   unavailable until the migration lands. That guard also covers the recovery
+   direction: restoring D1 to a pre-0033 bookmark under this Worker is safe.
 3. Deploy the compatible Worker with adaptive admission still `0`. Existing
    v1 complete/fail routes remain usable. Source invalidation and deletion work
    for both protocols.

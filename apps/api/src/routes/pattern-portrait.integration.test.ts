@@ -316,6 +316,48 @@ it("keeps an accepted portrait readable after a later locale preference change",
   const portrait=await ready();await env.DB.prepare("UPDATE users SET locale = 'fr-FR' WHERE id = ?").bind(USER_A).run();expect((await (await user("/v1/pattern-portrait")).json() as PatternPortraitResponse).graph).toEqual(portrait.graph);
 });
 
+it("leaves every stored portrait and its objects alone when 0033 is not applied",async () => {
+  // Merging deploys within about a minute, and a Time Travel restore can take
+  // the adaptive columns away under a Worker that already has them. Before the
+  // schema probe, maintenance read those absent columns as a mismatch on every
+  // row, cancelled each portrait and deleted its R2 objects -- silently, since
+  // scheduled.ts swallows each lane's error. Rebuild the pre-0033 shape and
+  // prove the lane stands down instead.
+  const portrait=await ready();
+  const objectsBefore=(await env.ARTIFACTS!.list({prefix:`pattern-portraits/${portrait.portrait_id}/`})).objects.length;
+  expect(objectsBefore).toBeGreaterThan(0);
+  const rows=(await env.DB.prepare("SELECT * FROM pattern_portraits").all<Record<string,unknown>>()).results;
+  const jobs=(await env.DB.prepare("SELECT * FROM pattern_portrait_jobs").all<Record<string,unknown>>()).results;
+  const assets=(await env.DB.prepare("SELECT * FROM pattern_portrait_assets").all<Record<string,unknown>>()).results;
+  const triggers=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
+  const replay=(names:string[])=>env.TEST_MIGRATIONS.filter((item)=>names.includes(item.name));
+  await env.DB.batch([...triggers.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants','pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
+  try {
+    for (const migration of replay(["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"])) await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
+    const runtime=env.TEST_MIGRATIONS.find(item=>item.name==="0032_runtime_health.sql")!;
+    await env.DB.batch(runtime.queries.filter(query=>/pattern_portrait_jobs|portrait_mesh_jobs/.test(query)).map(query=>env.DB.prepare(query)));
+    const restore=(table:string,source:Record<string,unknown>[],columns:string[])=>source.map((row)=>env.DB.prepare(`INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map(()=>"?").join(",")})`).bind(...columns.map((column)=>row[column] as never)));
+    await env.DB.batch(restore("pattern_portraits",rows,["id","user_id","pattern_id","generation_id","chart_id","chart_fingerprint_hash","document_revision","document_hash","generated_at","ontology_version","processing_consent_id","pattern_consent_id","consent_policy_version","sun_sign","status","graph_asset_id","checked_at","created_at","updated_at"]));
+    await env.DB.batch(restore("pattern_portrait_jobs",jobs,["id","portrait_id","user_id","chapter_index","source_sha256","status","attempts","lease_hash","lease_expires_at","retry_at","failure_code","completion_hash","image_asset_id","sample_asset_id","created_at","updated_at","completed_at"]));
+    await env.DB.batch(restore("pattern_portrait_assets",assets,["id","portrait_id","user_id","job_id","role","object_key","plaintext_sha256","byte_length","created_at","cleanup_at","deleted_at"]));
+
+    await maintainPortraits(enabledEnv());
+
+    const after=await env.DB.prepare("SELECT status FROM pattern_portraits WHERE id = ?").bind(portrait.portrait_id).first<{status:string}>();
+    expect(after?.status).toBe("ready");
+    const marked=await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_assets WHERE cleanup_at IS NOT NULL").first<{n:number}>();
+    expect(marked?.n).toBe(0);
+    expect((await env.ARTIFACTS!.list({prefix:`pattern-portraits/${portrait.portrait_id}/`})).objects.length).toBe(objectsBefore);
+  } finally {
+    const after=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
+    await env.DB.batch([...after.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants','pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
+    for (const migration of replay(["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"])) await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
+    const runtime=env.TEST_MIGRATIONS.find(item=>item.name==="0032_runtime_health.sql")!;
+    await env.DB.batch(runtime.queries.filter(query=>/pattern_portrait_jobs|portrait_mesh_jobs/.test(query)).map(query=>env.DB.prepare(query)));
+    const adaptiveMigration=env.TEST_MIGRATIONS.find(item=>item.name==="0033_adaptive_portrait_artwork.sql")!;
+    await env.DB.batch(adaptiveMigration.queries.map(query=>env.DB.prepare(query)));
+  }
+});
 it("keeps account deletion working before 0026 when portrait rollout is absent",async () => {
   const triggers=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
   const migrations=env.TEST_MIGRATIONS.filter((item)=>["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"].includes(item.name));

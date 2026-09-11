@@ -107,6 +107,9 @@ test("production parks the machine pipeline and configures Pattern for every acc
   // fail the pin check rather than running long.
   for (const block of [development, production]) {
     assert.equal(block.vars.PATTERN_GENERATION_ENABLED, "1");
+    // Committed configuration is the only thing between this source and live v2
+    // reservations, and 0033 must be applied before a Worker that admits them.
+    assert.equal(block.vars.PATTERN_ADAPTIVE_PORTRAITS_ENABLED, "0");
     assert.equal(block.vars.PATTERN_PUBLISHER, "codex");
     assert.equal(block.vars.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "900000");
     assert.equal(block.vars.OPENAI_PATTERN_WRITER_TIMEOUT_MS, "900000");

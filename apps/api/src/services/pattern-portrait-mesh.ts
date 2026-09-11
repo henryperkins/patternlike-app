@@ -39,6 +39,7 @@ import {
   PORTRAIT_LEASE_MS,
   portraitEnabled,
   adaptivePortraitsEnabled,
+  adaptivePortraitSchema,
   portraitEmpty,
   currentPattern,
   authorizedCurrent,
@@ -109,10 +110,18 @@ const opaque = (prefix: string) =>
   `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 export const meshEnabled = (env: Env) =>
   portraitEnabled(env) && env.PATTERN_PORTRAIT_MESH_ENABLED === "1";
+/**
+ * 0027 created the table; 0033 rebuilt the portrait family this code joins
+ * against and widened its chapter bounds. The table alone is not enough: on a
+ * database at 0027-0032 the queries below reference pattern_portraits columns
+ * that do not exist, and the maintenance lane's answer to that is cancellation
+ * plus R2 deletion of accepted models. Require both before doing any work.
+ */
 async function migrated(env: Env) {
-  return !!(await env.DB.prepare(
+  const table = await env.DB.prepare(
     "SELECT 1 FROM sqlite_master WHERE type='table' AND name='portrait_mesh_jobs'",
-  ).first());
+  ).first();
+  return !!table && (await adaptivePortraitSchema(env));
 }
 async function available(env: Env) {
   return meshEnabled(env) && (await migrated(env));
@@ -657,8 +666,16 @@ export async function completePortraitMesh(
   const job = await jobById(env, id);
   if (!job) throw new PortraitError(409, "portrait_mesh_conflict");
   const parent = await portraitById(env, job.portrait_id);
+  // The download path already refuses a program whose chapter binding does not
+  // match the job it was claimed for. Checking only there accepts the bad
+  // program, marks the job complete and then 404s the model forever, and
+  // UNIQUE(portrait_id, chapter_index, compiler_version) makes that awkward to
+  // redo. An honest runner cannot produce it; the server should not need one.
   if (!parent || !portraitTerminalMatches(parent, job.chapter_index, input, "codex-portrait-mesh-completion/v2")
-    || input.program.version !== (parent.protocol_version === "v2" ? "portrait-mesh-program/v2" : "portrait-mesh-program/v1"))
+    || input.program.version !== (parent.protocol_version === "v2" ? "portrait-mesh-program/v2" : "portrait-mesh-program/v1")
+    || (input.program.version === "portrait-mesh-program/v2"
+      && (input.program.chapter_count !== parent.chapter_count
+        || input.program.chapter_id !== `chapter-${job.chapter_index + 1}`)))
     throw new PortraitError(409, "portrait_mesh_conflict");
   const completionHash = await contentHash(canonicalJson(input));
   const leaseHash = await contentHash(input.lease_token);

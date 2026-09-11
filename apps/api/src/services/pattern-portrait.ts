@@ -81,8 +81,18 @@ export async function patternKey(env: Env, current: Current) {
   const d = current.document;
   return unwrapContentKey(env, current.identity, d.id, "pattern_documents.wrapped_document_key_enc", { key_version: d.wrapped_document_key_version, nonce: d.wrapped_document_key_nonce, ciphertext: b64(d.wrapped_document_key_enc) });
 }
+/**
+ * Pre-0033 rows carry neither adaptive column, and `SELECT *` then yields
+ * `undefined` for both. Comparing that directly makes every stored portrait
+ * mismatch, and the maintenance lane answers a mismatch by cancelling the
+ * portrait and deleting its R2 objects -- so an unmigrated database, or a
+ * Time Travel restore underneath a migrated Worker, would silently destroy
+ * every reader's artwork. Absence means the v1 shape these rows actually are.
+ */
 function matches(row: PortraitRow, current: Current) {
-  return row.pattern_id === current.document.id && row.chart_id === current.chart.id && row.document_hash === current.documentHash && row.document_revision === current.revision && row.chapter_count === current.chapterCount && (row.protocol_version === "v2" || (row.protocol_version === "v1" && row.chapter_count === 4)) && row.status !== "cancelled";
+  const protocol = row.protocol_version ?? "v1";
+  const chapters = row.chapter_count ?? 4;
+  return row.pattern_id === current.document.id && row.chart_id === current.chart.id && row.document_hash === current.documentHash && row.document_revision === current.revision && chapters === current.chapterCount && (protocol === "v2" || (protocol === "v1" && chapters === 4)) && row.status !== "cancelled";
 }
 export async function authorizedCurrent(env: Env, row: PortraitRow, now: Date) {
   const current = await currentPattern(env, row.user_id);
@@ -113,6 +123,17 @@ export function guards(env: Env, row: PortraitRow, current: Current, now: Date):
           AND consent.id = (SELECT head.id FROM consents head WHERE head.user_id = d.user_id AND head.kind = 'pattern_generation' ORDER BY head.version DESC, head.created_at DESC, head.id DESC LIMIT 1)
       )`).bind(row.pattern_consent_id, row.user_id, row.pattern_id, row.document_hash, row.generated_at, row.chart_fingerprint_hash, row.chart_id, current.chart.fingerprint, PATTERN_GENERATION_CONSENT_POLICY_VERSION, now.toISOString()),
   ];
+}
+/**
+ * True only once migration 0033 has been applied. Read from a fixed metadata
+ * projection, never from exception text or private data, and deliberately not
+ * cached: a restore can take the columns away under a running isolate.
+ */
+export async function adaptivePortraitSchema(env: Env): Promise<boolean> {
+  try {
+    const columns = (await env.DB.prepare("PRAGMA table_info(pattern_portraits)").all<{name:string}>()).results;
+    return columns.some((column) => column.name === "chapter_count") && columns.some((column) => column.name === "protocol_version");
+  } catch { return false; }
 }
 export async function portraitById(env: Env, id: string) { return env.DB.prepare("SELECT * FROM pattern_portraits WHERE id = ?").bind(id).first<PortraitRow>(); }
 async function jobsFor(env: Env, id: string) { return (await env.DB.prepare("SELECT * FROM pattern_portrait_jobs WHERE portrait_id = ? ORDER BY chapter_index").bind(id).all<JobRow>()).results; }
@@ -196,6 +217,13 @@ export async function readPortrait(env: Env, userId: string, protocol: PortraitP
   if (!current) return portraitEmpty("unavailable", protocol);
   let row = await env.DB.prepare("SELECT * FROM pattern_portraits WHERE pattern_id = ? AND user_id = ?").bind(current.document.id,userId).first<PortraitRow>();
   if (protocol === "v1" && (current.chapterCount !== 4 || row?.protocol_version === "v2")) return portraitEmpty();
+  // A reader whose Pattern needs adaptive support cannot start one while
+  // admission is off: reserving would answer 503 adaptive_portrait_unavailable.
+  // Saying "not_started" would render a create button that always fails, so say
+  // unavailable -- the same word the v1 path above uses for a Pattern it cannot
+  // serve. An already reserved portrait keeps reporting its real status, because
+  // disabling admission must not hide accepted work.
+  if (!row && protocol === "v2" && current.chapterCount !== 4 && !adaptivePortraitsEnabled(env)) return portraitEmpty("unavailable", protocol);
   const base: PatternPortraitResponse = { ...portraitEmpty("not_started", row?.protocol_version ?? protocol), pattern_id: current.document.id, generated_at: current.document.generated_at, chart_id: current.chart.id, document_revision: current.revision, sun_sign: current.sunSign };
   if (base.schema_version === PORTRAIT_V2_SCHEMA_VERSION) base.chapter_count = current.chapterCount;
   if (!row) return base;
@@ -358,6 +386,12 @@ export async function maintainPortraits(env: Env,now = new Date()) {
   // Old deployments may omit both the flag and migration. Cleanup remains active
   // after disabling a migrated feature, detected without reading private data.
   if (!await env.DB.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'pattern_portraits'").first()) return;
+  // The table can exist without 0033. Everything below reads the adaptive
+  // columns, and the failure mode is not an error -- it is cancellation and R2
+  // deletion of artwork this deployment merely cannot read yet. Stand down
+  // until the migration lands, the way runtime-health reports
+  // schema_unavailable rather than guessing.
+  if (!await adaptivePortraitSchema(env)) return;
   if (portraitEnabled(env)) await recoverPortraitLeases(env,now);
   const portraits = await nextPortraitMaintenanceBatch(env,now);
   for (const row of portraits) {

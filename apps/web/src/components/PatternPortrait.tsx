@@ -130,7 +130,7 @@ function ReadyPortrait({ manifest, savedGraph }: { manifest: PortraitManifest; s
             <div className="portrait-stage" role="group" aria-label="Interactive 3D constellation" ref={stageRef} tabIndex={-1}>
               <GraphicsBoundary key={sculptureKey} onUnavailable={onUnavailable}>
                 <Suspense fallback={<p className="portrait-graphics-message" role="status">Loading the 3D view. The chapters are ready to read.</p>}>
-                  {renderable ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls ?? []} graph={graph} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null, false)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to draw this constellation. You can still read every chapter.</p>}
+                  {renderable ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls ?? []} graph={graph} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null, false)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">An image for every chapter is needed to draw this constellation. You can still read every chapter.</p>}
                 </Suspense>
               </GraphicsBoundary>
             </div>
@@ -157,7 +157,7 @@ function ReadyPortrait({ manifest, savedGraph }: { manifest: PortraitManifest; s
                 </button>
               ))}
             </nav>
-            <p className="portrait-legend">Four images trace one connected constellation. Their edges become stars and lines, with depth composed for this portrait.{sunProfile ? " Your Sun sign guides the arrangement." : ""} This is an artistic composition, not a map of the sky.</p>
+            <p className="portrait-legend">{manifest.chapters.length === 4 ? "Four images trace one connected constellation." : "Your chapter images trace one connected constellation."} Their edges become stars and lines, with depth composed for this portrait.{sunProfile ? " Your Sun sign guides the arrangement." : ""} This is an artistic composition, not a map of the sky.</p>
           </div>
           <section className={`portrait-reader${chapter ? " portrait-reader--selected" : ""}`} id={readerId} aria-labelledby={headingId} ref={readerRef} tabIndex={-1}>
             {chapter ? (
