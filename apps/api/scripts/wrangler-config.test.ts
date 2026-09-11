@@ -42,6 +42,50 @@ test("Worker source and configuration contain no private ChatGPT transport", asy
   }
 });
 
+test("neither block permits dynamic code generation, and no source asks for it", async () => {
+  const development = unstable_readConfig({ config: configPath });
+  const production = unstable_readConfig({ config: configPath, env: "production" });
+
+  // Ajv used to compile schemas at module scope, which pushed isolate startup
+  // past Cloudflare's startup CPU budget and turned `wrangler deploy` into a
+  // coin flip (error 10021). Deferring compilation into the handler traded that
+  // for a worse failure: Workers forbid dynamic code generation at request and
+  // queue time no matter what any flag says, so every Today job died with
+  // execution_error. Validators are generated at build time now, so neither
+  // startup nor a handler needs eval. Both halves have to stay true -- the flag
+  // alone would not stop a handler compile, and clean sources would not stop a
+  // future compatibility_date from re-enabling startup eval by default.
+  for (const block of [development, production]) {
+    assert.ok(
+      block.compatibility_flags.includes("disallow_eval_during_startup"),
+      "disallow_eval_during_startup missing",
+    );
+    assert.equal(
+      block.compatibility_flags.includes("allow_eval_during_startup"),
+      false,
+      "allow_eval_during_startup is back",
+    );
+  }
+
+  // src/generated/*.js is the build output and is checked separately by
+  // check:validators; the .d.ts files it also emits are type-only.
+  const forbidden = [
+    "new Ajv",
+    "addSchema(",
+    "new Function(",
+  ];
+  for (const file of await sourceFiles(path.resolve(here, "../src"))) {
+    const source = await readFile(file, "utf8");
+    for (const literal of forbidden) {
+      assert.equal(
+        source.includes(literal),
+        false,
+        `${literal} is back in ${file}; the Worker must not compile schemas at runtime`,
+      );
+    }
+  }
+});
+
 test("production parks the machine pipeline and configures Pattern for every account", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({

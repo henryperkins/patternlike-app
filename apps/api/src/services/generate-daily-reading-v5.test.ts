@@ -267,7 +267,10 @@ describe("V5 execution", () => {
   it("publishes a completed candidate when runtime code generation is forbidden", async () => {
     const { enqueued, claim } = await claimReserved();
     // The Vitest Worker pool permits eval for its module loader. Production
-    // permits it only at startup, so reproduce the handler boundary explicitly.
+    // permits it nowhere: the Worker declares disallow_eval_during_startup,
+    // and Workers forbid dynamic code generation inside a handler regardless
+    // of any flag. That handler boundary is what broke Today, so reproduce it
+    // explicitly rather than trusting the pool's looser realm.
     const forbidCodeGeneration = () => {
       throw new EvalError("Code generation from strings disallowed for this context");
     };

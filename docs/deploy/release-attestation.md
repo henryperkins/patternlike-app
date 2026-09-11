@@ -42,10 +42,20 @@ build, and explicitly inject that checkout's commit:
 test -z "$(git status --porcelain)" || exit 1
 release_sha="$(git rev-parse --verify HEAD)"
 test "$release_sha" = "$(git rev-parse --verify origin/main)" || exit 1
+npm run check:validators -w @patternlike/api
 npm run build -w @patternlike/web
 npx wrangler deploy --config apps/api/wrangler.toml --env production \
   --var "RELEASE_GIT_SHA:${release_sha:?Missing reviewed commit SHA}"
 ```
+
+`check:validators` is listed explicitly because the npm `predeploy` hook does not
+cover this command, and does not cover the Workers Builds trigger either. Since
+`apps/api/src/generated/*.js` became build output, a merge carrying stale
+generated validators would deploy a Worker validating against superseded
+contracts, and nothing at runtime would notice. Append the same check to both
+configured Workers Builds trigger commands alongside the `RELEASE_GIT_SHA`
+injection above. `npm run ci:local` already runs it through `prebuild`/`pretest`,
+so a gated merge is covered; this line covers the manual path.
 
 Rebuilding must preserve the gated source identity and asset inputs. The SHA
 is an operator-supplied value; this command cannot itself authenticate that a

@@ -40,8 +40,11 @@ test("bundled validators work with string code generation forbidden even during 
     target: "es2022",
     write: false,
   });
-  // A fresh realm cannot reuse validators warmed by another test. This also
-  // catches accidental eager compilation, which exhausted Worker startup CPU.
+  // A fresh realm cannot reuse validators warmed by another test, so this
+  // catches a bundle that only works once something else has already
+  // evaluated it. It proves the absence of eval, not of CPU spend: nothing
+  // here measures startup cost, which is the separate 10021 deploy failure
+  // that moving compilation to build time also removes.
   const validators = runInNewContext(
     `${built.outputFiles[0]!.text}\nvalidators;`,
     {},
