@@ -69,6 +69,37 @@ Order on the product API is `configGuard` → `authenticate`. Reading feedback a
 
 The default export is `{ fetch, queue }`, not the Hono app — tests that drive it with `app.request()` import the named `app` export instead. **A queue message never enters the Hono pipeline, so `configGuard` does not run on it**; `src/queue.ts` calls `checkSecureConfig` itself. Deleting that call would leave the one surface that decrypts a frozen command and writes a user's prose as the only surface a development-shaped deployment could still run.
 
+### Generated Worker validators
+
+`apps/api/src/generated/{reading,strict,ontology-output}-validators.js` are build
+output, not source. **Never hand-edit them, and never add a runtime `new Ajv`,
+`addSchema`, or `compile` call to `apps/api/src`** — `npm run generate:validators
+-w @patternlike/api` regenerates all six files from the frozen contracts, and
+`check:validators` (wired into `prebuild` and `pretest`, so `npm run ci:local`
+covers it) fails when they drift. `scripts/wrangler-config.test.ts` asserts both
+halves: the flags stay `disallow_eval_during_startup`, and no Worker source
+reintroduces the forbidden constructs.
+
+This replaced a lazy Ajv accessor, and the history is the reason the rule is
+narrow. Compiling at module scope pushed isolate startup past Cloudflare's
+startup CPU budget, so `wrangler deploy` began failing validation with `Script
+startup exceeded CPU time limit` (10021) on `c98ecf0`, a commit that touched no
+Worker code — the Worker had been sitting just under the ceiling and build-host
+variance tipped it over. Deferring compilation into the handler cleared that but
+traded it for a worse failure: **Workers forbid dynamic code generation at
+request and queue time regardless of any compatibility flag**, so every Today
+job died with `execution_error` (production, 2026-09-09 through 2026-09-11).
+Build-time generation is the only arrangement that avoids both. Moving
+compilation back to either place re-breaks one of them.
+
+**A contract edit is not live until the validators are regenerated.** The Worker
+no longer imports `contracts/*.schema.json` directly, so a schema change without
+`generate:validators` leaves the Worker validating against stale bytes and
+nothing at runtime notices. The generated bundles also inline a little
+MIT-licensed Ajv runtime; the notice is written by the generator's banner
+because those sources carry none of their own, and `apps/api` is otherwise
+all-rights-reserved.
+
 ### Daily reading generation (M3 phase 4)
 
 Two transactions, never one. **Enqueue** (`services/enqueue.ts`) freezes every input into a `GenerateDailyReadingCommandV1`, stores it DEK-encrypted in `jobs.payload_enc`, reserves a `pending` `daily_readings` row pointing at that job, and only then sends an opaque `{job_id, reading_id}`. **Execute** (`services/generate-daily-reading.ts`) claims the job by CAS, dereferences only the versions the command pinned, and publishes in one guarded batch. Queues is at-least-once, so nothing on the execute path may resolve "today" or "active" again — a retry that did would produce different prose under the same `assembly_id`.

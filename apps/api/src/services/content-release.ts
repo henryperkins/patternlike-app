@@ -4,17 +4,8 @@ import {
   isCanonicalAspectPair,
   M3_SCHEMA_VERSION,
 } from "@patternlike/shared";
-import Ajv2020 from "ajv/dist/2020.js";
 import type { ValidateFunction } from "ajv";
-import addFormats from "ajv-formats";
-import { lazy } from "./lazy-validator.js";
-import commonSchema from "../../../../contracts/m0/common.schema.json";
-import contentReleaseSchema from "../../../../contracts/m0/content-release.schema.json";
-import m3CommonSchema from "../../../../contracts/m3/common.schema.json";
-import m3ContentReleaseSchema from "../../../../contracts/m3/content-release.schema.json";
-import m4CommonSchema from "../../../../contracts/m4/common.schema.json";
-import m4NatalFeatureSchema from "../../../../contracts/m4/natal-feature.schema.json";
-import m4ContentReleaseSchema from "../../../../contracts/m4/content-release.schema.json";
+import { validateContentReleaseV3, validateContentReleaseV4 } from "../generated/strict-validators.js";
 
 /**
  * Verification for signed editorial release bundles.
@@ -403,42 +394,14 @@ function isStringArray(value: unknown): value is string[] {
 const HASH_RE = /^(sha256:)?[a-f0-9]{64}$/;
 const RELEASE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
-// Register every absolute document reached by either supported release schema.
-// Version selection remains explicit below; registration alone never makes a
-// schema version ingestible.
-const schemaValidator = lazy(() => {
-  const validator = new Ajv2020({ strict: true });
-  addFormats(validator);
-  validator.addSchema(commonSchema);
-  validator.addSchema(contentReleaseSchema);
-  validator.addSchema(m3CommonSchema);
-  validator.addSchema(m3ContentReleaseSchema);
-  validator.addSchema(m4CommonSchema);
-  validator.addSchema(m4NatalFeatureSchema);
-  validator.addSchema(m4ContentReleaseSchema);
-  return validator;
-});
-
 /**
- * Explicit, bounded version dispatch. A `schema_version` with no entry here
- * fails closed before hashing, signing, R2, or D1 work; it never falls through
- * to the M3 validator, which would let an M4-shaped body reserve an immutable
- * release version under a contract it was never checked against.
+ * Explicit version dispatch stays closed; validators are compiled from the
+ * frozen contracts by generate:validators, outside the Worker runtime.
  */
-const RELEASE_REQUEST_SCHEMAS: ReadonlyArray<readonly [string, { $id: string }]> = [
-  [M3_SCHEMA_VERSION, m3ContentReleaseSchema],
-  [M4_SCHEMA_VERSION, m4ContentReleaseSchema],
-];
-
-const releaseRequestValidators = new Map<string, ValidateFunction<ContentReleaseIngestionRequest>>(
-  RELEASE_REQUEST_SCHEMAS.map(([version, schema]) => {
-    const validator = schemaValidator().getSchema<ContentReleaseIngestionRequest>(
-      `${schema.$id}#/$defs/contentReleaseIngestionRequest`,
-    );
-    if (!validator) throw new Error(`Could not load ${version} content release schema`);
-    return [version, validator] as const;
-  }),
-);
+const releaseRequestValidators = new Map<string, ValidateFunction<ContentReleaseIngestionRequest>>([
+  [M3_SCHEMA_VERSION, validateContentReleaseV3],
+  [M4_SCHEMA_VERSION, validateContentReleaseV4],
+]);
 
 /**
  * Structural validation of an ingestion request.

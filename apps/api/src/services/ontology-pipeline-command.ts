@@ -29,6 +29,7 @@ import {
   type OntologyCoverageSourceHint,
 } from "./ontology-coverage-source-hints.js";
 import type { OntologyCoverageTarget } from "./ontology-packet.js";
+import { ONTOLOGY_PIPELINE_LIMITS } from "./ontology-pipeline-limits.js";
 
 export const ONTOLOGY_PIPELINE_COMMAND_VERSION =
   "OntologyPipelineCommandV5" as const;
@@ -41,12 +42,7 @@ export const ONTOLOGY_PROHIBITED_CLAIMS = [
   "fate",
   "biographical fact",
 ] as const;
-export const ONTOLOGY_PIPELINE_LIMITS = {
-  maximum_generation_chunks: 16,
-  maximum_candidate_records: 64,
-  maximum_evaluator_calls: 64,
-  maximum_candidate_bytes: 262_144,
-} as const;
+export { ONTOLOGY_PIPELINE_LIMITS } from "./ontology-pipeline-limits.js";
 export const ONTOLOGY_PIPELINE_FEATURE_VOCABULARY = [
   ...m4CommonSchema.$defs.featureClass.enum,
 ] as readonly NatalFeatureClass[];
