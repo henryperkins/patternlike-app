@@ -2,11 +2,15 @@
 
 Date: 2026-09-07
 
-Status: specification for review; implementation has not started.
+Status: implemented locally; map maintenance is optional. See the [implementation record](../plans/2026-09-09-source-map-maintenance-implementation.md) for dated results.
+
+Scope simplified: 2026-09-09. Keep map commands and their focused tests available for maintenance without adding them to existing verification gates. The proposed Slice 2 preflight is withdrawn; this work does not introduce a replacement release process.
 
 Planning basis: [Slice 1 in the delivery ledger](../plans/2026-09-07-mind-map-alignment-slices.md#slice-1--source-truth-and-map-maintenance) and [the alignment roadmap](../../reviews/2026-09-07-mind-map-alignment-roadmap.md), especially sections 2, 4, 5, 7, and 8.
 
-Source baseline inspected: `6e706741f03253f2807d33380afb529161f3481f`, including the existing local Observatory edits represented in the original map. This commit alone does not contain those edits.
+Original source baseline inspected: `6e706741f03253f2807d33380afb529161f3481f`, including the existing local Observatory edits represented in the original map. This commit alone does not contain those edits.
+
+Reconciled: 2026-09-09 against the updated roadmap, the corrected map, and targeted source at `d338b86c9444ebe2f372f2a2f3990f4a1270bc80`. The September 7 observations below retain their date; this pass does not repeat their build or hash verification.
 
 ## 1. Outcome and boundaries
 
@@ -17,18 +21,25 @@ The slice delivers two review units:
 1. **Source-truth corrections:** current comments/guidance agree with source; dated observations and original map artifacts retain their provenance.
 2. **Map maintenance:** one authored input produces the Markdown map, evidence index, and immutable dated snapshot, with deterministic checking and regression coverage.
 
-This slice does not change application behavior, provider configuration, ontology content or activation, generation policy, saved readings, or the Observatory implementation. It does not implement the Slice 2 release preflight. A map check establishes a defined set of file identities and structural relationships; it does not certify interpretation quality, all repository behavior, or production readiness.
+This slice does not change application behavior, provider configuration, ontology content or activation, generation policy, saved readings, or the Observatory implementation. A map check establishes a defined set of file identities and structural relationships; it does not certify interpretation quality, all repository behavior, or production readiness.
 
 ## 2. Source findings that set the scope
 
-The following were checked locally while preparing this specification:
+The following were checked locally on September 7 while preparing this specification:
 
-- The original map contains eight branches, 34 topics, 68 leaves, and 86 distinct referenced source files. Its recorded source hashes and Markdown hash match the current local bytes; recorded line numbers are in range. That is not yet a check that every anchor identifies the best implementation boundary.
+- The original map contains eight branches, 34 topics, 68 leaves, and 86 distinct referenced source files. Its recorded source hashes and Markdown hash matched the local bytes on that date; recorded line numbers were in range. That was not a check that every anchor identified the best implementation boundary.
 - The real offline builder under Node `v22.23.2` produces 40 records from 60 fragments. Every record is `source_supported` and cites one prepared fragment. It skips all twelve §2 sign fragments and all eight §8 cross-cutting fragments.
 - The rebuilt corpus hash is `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`. The recomputed unsigned bundle hash is `sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84`. Both match the [recorded observation](../../reviews/artifacts/2026-09-06-source-register-followup/production-observation.json) at `2026-09-06T18:49:35.205Z`; no live object or active pointer was fetched.
 - [Corpus provenance](../../../pattern-corpus/provenance.json) records `model_generated_first_party` and zero certified human-reviewed fragments. The offline builder's evaluator compatibility fields are not an independent evaluation receipt.
 - [ontologyServesAccount](../../../apps/api/src/db/pattern-ontology.ts) admits `synthetic_internal` by origin and requires `public` activation scope for `machine_pipeline`. The signing-client comment and runbook activation table contradict this.
 - Both TypeScript files selected for comment corrections are absent from [the Pattern source manifest](../../../apps/api/pattern-creation-sources.json). This scope can preserve the generated Pattern source identity; verify the manifest again at implementation time.
+
+The September 9 reconciliation adds these boundaries:
+
+- The [corrected anchored map](../../../output/mindmaps/2026-09-09-corrected/patternlike-source-mindmap.with-anchors.md) contains eight branches, 38 topics, 83 claim bullets, and 129 file-and-line anchors across 100 files. Its [plain version](../../../output/mindmaps/2026-09-09-corrected/patternlike-source-mindmap.md) has the same claims. This is an architecture overview, not complete repository coverage or a replacement for the original 86-file hash receipt.
+- The corrected Markdown does not record an explicit source baseline or complete file-hash manifest. September 9 review against the named HEAD does not establish which source bytes its author captured. Preserve that limitation when importing its useful additions.
+- Resolving an anchor does not prove the attached claim. Current routing, release harnesses, revision reasons, and portrait automation require the corrections in ST-09–ST-12; the corrected map also still needs the offline supply and shared-mechanics distinctions in ST-08.
+- The roadmap's four opportunity directions are proposed product and evaluation work. Current map prose must describe existing connections and gaps without claiming that stronger interpretation quality, a connected reader journey, clearer permission consequences, or fairer scheduling has been implemented or measured.
 
 ## 3. Correction contract
 
@@ -44,6 +55,10 @@ The correction record will live at `docs/architecture/source-map/source-correcti
 | ST-06 | Same runbook: current-state versus historical operations | Cite the September 6 pointer/hash observation with its date and active-pointer-join scope. Keep older observations dated. Separate obsolete cohort transitions in Gates 8/10 from still-needed lifecycle evidence; do not blanket-mark every gate passed, open, or inapplicable. Mark older operational steps as requiring current-source reconciliation before use. |
 | ST-07 | `CLAUDE.md`: M7 and isolated-signing explanations | Apply the same supply/admission/coverage/safety distinctions. Keep thirty frozen regression fixtures and the eleven-call worst-case envelope. Remove the unverified minimum-seven-fixtures claim from current guidance; no fixture reduction or new minimum is authorized. Preserve historical provider/model provenance and current Codex deployment admission. |
 | ST-08 | Maintained map and evidence index | Show offline ontology supply separately from the parked machine producer; shared Codex text mechanics separately from domain ownership; frozen Daily V1/V2 execution compatibility; and observability/release identity with their actual limits. Replace selection/planning anchors that point only at imports with owning implementations and relevant call sites. |
+| ST-09 | Maintained map: route authority zones | [Route registration](../../../apps/api/src/index.ts) mounts [health and meta endpoints](../../../apps/api/src/routes/health.ts) outside `configGuard`. Session exchange is configuration guarded; [deletion status](../../../apps/api/src/routes/privacy.ts) is configuration guarded and requires its own deletion-receipt cookie after the normal session is revoked. Describe credentials and middleware per route boundary instead of grouping deletion status as unauthenticated or claiming every authority passes through `configGuard`. Preserve separate product, service, admin, runner, and crypto-operator credentials. |
+| ST-10 | Maintained map: release assurance tooling | Classify each command/mode by actual effects. The [operational canary](../../../scripts/pattern-release/operational-canary.mjs) performs network readbacks; fresh [Daily](../../../scripts/pattern-release/fresh-reading-evaluation.mjs), [Pattern](../../../scripts/pattern-release/fresh-pattern-evaluation.mjs), and [verifier](../../../scripts/pattern-release/fresh-pattern-verifier-evaluation.mjs) evaluation runs invoke Codex. Where supported, preparation modes construct inputs without that execution. [Release evidence](../../../scripts/pattern-release/release-evidence.mjs) captures/verifies the local gate, while [reconciliation](../../../scripts/pattern-release/release-reconciliation.mjs) consumes supplied records offline. Do not label all harnesses offline or treat their presence as execution evidence. |
+| ST-11 | Maintained map: operator generation and repair | `revision_reason` states the revision's purpose, not whether an operator or scheduler initiated execution. [Fact repair](../../../apps/api/src/services/reading-invalidation.ts) can select `defect_repair`, the [scheduler](../../../apps/api/src/services/run-reading-scheduler.ts) can reserve that repair, and [retry command reconstruction](../../../apps/api/src/services/enqueue.ts) preserves the reserved reason. Keep the [internal reissue route](../../../apps/api/src/routes/internal-generation.ts) and frozen revision provenance visible without inventing an operator-versus-retry discriminator. |
+| ST-12 | Maintained map: portrait automation and reading availability | [Privacy](../../../apps/web/src/components/PrivacyView.tsx) exposes an explicit chart-bound portrait automation grant. The [publication outbox and withdrawal triggers](../../../db/d1/0027_portrait_mesh_automation.sql), [automation service](../../../apps/api/src/services/pattern-portrait-mesh.ts), and separate runner lanes coordinate existing automatic work; withdrawal cancels unfinished work without rewriting the reading or declaring every completed asset erased. Preserve the distinction between existing [three-to-six-chapter reading stations](../../../apps/web/src/components/portrait-explorer/PortraitExplorer.tsx) and [four-chapter generated-artwork eligibility](../../../apps/api/src/services/pattern-portrait.ts). Improvements to consent explanations, readiness, and scheduling are separate proposed slices. |
 
 For ST-04, the current admission table must distinguish:
 
@@ -68,8 +83,9 @@ Create these files during implementation:
 | --- | --- |
 | `docs/architecture/source-map/README.md` | Scope, maintenance commands, current published snapshot link, archive provenance, and how to interpret check results |
 | `docs/architecture/source-map/map.json` | Sole maintained source of map prose, hierarchy, stable IDs, and evidence selectors |
-| `docs/architecture/source-map/source-corrections.md` | ST-01–ST-08 dispositions and verification evidence |
+| `docs/architecture/source-map/source-corrections.md` | ST-01–ST-12 dispositions and verification evidence |
 | `docs/architecture/source-map/archive/2026-09-07-184743/` | Byte-identical copies of the original map Markdown, source-evidence Markdown, and source-snapshot JSON |
+| `docs/architecture/source-map/archive/2026-09-09-corrected/` | Byte-identical copies of the corrected plain and anchored Markdown, with their separate provenance limitations recorded in the README |
 | `docs/architecture/source-map/snapshots/<capture-id>/` | Four-file generated snapshot bundle described in section 6 |
 | `scripts/source-map/model.mjs` | Closed input validation and pure Markdown/evidence rendering |
 | `scripts/source-map/snapshot.mjs` | Source/selector resolution, snapshot identity, capture, and comparison |
@@ -78,7 +94,9 @@ Create these files during implementation:
 
 Archive the three files currently under `output/mindmaps/2026-09-07-184743/` before adapting their content. Record each archive file's exact SHA-256 and original path in the README. Do not normalize their links, line endings, dates, absolute checkout path, or renderer-reported flags. Explain that their absolute links are historical and their hashes alone cannot reconstruct the uncommitted source bytes. Leave the originals and the alignment roadmap unchanged.
 
-The maintained map keeps the original eight branch subjects. Split the old ontology-preparation topic into **Offline ontology supply** and **Parked machine-ontology producer**. Add **Shared Codex exchange mechanics** and **Observability and release identity** under runtime services. This gives an initial target of 37 topics if all other topics are retained; actual counts are derived, not hardcoded into the validator. Preserve useful existing prose and record substantive changes in the correction record. Do not claim new Observatory behavior from an isolated checkout unless that checkout contains it.
+Archive the two corrected September 9 Markdown files separately before adapting their content, recording their exact hashes and original paths under the same preservation rules. Record the later source review baseline as review metadata, not a fabricated original capture identity. Do not retrofit the September 7 hash receipt onto the corrected map or silently promote either historical format to the new snapshot schema.
+
+The maintained map keeps the eight branch subjects and uses the corrected 38-topic overview as a starting point for current prose, with both map generations reconciled against actual source. Split the ontology-preparation topic into **Offline ontology supply** and **Parked machine-ontology producer**. Add **Shared Codex exchange mechanics** and **Observability and release identity** under runtime services, and represent the automation and authority distinctions above. Preserve useful additions about provenance, operator repair, administration, and release tooling after correcting their meaning. Actual counts are derived, not a fixed 37- or 38-topic requirement. Record substantive changes in the correction record. Do not claim new Observatory behavior from an isolated checkout unless that checkout contains it.
 
 ## 5. Definition and evidence model
 
@@ -144,7 +162,7 @@ Each successful capture creates exactly these four files in a previously absent 
 3. `source-evidence.md`: generated claim/evidence index with evidence class/date, repository-relative source links, resolved line numbers, and a link to the snapshot's complete hashes.
 4. `source-snapshot.json`: metadata and the complete identity manifest below.
 
-Generated Markdown uses LF newlines and a final newline. Source links are relative to the fixed snapshot-directory depth and use `#L<start-line>`; encode path segments where necessary. Leaf/evidence links use explicit stable anchors such as `claim-<leaf-id>`. Rendered Markdown contains no capture timestamp, capture ID, branch, or absolute checkout path; those belong in the snapshot. Thus identical inputs at another dated sibling directory produce identical Markdown bytes.
+Generated Markdown uses LF newlines and a final newline. Source links are relative to the fixed snapshot-directory depth and use `#L<start-line>`; encode path segments where necessary. Leaf/evidence links use explicit stable anchors such as `claim-<leaf-id>`. Both generated Markdown files include a scope notice and a relative link to `source-snapshot.json` so their capture date, source baseline, dirty-source qualifications, and file identities are discoverable. Rendered Markdown contains no capture timestamp, capture ID, branch, or absolute checkout path; those belong in the snapshot. Thus identical inputs at another dated sibling directory produce identical Markdown bytes.
 
 The snapshot has these top-level fields, and rejects unknown fields:
 
@@ -236,42 +254,40 @@ Use Node's built-in test runner and temporary repositories outside the real chec
 | Unsupported historical schema or malformed command | Correct closed error and exit code; no rewritten archive |
 | More than 50 problems | Failed result with total count and explicit truncated diagnostics |
 
-`test:source-map` runs `node --test --test-concurrency=1 "scripts/source-map/*.test.mjs"`. Extend the existing `test:content` command to include that same glob after `"scripts/pattern-release/*.test.mjs"`, retaining serial execution. This keeps map tooling inside the existing content lane and preserves the fourteen-lane `ci:local` summary contract. Do not add a fifteenth gate lane or change release-evidence parsing in Slice 1.
+`test:source-map` runs `node --test --test-concurrency=1 "scripts/source-map/*.test.mjs"` as an optional, focused command for changes to map tooling. Keep `test:content`, `ci:local`, and release-evidence parsing unchanged; map tests are not added to an existing gate lane.
 
-Do not run a current-map freshness check as an unconditional CI test: historical snapshots are expected to become stale as referenced source changes. CI tests the tooling with deterministic fixtures. A maintainer runs `map:check` on the selected publication candidate whenever publishing or refreshing the map; its date and source scope remain visible between refreshes.
+Historical snapshots are expected to become stale as referenced source changes. Map freshness does not block application work or a release. When a maintainer chooses to publish or refresh the map, `map:check` checks that selected snapshot; its date and source scope remain visible between refreshes.
 
 For the documentation/comment unit, inspect the diff and compare non-trivia TypeScript token kind/text sequences before and after in the two edited files, using the installed TypeScript scanner. This proves the change is confined to comments/whitespace without creating brittle tests that require particular documentation wording. Preserve the runbook's dated evidence-ledger rows and original archive bytes. Re-run the real corpus preparation/builder in a new temporary directory outside the repository, pinning corpus release ID `pattern-ontology-source-manual-en-us-0.1.0` and `ONTOLOGY_VERSION=pattern-ontology-en-us-internal-0.1.0`. Use `computeOntologyBundleHash` from `apps/api/src/services/pattern-ontology-verify.ts` for the canonical bundle hash; require unchanged content identities and the 40/60/20 breakdown. Do not compare the builder's placeholder `bundle_hash` directly to the recorded release hash.
 
-Before the implementation candidate is reviewed for merge, run:
+For a map-tooling change, run `npm run test:source-map`. When intentionally publishing a new snapshot, use:
 
 ```text
-npm run test:source-map
-npm run test:content
-npm run check:pattern-source -w @patternlike/api
 npm run map:capture -- <new-valid-capture-id>
 npm run map:check -- docs/architecture/source-map/snapshots/<new-valid-capture-id>
-npm run ci:local
 ```
 
-The capture ID in this workflow is chosen once per fresh snapshot; never rerun capture against an existing destination. Retain focused results, the offline ontology receipt, the selected map-check result, and the real full-gate summary. These are different evidence types. Complete source/fingerprint work before freezing the gate candidate; re-run affected verification after a relevant change. Slice 2 must be established before the tooling merge, as required by the delivery ledger.
+The capture ID is chosen once per fresh snapshot; never rerun capture against an existing destination. Report the checks actually performed. The comment/source-correction checks above are scoped to those changes, not recurring release requirements. Ordinary application changes use their affected tests and the existing [repository merge policy](../../../AGENTS.md); this slice adds no preflight or mandatory full-gate run to local implementation work.
 
 ## 9. Acceptance and maintenance handoff
 
 Slice 1 is locally complete only when:
 
-- ST-01–ST-08 have current-source evidence and explicit dispositions, with no unresolved contradiction presented as current guidance.
-- The archived originals match their original byte hashes, the roadmap is unchanged, and unrelated checkout work is preserved.
-- The maintained definition represents the required supply, compatibility, shared-mechanics, and observability distinctions, with evidence for every leaf.
+- ST-01–ST-12 have current-source evidence and explicit dispositions, with no unresolved contradiction presented as current guidance.
+- Both archived map generations match their original byte hashes and retain their separate provenance limits; the implementation leaves the roadmap and unrelated checkout work unchanged.
+- The maintained definition represents the required supply, compatibility, shared-mechanics, observability, authority, harness, revision, and automation distinctions, with evidence for every leaf and a visible link to scoped source identity.
 - A fresh bundle is reproducible from the documented input/commands, passes the checker against its actual source, and retains dirty/base-commit qualifications where relevant.
-- The failure matrix and integrated tooling tests pass, executable comment-file tokens and ontology content remain unchanged, and the Pattern source-fingerprint check passes.
+- The failure matrix and focused tooling tests pass, executable comment-file tokens and ontology content remain unchanged, and the Pattern source-fingerprint check passes.
 - The README identifies the maintainer responsibility, current published snapshot, refresh triggers, check scope, and release/evidence limitations.
 
-Refresh when a cited file or map/tool input changes, a current explanation is found wrong, or a new dated observation is intentionally added. Review the source first, update prose/selectors, capture a new directory, run the check, review the generated evidence index, and then update the README link. Keep older snapshots and their dates; do not repair a historical receipt in place.
+When the map is next used or published, refresh stale source references, correct explanations found wrong, and label any new dated observation. Review the source, update prose/selectors, capture a new directory, check it, and update the README link. Keep older snapshots and their dates; do not repair a historical receipt in place. A changed application file does not require an immediate map refresh.
 
 Documentation correction and tooling can be reviewed separately. Each PR states its source identity, verification, and remaining release steps; every merge follows repository policy. This specification and a successful local map check provide no authority to merge, deploy, activate ontology, or modify existing readings.
 
 ## 10. Specification verification receipt
 
-Preparation included current-source inspection, rechecking the original map identities, and an offline corpus/builder run under Node `v22.23.2`. The run reproduced the two hashes and counts in section 2 without signing, ingestion, provider calls, or production access. The selected comment files' absence from the Pattern fingerprint manifest was checked directly.
+September 7 preparation included current-source inspection, rechecking the original map identities, and an offline corpus/builder run under Node `v22.23.2`. The run reproduced the two hashes and counts in section 2 without signing, ingestion, provider calls, or production access. The selected comment files' absence from the Pattern fingerprint manifest was checked directly.
 
-The commands, modules, model, and snapshot format above are proposed interfaces, not an implemented tool or a passing implementation test result. Documentation links/structure and checkout preservation are checked separately when saving this specification. Application suites and `ci:local` are not claimed for this specification-only change.
+September 9 reconciliation reviewed the updated roadmap and both corrected-map variants, then inspected the owning route, scheduler/repair, release-harness, and portrait-automation source for ST-09–ST-12. Local documentation checks cover links, Markdown structure, whitespace, and the scoped diff. No original artifact was rewritten, and no new corpus build, application test, provider evaluation, remote observation, or production action was performed for this reconciliation.
+
+At the September 9 specification reconciliation, the commands, modules, model, and snapshot format above were proposed interfaces, not an implemented tool or a passing implementation test result. Documentation links/structure and checkout preservation were checked separately when saving that specification. Application suites and `ci:local` were not claimed for that specification-only change. Subsequent implementation results are recorded in the linked implementation record; the later scope simplification does not rewrite those historical results.

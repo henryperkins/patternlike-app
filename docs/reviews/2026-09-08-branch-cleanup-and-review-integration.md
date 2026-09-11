@@ -11,6 +11,10 @@ The four original remote branches remain pending at the user's request.
 Their retained source identities are recorded below. Incorporating historical
 reports does not make their original findings current again.
 
+## Later disposition — 2026-09-11
+
+This remains the September 8 documentation review. The later [portrait priorities record](2026-09-07-portrait-remaining-priorities.md) records implemented R5/R6 interaction work, and current source includes their passage labels and reading footer. References below to R6 being open are historical, not the present backlog. The [roadmap ledger](../superpowers/plans/2026-09-07-mind-map-alignment-slices.md#current-integration--2026-09-11) carries current work priorities.
+
 ## Documentation from PR #50
 
 Source: [PR #50](https://github.com/henryperkins/patternlike-app/pull/50),
