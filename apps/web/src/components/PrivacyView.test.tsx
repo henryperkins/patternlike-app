@@ -1,9 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PrivacyView } from "./PrivacyView.js";
 import { aiConsentCategoryLabel } from "../lib/reading-format.js";
-import { capturedFor, mockApiResponses, type MockResponse } from "../test/api-mock.js";
+import { capturedFor, deferred, mockApiResponses, type MockResponse } from "../test/api-mock.js";
 import {
   consentGranted,
   consentNotGranted,
@@ -117,6 +117,43 @@ function geocoderPanel(): HTMLElement {
 }
 
 describe("Context & privacy", () => {
+  it("rechecks Pattern consent and requires another explicit decision when the observation changed", async () => {
+    const path = "/v1/consents/pattern-generation";
+    const consent = { schema_version: "0.7.0", kind: "pattern_generation", status: "granted", provider: "OpenAI", purpose: "one_pattern_per_chart", policy_version: "1.1.0", enabled_categories: [], granted_at: "2026-09-11T00:00:00Z" };
+    const responses = { [`GET ${CONSENT}`]: ok(consentGranted), [`GET ${path}`]: ok(consent) };
+    renderPrivacy(responses);
+    const withdraw = await screen.findByRole("button", { name: "Withdraw Pattern consent" });
+    responses[`GET ${path}`] = ok({ ...consent, policy_version: "1.2.0" });
+    await userEvent.click(withdraw);
+    expect(capturedFor(path).filter(request => request.method === "DELETE")).toHaveLength(0);
+    expect(await screen.findByText(/Permission changed. Review the current consequences/)).toBeInTheDocument();
+  });
+
+  it("does not apply a late freeze response after the account surface is unmounted", async () => {
+    const gate = deferred();
+    const frozen = vi.fn();
+    const { unmount } = renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(accountProcessingGranted),
+      [`DELETE ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: { ...ok(accountProcessingRevokedFreeze), gate: gate.promise },
+    }, frozen);
+    await userEvent.click(await within(processingPanel()).findByRole("button", { name: /Withdraw calculation permission/i }));
+    await userEvent.click(within(processingPanel()).getByRole("checkbox", { name: /understand.*retained data.*stop being served/i }));
+    await userEvent.click(within(processingPanel()).getByRole("button", { name: /Freeze account/i }));
+    unmount();
+    await act(async () => gate.release());
+    expect(frozen).not.toHaveBeenCalled();
+  });
+  it("uses the returned Pattern retention confirmation without calling it erasure", async () => {
+    const consent = { schema_version: "0.7.0", kind: "pattern_generation", status: "granted", provider: "OpenAI", purpose: "one_pattern_per_chart", policy_version: "1.1.0", enabled_categories: [], granted_at: "2026-09-11T00:00:00Z" };
+    renderPrivacy({ [`GET ${CONSENT}`]: ok(consentGranted),
+      "GET /v1/consents/pattern-generation": ok(consent),
+      "DELETE /v1/consents/pattern-generation": ok({ consent: { ...consent, status: "not_granted" }, existing_pattern_retained: true }),
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Withdraw Pattern consent" }));
+    expect(await screen.findByText(/Your existing Pattern is retained/)).toHaveTextContent(/does not certify completion/);
+  });
+
   it("keeps the automatic portrait choice in privacy", async () => {
     renderPrivacy({
       [`GET ${CONSENT}`]: ok(consentNotGranted),
@@ -205,6 +242,27 @@ describe("Context & privacy", () => {
       await screen.findByRole("button", { name: /Withdraw permission/i }),
     ).toBeInTheDocument();
     expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
+  });
+
+  it.each([
+    { intent: "grant", initial: consentNotGranted, result: consentGranted, method: "PUT", action: "Grant permission", nextAction: "Withdraw permission" },
+    { intent: "withdraw", initial: consentGranted, result: consentNotGranted, method: "DELETE", action: "Withdraw permission", nextAction: "Grant permission" },
+  ])("reports the Daily $intent outcome without reversing its meaning", async ({ intent, initial, result, method, action, nextAction }) => {
+    renderPrivacy({
+      [`GET ${CONSENT}`]: ok(initial),
+      [`${method} ${CONSENT}`]: ok(result),
+    });
+    await userEvent.click(await within(consentPanel()).findByRole("button", { name: action }));
+    await within(consentPanel()).findByRole("button", { name: nextAction });
+    const receipt = within(consentPanel()).getByRole("status");
+    if (intent === "withdraw") {
+      expect(receipt).toHaveTextContent("Daily synthesis permission withdrawn.");
+      expect(receipt).toHaveTextContent("Published readings are retained.");
+      expect(receipt).toHaveTextContent("not completion of unfinished-work cancellation");
+    } else {
+      expect(receipt).not.toHaveTextContent(/withdrawn|cancellation/i);
+      expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
+    }
   });
 
   it("withdraws with an empty DELETE and reports the new state", async () => {

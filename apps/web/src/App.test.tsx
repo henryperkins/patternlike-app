@@ -846,6 +846,49 @@ describe("web application shell", () => {
     ).toBeInTheDocument();
   });
 
+  it.each(["birth acceptance", "chart result"] as const)("ignores late correction %s after a newer chart observation", async (heldStage) => {
+    const user = userEvent.setup();
+    const gate = deferred();
+    const supersededResult = { ...chart, id: "cht_late_correction", profile_version: 2, positions: [{ body: "sun", longitude_deg: 120.4, sign: "leo", house: 1, retrograde: false }] };
+    const latest = { ...chart, id: "cht_newer_observation", profile_version: 3, positions: [{ body: "sun", longitude_deg: 185, sign: "libra", house: 1, retrograde: false }] };
+    const responses: Record<string, MockResponse> = {
+      "/v1/chart": { status: 200, body: chart },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "/v1/birth-profiles": { status: 202, body: { schema_version: "0.2.0", workflow: "NormalizeBirthAndCalculateChart", status: "succeeded", idempotency_key: "web-birth-test", job_id: "job_delayed_birth", resource_id: supersededResult.id }, ...(heldStage === "birth acceptance" ? { gate: gate.promise } : {}) },
+    };
+    mockApiResponses(responses);
+    const { rerender } = render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]!);
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+    await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }));
+    if (heldStage === "chart result") responses["/v1/chart"] = { status: 200, body: supersededResult, gate: gate.promise };
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+    await waitFor(() => expect(capturedFor("/v1/birth-profiles")).toHaveLength(1));
+    if (heldStage === "chart result") await waitFor(() => expect(capturedFor("/v1/chart")).toHaveLength(2));
+    const later = Date.now() + 60_001;
+    const now = vi.spyOn(Date, "now").mockReturnValue(later);
+    try {
+      responses["/v1/chart"] = { status: 200, body: latest };
+      rerender(<App />);
+      await user.click(screen.getByRole("button", { name: "Reload current chart" }));
+      await waitFor(() => expect(capturedFor("/v1/chart")).toHaveLength(heldStage === "chart result" ? 3 : 2));
+      await user.click(screen.getAllByRole("link", { name: "Pattern" })[0]!);
+      await screen.findAllByText("Libra 5.0 deg");
+      expect(capturedFor("/v1/birth-profiles")[0]!.signal?.aborted).toBe(true);
+      if (heldStage === "chart result") expect(capturedFor("/v1/chart")[1]!.signal?.aborted).toBe(true);
+      responses["/v1/chart"] = { status: 200, body: supersededResult };
+      await act(async () => gate.release());
+      expect(screen.getAllByText("Libra 5.0 deg").length).toBeGreaterThan(0);
+      expect(screen.queryByText("Leo 0.4 deg")).not.toBeInTheDocument();
+      expect(capturedFor("/v1/chart")).toHaveLength(heldStage === "chart result" ? 3 : 2);
+    } finally { now.mockRestore(); }
+  });
+
   it("replaces the active chart when different birth data is submitted", async () => {
     const user = userEvent.setup();
     const responses: Record<string, MockResponse> = {

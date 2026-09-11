@@ -17,6 +17,9 @@ import {
   regeneratePattern,
   startPatternGeneration,
 } from "../lib/api-client.js";
+import { selectReaderReadiness, observationReason, type Observation, type ReaderPresentation } from "../lib/reader-readiness.js";
+import { readerActionRoute } from "../lib/reader-routes.js";
+import { ReaderConsequences, ReaderReadiness, useReaderScope } from "./ReaderReadiness.js";
 import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument } from "../lib/pattern-portrait.js";
 import type { PortraitSky } from "../lib/portrait-sky.js";
@@ -82,12 +85,14 @@ const REGENERATE_CONFIRMATION = "REGENERATE MY PATTERN";
 
 function PatternRegenerationPanel({
   regeneration,
+  presentation,
   onRegenerate,
   onRefresh,
   busy,
   error,
 }: {
   regeneration: PatternRegenerationState | null;
+  presentation: ReaderPresentation;
   onRegenerate: () => void;
   onRefresh: () => void;
   busy: boolean;
@@ -115,6 +120,7 @@ function PatternRegenerationPanel({
     );
   }
 
+  const canMutate = presentation.actions.some(action => action.type === "start_generation" || action.type === "retry_generation");
   const failed = regeneration.failure;
   if (!regeneration.eligible && !failed) return null;
 
@@ -123,7 +129,7 @@ function PatternRegenerationPanel({
       className={`pattern-regeneration${failed ? " pattern-regeneration--failed" : ""}`}
       aria-labelledby="pattern-regeneration-heading"
     >
-      <p className="kicker">{failed ? "Pattern update paused" : "Pattern update available"}</p>
+      <p className="kicker">{failed ? "Pattern update not completed" : "Pattern update available"}</p>
       <h3 id="pattern-regeneration-heading">
         {failed ? "Your Pattern was not changed" : "A newer Pattern method is available"}
       </h3>
@@ -144,7 +150,7 @@ function PatternRegenerationPanel({
           className="pattern-regeneration__confirm"
           onSubmit={(event) => {
             event.preventDefault();
-            if (confirmText !== REGENERATE_CONFIRMATION || busy) return;
+            if (confirmText !== REGENERATE_CONFIRMATION || busy || !canMutate) return;
             onRegenerate();
           }}
         >
@@ -167,7 +173,7 @@ function PatternRegenerationPanel({
             <button
               className="button"
               type="submit"
-              disabled={confirmText !== REGENERATE_CONFIRMATION || busy}
+              disabled={confirmText !== REGENERATE_CONFIRMATION || busy || !canMutate}
             >
               Replace my Pattern
             </button>
@@ -184,7 +190,7 @@ function PatternRegenerationPanel({
             </button>
           </div>
         </form>
-      ) : failed && !failed.retryable ? (
+      ) : !canMutate ? (
         <button
           className="button button--secondary"
           type="button"
@@ -216,6 +222,9 @@ function ReadyDocument({
   canCreatePortrait,
   onUnauthorized,
   regeneration,
+  replacementPresentation,
+  fresh,
+  observedAt,
   onRegenerate,
   onRefresh,
   onDelete,
@@ -229,6 +238,9 @@ function ReadyDocument({
   canCreatePortrait: boolean;
   onUnauthorized: () => void;
   regeneration: PatternRegenerationState | null;
+  replacementPresentation: ReaderPresentation;
+  fresh: boolean;
+  observedAt: number | null;
   onRegenerate: () => void;
   onRefresh: () => void;
   onDelete: () => void;
@@ -278,21 +290,24 @@ function ReadyDocument({
       </p>
       <PatternRegenerationPanel
         regeneration={regeneration}
+        presentation={replacementPresentation}
         onRegenerate={onRegenerate}
         onRefresh={onRefresh}
         busy={busy}
         error={error}
       />
+      {!fresh && <ReaderReadiness presentation={replacementPresentation} onAction={() => onRefresh()} />}
       <div className="pattern-delete">
         {confirming ? (
           <form
             className="privacy-action__confirm"
             onSubmit={(event) => {
               event.preventDefault();
-              if (confirmText !== DELETE_CONFIRMATION || busy) return;
+              if (confirmText !== DELETE_CONFIRMATION || busy || !fresh) return;
               onDelete();
             }}
           >
+            <ReaderConsequences action="delete_pattern" observedAt={observedAt} evidence={fresh ? "known" : "unavailable"} />
             <label htmlFor="pattern-delete-confirm">
               Type {DELETE_CONFIRMATION} to confirm. This Pattern and retained
               generation material will be permanently erased and cannot be
@@ -313,7 +328,7 @@ function ReadyDocument({
               <button
                 className="button button--danger"
                 type="submit"
-                disabled={confirmText !== DELETE_CONFIRMATION || busy}
+                disabled={confirmText !== DELETE_CONFIRMATION || busy || !fresh}
               >
                 Confirm deletion
               </button>
@@ -348,6 +363,14 @@ function ReadyDocument({
 
 function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: PatternExperienceProps) {
   const clearPortraitSession = useClearPortraitSession();
+  const accountScope = useReaderScope();
+  const [observation, setObservation] = useState<Observation<PatternStateDocumentV9> | null>(null);
+  const [, setClockRevision] = useState(0);
+  const requestGeneration = useRef(0);
+  const mutation = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  const [deletionReceipt, setDeletionReceipt] = useState<"accepted" | "already_unavailable" | null>(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; mutation.current?.abort(); requestGeneration.current++; }; }, []);
   const [portraitPreferenceSaving, setPortraitPreferenceSaving] = useState(false);
   const [state, setState] = useState<PatternStateDocumentV9 | null>(null);
   const [document, setDocument] = useState<PatternResponseV7 | null>(null);
@@ -362,10 +385,13 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
   const currentDocument = useRef<PatternResponseV7 | null>(null);
 
   const load = useCallback(async (signal: AbortSignal) => {
+    const generation = ++requestGeneration.current;
+    const current = () => mounted.current && !signal.aborted && generation === requestGeneration.current;
     setBusy(true);
+    setObservation(previous => previous ? { ...previous, evidence: "unavailable" } : previous);
     try {
       const next = await getPatternState(signal);
-      if (signal.aborted) return;
+      if (!current()) return;
       if ((next.chart && next.chart.chart_id !== chartId) || (next.state === "ready" && (!next.chart || !next.pattern))) {
         clearPortraitSession();
         currentDocument.current = null;
@@ -374,6 +400,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
         throw new Error("This reading no longer matches the current chart. Refresh to load its Pattern.");
       }
       setState(next);
+      setObservation({ scope: { ...accountScope, chartId, source: next.pattern ? `${next.pattern.pattern_id}:${next.pattern.generated_at}` : null }, requestGeneration: generation, observedAt: Date.now(), evidence: "known", value: next });
       setError(null);
       setRequestId(null);
       if (next.state === "ready") {
@@ -383,7 +410,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
           setDocument(null);
         }
         const generated = await getGeneratedPattern(signal);
-        if (signal.aborted) return;
+        if (!current()) return;
         if (!patternMatchesDocument(next.pattern, generated)) {
           clearPortraitSession();
           currentDocument.current = null;
@@ -399,7 +426,11 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
         setDocument(null);
       }
     } catch (caught) {
-      if (signal.aborted) return;
+      if (!current()) return;
+      setObservation(previous => previous ? { ...previous, evidence: "unavailable" } : previous);
+      if (caught instanceof ApiError && [401, 403, 404, 409, 410].includes(caught.status)) {
+        clearPortraitSession(); currentDocument.current = null; setDocument(null); setState(null);
+      }
       if (caught instanceof ApiError && caught.status === 401) {
         clearPortraitSession();
         onUnauthorized();
@@ -412,9 +443,9 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
       );
       setRequestId(caught instanceof ApiError ? caught.requestId : null);
     } finally {
-      if (!signal.aborted) setBusy(false);
+      if (current()) setBusy(false);
     }
-  }, [chartId, onUnauthorized, clearPortraitSession]);
+  }, [chartId, onUnauthorized, clearPortraitSession, accountScope]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -443,15 +474,31 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
     };
   }, [state]);
 
+  const scope = { ...accountScope, chartId, source: state?.pattern ? `${state.pattern.pattern_id}:${state.pattern.generated_at}` : null };
+  const presentation = selectReaderReadiness({ scope, requestGeneration: requestGeneration.current, now: Date.now(), pattern: observation,
+    patternDocumentMatches: Boolean(document && patternMatchesDocument(state?.pattern ?? null, document)),
+    retainAcceptedPattern: Boolean(document), chapterCount: document?.core_chapters.length });
+  const fresh = !busy && observation !== null && !observationReason(observation, scope, requestGeneration.current, Date.now());
+  useEffect(() => {
+    if (!observation || observation.evidence !== "known") return;
+    const timer = window.setTimeout(() => setClockRevision(value => value + 1), Math.max(0, observation.observedAt + 60_001 - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [observation]);
+
   const generate = async (consent: PatternConsent, reason: "first_open" | "first_open_retry" | "failed_attempt_retry") => {
+    if (!fresh || observationReason(observation, scope, requestGeneration.current, Date.now()) || !presentation.pattern.actions.some(action => ["review_consent", "start_generation", "retry_generation"].includes(action.type))) return;
+    const controller = new AbortController(); mutation.current = controller;
     setBusy(true);
     setError(null);
     generateKey.current ??= newIdempotencyKey("web-pattern-generation");
     try {
-      await startPatternGeneration(consent.policy_version, reason, generateKey.current);
+      await startPatternGeneration(consent.policy_version, reason, generateKey.current, controller.signal);
+      if (controller.signal.aborted || !mounted.current) return;
       generateKey.current = null;
       setAttempt((value) => value + 1);
     } catch (caught) {
+      if (controller.signal.aborted || !mounted.current) return;
+      setObservation(previous => previous ? { ...previous, evidence: "unavailable" } : previous);
       if (caught instanceof ApiError && caught.status === 401) {
         onUnauthorized();
         return;
@@ -467,16 +514,22 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
   };
 
   const erase = async () => {
+    if (!fresh || observationReason(observation, scope, requestGeneration.current, Date.now()) || !document) return;
+    const controller = new AbortController(); mutation.current = controller;
     setBusy(true);
     deleteKey.current ??= newIdempotencyKey("web-pattern-delete");
     try {
-      await deleteGeneratedPattern(deleteKey.current);
+      const receipt = await deleteGeneratedPattern(deleteKey.current, controller.signal);
+      if (controller.signal.aborted || !mounted.current) return;
+      setDeletionReceipt(receipt.receipt);
       clearPortraitSession();
       currentDocument.current = null;
       setDocument(null);
       deleteKey.current = null;
       setAttempt((value) => value + 1);
     } catch (caught) {
+      if (controller.signal.aborted || !mounted.current) return;
+      setObservation(previous => previous ? { ...previous, evidence: "unavailable" } : previous);
       if (caught instanceof ApiError && caught.status === 401) {
         onUnauthorized();
         return;
@@ -488,6 +541,8 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
 
   const regenerate = async () => {
     if (
+      !fresh ||
+      !presentation.patternReplacement.actions.some(action => action.type === "start_generation" || action.type === "retry_generation") ||
       regenerationInFlight.current ||
       state?.state !== "ready" ||
       !state.regeneration?.eligible ||
@@ -495,16 +550,30 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
     ) {
       return;
     }
+    const controller = new AbortController(); mutation.current = controller;
     regenerationInFlight.current = true;
     setBusy(true);
     setError(null);
     setRequestId(null);
     regenerateKey.current ??= newIdempotencyKey("web-pattern-regeneration");
     try {
-      await regeneratePattern(state.consent.policy_version, regenerateKey.current);
+      // A confirmation may remain open while permission or source eligibility changes.
+      const current = await getPatternState(controller.signal);
+      if (controller.signal.aborted || !mounted.current) return;
+      if (current.chart?.chart_id !== chartId || current.state !== "ready" || !current.regeneration?.eligible
+        || current.regeneration.generation || current.consent?.status !== "granted"
+        || (current.regeneration.failure && current.regeneration.failure.retryable !== true)
+        || !document || !patternMatchesDocument(current.pattern, document)) {
+        setAttempt(value => value + 1);
+        return;
+      }
+      await regeneratePattern(current.consent.policy_version, regenerateKey.current, controller.signal);
+      if (controller.signal.aborted || !mounted.current) return;
       regenerateKey.current = null;
       setAttempt((value) => value + 1);
     } catch (caught) {
+      if (controller.signal.aborted || !mounted.current) return;
+      setObservation(previous => previous ? { ...previous, evidence: "unavailable" } : previous);
       if (caught instanceof ApiError && caught.status === 401) {
         onUnauthorized();
         return;
@@ -562,9 +631,12 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
         sky={sky}
         document={document}
         pattern={state.pattern}
-        canCreatePortrait={state.consent?.status === "granted" && !state.regeneration?.generation}
+        canCreatePortrait={fresh && state.consent?.status === "granted" && !state.regeneration?.generation}
         onUnauthorized={onUnauthorized}
         regeneration={state.regeneration}
+        replacementPresentation={presentation.patternReplacement}
+        fresh={fresh}
+        observedAt={observation?.observedAt ?? null}
         onRegenerate={() => void regenerate()}
         onRefresh={() => setAttempt((value) => value + 1)}
         onDelete={() => void erase()}
@@ -578,24 +650,13 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
     return (
       <section className="pattern-chapters" aria-labelledby="pattern-experience-heading" aria-busy="true">
         {heading}
-        <p className="pattern-chapters__status" role="status">{PROGRESS[state.state]}</p>
+        <p className="pattern-chapters__status" role="status" data-readiness={presentation.pattern.code}>{presentation.pattern.text}</p>
         <p>This usually takes a short while. You can leave and come back.</p>
       </section>
     );
   }
 
-  const titles: Partial<Record<PatternState, string>> = {
-    chart_required: "Add a birth chart before a Pattern can be written.",
-    locale_confirmation_required: "Confirm your content language to generate a Pattern.",
-    ontology_unavailable: "Pattern generation is not available right now.",
-    deleted: "This Pattern was deleted and cannot be regenerated for this chart.",
-    withdrawn: "The interpretation basis for this Pattern was withdrawn.",
-    failed: "This Pattern could not be finished.",
-    consent_required: "Generate my Pattern",
-    available: "Generate my Pattern",
-  };
-
-  const canRetry = state.generation?.retryable === true;
+  const canRetry = presentation.pattern.actions.some(action => action.type === "retry_generation");
   const details: Partial<Record<PatternState, string>> = {
     chart_required: "Your Pattern is written from calculated natal facts, so it waits for an active chart.",
     locale_confirmation_required: "The Pattern is written in the language you confirm.",
@@ -613,16 +674,17 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
 
   const consent = state.consent;
   const canGenerate =
-    (state.state === "consent_required" || state.state === "available" || (state.state === "failed" && canRetry)) &&
-    consent !== null;
+    fresh && presentation.pattern.actions.some(action => ["review_consent", "start_generation", "retry_generation"].includes(action.type)) && consent !== null;
   const reason = state.state === "failed" ? "failed_attempt_retry" as const : "first_open" as const;
 
   return (
     <section className="pattern-chapters" aria-labelledby="pattern-experience-heading">
       {heading}
       <div className={state.state === "failed" ? "pattern-chapters__failure" : "pattern-chapters__empty"}>
-        <h3>{titles[state.state] ?? "Your Pattern is not ready."}</h3>
+        <h3 data-readiness={presentation.pattern.code}>{state.state === "ontology_unavailable" ? "Pattern generation is not available right now." : presentation.pattern.text}</h3>
         <p>{details[state.state] ?? "Chart facts above are unaffected."}</p>
+        {deletionReceipt && <p role="status">{deletionReceipt === "accepted" ? "Deletion request accepted." : "The Pattern is already unavailable."} This is not a receipt for completed storage or provider erasure.</p>}
+        {presentation.pattern.actions.filter(action => action.type === "open_birth_details" || action.type === "confirm_locale").map(action => <a className="button" key={action.type} href={readerActionRoute(action) ?? "#pattern"}>{action.type === "confirm_locale" ? "Confirm language" : "Open birth details"}</a>)}
         {error ? <p role="status">{withRequestId(error, requestId)}</p> : null}
         {canGenerate && consent ? (
           <>
@@ -638,7 +700,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
             </button>
           </>
         ) : null}
-        {state.state === "failed" ? (
+        {state.state === "failed" || !fresh ? (
           <button
             className="button button--secondary"
             type="button"
@@ -654,5 +716,6 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
 
 /** A corrected chart starts an isolated reader and aborts the previous chart's work. */
 export function PatternExperience(props: PatternExperienceProps) {
-  return <CurrentChartPatternExperience key={props.chartId} {...props} />;
+  const scope = useReaderScope();
+  return <CurrentChartPatternExperience key={`${scope.sessionEpoch}:${scope.accountId}:${props.chartId}:${scope.profileVersion}`} {...props} />;
 }

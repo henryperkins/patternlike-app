@@ -1,6 +1,7 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BirthProfileRequest } from "@patternlike/shared";
+import { ReaderScopeContext, ReaderChartObservedAtContext, ReaderRefreshChartContext } from "./components/ReaderReadiness.js";
 import { AccountAccessRecovery } from "./components/AccountAccessRecovery.js";
 import { AccountDataControls } from "./components/AccountDataControls.js";
 import { AppShell, type ViewId } from "./components/AppShell.js";
@@ -40,7 +41,7 @@ import {
 
 type ChartState =
   | { status: "loading" }
-  | { status: "ready"; chart: ChartResponse }
+  | { status: "ready"; chart: ChartResponse; observedAt: number }
   | { status: "missing" }
   | { status: "access-recovery"; consent: AccountProcessingConsentDocument }
   | { status: "access-unavailable"; message: string; requestId?: string | null }
@@ -96,14 +97,26 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   const [preferenceSyncRevision, setPreferenceSyncRevision] = useState(0);
   const [correctingBirth, setCorrectingBirth] = useState(false);
 
-  const load = useCallback(async (signal?: AbortSignal) => {
+  const chartRequestGeneration = useRef(0);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  const scopeChart = chartState.status === "ready" ? chartState.chart : null;
+  const readerScope = useMemo(() => ({ accountId: scopeChart?.user_id ?? null, sessionEpoch,
+    chartId: scopeChart?.id ?? null, profileVersion: scopeChart?.profile_version ?? null, source: null }),
+    [scopeChart?.user_id, scopeChart?.id, scopeChart?.profile_version, sessionEpoch]);
+  const load = useCallback(async (signal?: AbortSignal, preserveDraft = false) => {
+    const generation = ++chartRequestGeneration.current;
+    const current = () => !signal?.aborted && generation === chartRequestGeneration.current;
     try {
       const chart = await getChart(signal);
+      if (!current()) return;
       setHasValidatedSession(true);
       setAuthState({ status: "signed-in" });
-      setChartState({ status: "ready", chart });
+      setChartState({ status: "ready", chart, observedAt: Date.now() });
     } catch (error) {
-      if (signal?.aborted) return;
+      if (!current()) return;
+      // A read-only correction review keeps entered details through transport
+      // failure. Authoritative access changes still use the existing recovery.
+      if (preserveDraft && !(error instanceof ApiError && [401, 403, 404, 410].includes(error.status))) throw error;
       if (error instanceof ApiError && error.status === 401) {
         // No session, or one that has expired or been revoked. The API answers
         // all three identically on purpose, so the client cannot distinguish
@@ -127,7 +140,7 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         setHasValidatedSession(false);
         try {
           const consent = await getAccountProcessingConsent(signal);
-          if (signal?.aborted) return;
+          if (!current()) return;
           if (!isAccountProcessingConsentResponse(consent)) {
             setChartState({
               status: "access-unavailable",
@@ -158,7 +171,7 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
             });
           }
         } catch (consentError) {
-          if (signal?.aborted) return;
+          if (!current()) return;
           if (consentError instanceof ApiError && consentError.status === 401) {
             setHasValidatedSession(false);
             setAuthState({ status: "signed-out" });
@@ -292,7 +305,13 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
    * state the app already has a screen for. Stable identity because TodayView
    * holds it as an effect dependency.
    */
-  const handleSignedOut = useCallback(() => setAuthState({ status: "signed-out" }), []);
+  const handleSignedOut = useCallback(() => {
+    chartRequestGeneration.current++;
+    setSessionEpoch(value => value + 1);
+    setHasValidatedSession(false);
+    setChartState({ status: "loading" });
+    setAuthState({ status: "signed-out" });
+  }, []);
 
   const showDeletionStatus = useCallback(() => {
     window.location.hash = "deletion-status";
@@ -321,11 +340,21 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     profile: BirthProfileRequest,
     intent: "create" | "correct",
     idempotencyKey: string,
+    signal?: AbortSignal,
   ) => {
+    const generation = ++chartRequestGeneration.current;
+    const assertCurrent = () => {
+      if (signal?.aborted || generation !== chartRequestGeneration.current) {
+        throw new DOMException("The chart or session changed during this request. Reload its status before continuing.", "AbortError");
+      }
+    };
+    assertCurrent();
     let accepted: BirthWorkflowResponse | null = null;
     try {
-      accepted = await createBirthProfile(profile, idempotencyKey);
+      accepted = await createBirthProfile(profile, idempotencyKey, signal);
+      assertCurrent();
     } catch (error) {
+      assertCurrent();
       if (!(error instanceof ApiError && error.code === "chart_already_exists")) {
         throw error;
       }
@@ -337,8 +366,13 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     }
 
     for (let attempt = 0; attempt < 5; attempt++) {
+      assertCurrent();
       try {
-        const chart = await getChart();
+        const chart = await getChart(signal);
+        assertCurrent();
+        if (readerScope.accountId !== null && chart.user_id !== readerScope.accountId) {
+          throw new Error("The returned chart belongs to a different session. Reload the account before continuing.");
+        }
         // POST commits the replacement before it returns, but GET can still
         // answer the superseded snapshot (in-flight job, or a cached 200).
         // Accepting that 200 would leave Pattern on the chart the reader
@@ -352,10 +386,11 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
           continue;
         }
         setCorrectingBirth(false);
-        setChartState({ status: "ready", chart });
+        setChartState({ status: "ready", chart, observedAt: Date.now() });
         window.location.hash = "pattern";
         return;
       } catch (error) {
+        assertCurrent();
         if (!(error instanceof ApiError && error.status === 404)) throw error;
         await wait(700);
       }
@@ -363,12 +398,12 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     throw new Error("The calculation was accepted but is not ready yet. Try again in a moment.");
   };
 
-  const createChart = async (profile: BirthProfileRequest, idempotencyKey: string) => {
-    await submitBirthProfile(profile, "create", idempotencyKey);
+  const createChart = async (profile: BirthProfileRequest, idempotencyKey: string, signal?: AbortSignal) => {
+    await submitBirthProfile(profile, "create", idempotencyKey, signal);
   };
 
-  const correctChart = async (profile: BirthProfileRequest, idempotencyKey: string) => {
-    await submitBirthProfile(profile, "correct", idempotencyKey);
+  const correctChart = async (profile: BirthProfileRequest, idempotencyKey: string, signal?: AbortSignal) => {
+    await submitBirthProfile(profile, "correct", idempotencyKey, signal);
   };
 
   if (view === "deletion-status") {
@@ -503,7 +538,10 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   }
 
   return (
-    <PortraitSessionProvider key={chart?.id ?? "no-chart"}>
+    <ReaderScopeContext value={readerScope}>
+    <ReaderChartObservedAtContext value={chartState.status === "ready" ? chartState.observedAt : null}>
+    <ReaderRefreshChartContext value={() => load(undefined, true)}>
+    <PortraitSessionProvider key={`${readerScope.sessionEpoch}:${readerScope.accountId}:${readerScope.chartId}:${readerScope.profileVersion}`}>
       <ReadingConnectionChartContext value={chart?.id ?? null}>
         <ReadingBirthCorrectionContext value={chart ? () => {
           window.location.hash = "privacy";
@@ -516,5 +554,8 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         </ReadingBirthCorrectionContext>
       </ReadingConnectionChartContext>
     </PortraitSessionProvider>
+    </ReaderRefreshChartContext>
+    </ReaderChartObservedAtContext>
+    </ReaderScopeContext>
   );
 }
