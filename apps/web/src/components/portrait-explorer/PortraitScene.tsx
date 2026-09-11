@@ -24,7 +24,7 @@ function sceneDescription(props: PortraitSceneProps): string {
     return `Two saved chapter objects: ${names.join(" and ")}. Use their named source-passage links and scene controls to explore.`;
   }
   return props.experience ? `A zodiac observatory with a bronze twelve-sign instrument${props.sky?.placements.length ? ", birth-chart markers" : ""}, ${props.chapters.length} chapter displays, and opening reading desks. Use the named sky, chapter, and scene controls to explore.`
-    : "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.";
+    : `${props.chapters.length} sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.`;
 }
 
 async function loadForm(asset: PortraitSceneProps["assets"][number], signal: AbortSignal): Promise<LoadedForm> {

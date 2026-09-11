@@ -8,6 +8,9 @@ import { createHash } from "node:crypto";
 import { runPortraitInvocation, preparePortraitImage } from "./portrait-invocation.js";
 import { parsePortraitClaim } from "./portrait-client.js";
 import type { CodexPortraitClaim } from "@patternlike/shared";
+import { installPortableTestScriptSpawn } from "./portable-script-spawn.test-helper.js";
+
+installPortableTestScriptSpawn();
 
 export const CLAIM: CodexPortraitClaim = {
   schema_version: "codex-portrait-claim/v1", job_id: `ppjob_${"a".repeat(32)}`,
@@ -101,6 +104,42 @@ test("requires one completed native image and successful turn, preserves image p
     assert.deepEqual(await readdir(join(f.root, "attempts")), []);
     assert.deepEqual(await readdir(join(f.home, "generated_images")), []);
     assert.deepEqual(await readFile(join(f.root, "untouched.png")), f.png);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("adaptive image completion carries the exact claimed last-chapter binding without adding metadata to the model prompt", async () => {
+  const f = await fixture();
+  const claim: CodexPortraitClaim = {
+    ...CLAIM,
+    schema_version: "codex-portrait-claim/v2",
+    chapter_count: 5,
+    chapter_index: 4,
+    chapter_id: "chapter-5",
+    document_revision: "pattern-response/v7:fictional:revision-5",
+    prompt: "Authorized fictional chapter five only.",
+  };
+  try {
+    const out = await runPortraitInvocation({ ...f.options, claim });
+    assert.equal(out.ok, true); if (!out.ok) return;
+    assert.deepEqual({
+      schema_version: out.completion.schema_version,
+      chapter_count: out.completion.chapter_count,
+      chapter_index: out.completion.chapter_index,
+      chapter_id: out.completion.chapter_id,
+      document_revision: out.completion.document_revision,
+      source_sha256: out.completion.source_sha256,
+    }, {
+      schema_version: "codex-portrait-completion/v2",
+      chapter_count: 5,
+      chapter_index: 4,
+      chapter_id: "chapter-5",
+      document_revision: claim.document_revision,
+      source_sha256: claim.source_sha256,
+    });
+    const turn = JSON.parse(await readFile(join(f.root, "turn.json"), "utf8"));
+    assert.equal(turn.input[0].text, claim.prompt);
+    assert(!JSON.stringify(turn.input).includes(claim.document_revision));
+    assert(!JSON.stringify(turn.input).includes("chapter_count"));
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
 

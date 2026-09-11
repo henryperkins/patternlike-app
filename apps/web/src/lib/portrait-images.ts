@@ -1,11 +1,12 @@
+import { isPortraitChapterCount } from "@patternlike/shared";
 import type { ImagePixels } from "./image-sculpture.js";
 
 const MAX_IMAGE_SIDE = 128;
 
-/** Decode four references independently of Sun sign or reading metadata. */
+/** Decode chapter references independently of Sun sign or reading metadata. */
 export async function loadPortraitImages(urls: readonly string[], signal: AbortSignal): Promise<ImagePixels[]> {
-  if (urls.length !== 4 || urls.some((url) => !url.trim())) {
-    throw new Error("A portrait requires four image references.");
+  if (!isPortraitChapterCount(urls.length) || urls.some((url) => !url.trim())) {
+    throw new Error("A portrait requires three through six image references.");
   }
   signal.throwIfAborted();
   return Promise.all(urls.map(async (url) => {

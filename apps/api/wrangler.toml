@@ -151,6 +151,7 @@ crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 # `npm run deploy` targets the production environment explicitly and the
 # configGuard middleware refuses AUTH_STUB=1 outside development.
 [vars]
+PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "0"
 ENVIRONMENT = "development"
 # Workers Builds must override this with --var RELEASE_GIT_SHA:$WORKERS_CI_COMMIT_SHA.
 RELEASE_GIT_SHA = "0000000000000000000000000000000000000000"
@@ -313,6 +314,8 @@ binding = "CF_VERSION_METADATA"
 # and 0027 and install the compatible image/mesh runner before this release.
 PATTERN_PORTRAIT_ENABLED = "1"
 PATTERN_PORTRAIT_MESH_ENABLED = "1"
+# Producer admission stays off until migration, compatible runner and consent rollout.
+PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "0"
 ENVIRONMENT = "production"
 # Workers Builds must override this with --var RELEASE_GIT_SHA:$WORKERS_CI_COMMIT_SHA.
 RELEASE_GIT_SHA = "0000000000000000000000000000000000000000"

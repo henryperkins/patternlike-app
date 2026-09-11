@@ -100,7 +100,8 @@ function completed(claim: CodexPortraitClaim): CodexPortraitCompletion {
     const at=(y*128+x)*4; const inside=x>25+claim.chapter_index*4 && x<97 && y>20 && y<108-claim.chapter_index*5;
     pixels[at]=pixels[at+1]=pixels[at+2]=inside?32:255;pixels[at+3]=255;
   }
-  return {lease_token:claim.lease_token,source_sha256:claim.source_sha256,label:`Object ${claim.chapter_index+1}`,rationale:"An object expressing the full chapter.",image_base64:PNG,original_sha256:"a".repeat(64),pixels:{width:128,height:128,rgba_base64:b64(pixels)},provider_request_id:"thread:turn",image_request_id:"native-tool-call",image_model:"gpt-image-2"};
+  const base = {lease_token:claim.lease_token,source_sha256:claim.source_sha256,label:`Object ${claim.chapter_index+1}`,rationale:"An object expressing the full chapter.",image_base64:PNG,original_sha256:"a".repeat(64),pixels:{width:128,height:128,rgba_base64:b64(pixels)},provider_request_id:"thread:turn",image_request_id:"native-tool-call",image_model:"gpt-image-2" as const};
+  return claim.schema_version === "codex-portrait-claim/v2" ? { ...base, schema_version: "codex-portrait-completion/v2", chapter_count: claim.chapter_count, chapter_index: claim.chapter_index, chapter_id: claim.chapter_id, document_revision: claim.document_revision } : base;
 }
 async function start() { const res=await user("/v1/pattern-portrait-generations",request());expect(res.status).toBe(202);return await res.json() as PatternPortraitResponse; }
 async function take() { const res=await machine("/claim",{});expect(res.status).toBe(200);return await res.json() as CodexPortraitClaim; }
@@ -315,6 +316,48 @@ it("keeps an accepted portrait readable after a later locale preference change",
   const portrait=await ready();await env.DB.prepare("UPDATE users SET locale = 'fr-FR' WHERE id = ?").bind(USER_A).run();expect((await (await user("/v1/pattern-portrait")).json() as PatternPortraitResponse).graph).toEqual(portrait.graph);
 });
 
+it("leaves every stored portrait and its objects alone when 0033 is not applied",async () => {
+  // Merging deploys within about a minute, and a Time Travel restore can take
+  // the adaptive columns away under a Worker that already has them. Before the
+  // schema probe, maintenance read those absent columns as a mismatch on every
+  // row, cancelled each portrait and deleted its R2 objects -- silently, since
+  // scheduled.ts swallows each lane's error. Rebuild the pre-0033 shape and
+  // prove the lane stands down instead.
+  const portrait=await ready();
+  const objectsBefore=(await env.ARTIFACTS!.list({prefix:`pattern-portraits/${portrait.portrait_id}/`})).objects.length;
+  expect(objectsBefore).toBeGreaterThan(0);
+  const rows=(await env.DB.prepare("SELECT * FROM pattern_portraits").all<Record<string,unknown>>()).results;
+  const jobs=(await env.DB.prepare("SELECT * FROM pattern_portrait_jobs").all<Record<string,unknown>>()).results;
+  const assets=(await env.DB.prepare("SELECT * FROM pattern_portrait_assets").all<Record<string,unknown>>()).results;
+  const triggers=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
+  const replay=(names:string[])=>env.TEST_MIGRATIONS.filter((item)=>names.includes(item.name));
+  await env.DB.batch([...triggers.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants','pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
+  try {
+    for (const migration of replay(["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"])) await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
+    const runtime=env.TEST_MIGRATIONS.find(item=>item.name==="0032_runtime_health.sql")!;
+    await env.DB.batch(runtime.queries.filter(query=>/pattern_portrait_jobs|portrait_mesh_jobs/.test(query)).map(query=>env.DB.prepare(query)));
+    const restore=(table:string,source:Record<string,unknown>[],columns:string[])=>source.map((row)=>env.DB.prepare(`INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map(()=>"?").join(",")})`).bind(...columns.map((column)=>row[column] as never)));
+    await env.DB.batch(restore("pattern_portraits",rows,["id","user_id","pattern_id","generation_id","chart_id","chart_fingerprint_hash","document_revision","document_hash","generated_at","ontology_version","processing_consent_id","pattern_consent_id","consent_policy_version","sun_sign","status","graph_asset_id","checked_at","created_at","updated_at"]));
+    await env.DB.batch(restore("pattern_portrait_jobs",jobs,["id","portrait_id","user_id","chapter_index","source_sha256","status","attempts","lease_hash","lease_expires_at","retry_at","failure_code","completion_hash","image_asset_id","sample_asset_id","created_at","updated_at","completed_at"]));
+    await env.DB.batch(restore("pattern_portrait_assets",assets,["id","portrait_id","user_id","job_id","role","object_key","plaintext_sha256","byte_length","created_at","cleanup_at","deleted_at"]));
+
+    await maintainPortraits(enabledEnv());
+
+    const after=await env.DB.prepare("SELECT status FROM pattern_portraits WHERE id = ?").bind(portrait.portrait_id).first<{status:string}>();
+    expect(after?.status).toBe("ready");
+    const marked=await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_assets WHERE cleanup_at IS NOT NULL").first<{n:number}>();
+    expect(marked?.n).toBe(0);
+    expect((await env.ARTIFACTS!.list({prefix:`pattern-portraits/${portrait.portrait_id}/`})).objects.length).toBe(objectsBefore);
+  } finally {
+    const after=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
+    await env.DB.batch([...after.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants','pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
+    for (const migration of replay(["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"])) await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
+    const runtime=env.TEST_MIGRATIONS.find(item=>item.name==="0032_runtime_health.sql")!;
+    await env.DB.batch(runtime.queries.filter(query=>/pattern_portrait_jobs|portrait_mesh_jobs/.test(query)).map(query=>env.DB.prepare(query)));
+    const adaptiveMigration=env.TEST_MIGRATIONS.find(item=>item.name==="0033_adaptive_portrait_artwork.sql")!;
+    await env.DB.batch(adaptiveMigration.queries.map(query=>env.DB.prepare(query)));
+  }
+});
 it("keeps account deletion working before 0026 when portrait rollout is absent",async () => {
   const triggers=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
   const migrations=env.TEST_MIGRATIONS.filter((item)=>["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"].includes(item.name));
@@ -331,6 +374,8 @@ it("keeps account deletion working before 0026 when portrait rollout is absent",
     // additive instrumentation too, without recreating surviving audit/text state.
     const runtime = env.TEST_MIGRATIONS.find(item=>item.name==="0032_runtime_health.sql")!;
     await env.DB.batch(runtime.queries.filter(query=>/pattern_portrait_jobs|portrait_mesh_jobs/.test(query)).map(query=>env.DB.prepare(query)));
+    const adaptiveMigration = env.TEST_MIGRATIONS.find(item=>item.name==="0033_adaptive_portrait_artwork.sql")!;
+    await env.DB.batch(adaptiveMigration.queries.map(query=>env.DB.prepare(query)));
   }
 });
 
@@ -362,4 +407,105 @@ it("pauses pending portrait claims while frozen and resumes missing chapters aft
   expect((await machine("/claim",{})).status).toBe(204);
   expect((await env.DB.prepare("SELECT status FROM pattern_portraits WHERE id = ?").bind(portrait.portrait_id).first<{status:string}>())?.status).toBe("generating");
   await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(USER_A).run();expect((await take()).chapter_index).toBe(1);
+});
+
+async function replaceChapterCount(count: number) {
+  const row = (await loadAnyPatternDocument(env, USER_A))!;
+  const internal = await decryptPatternDocument(env, IDENTITY_A, row);
+  internal.artifact.chapters = Array.from({ length: count }, (_, index) => ({
+    ...internal.artifact.chapters[index % 4]!, chapter_key: `chapter_0${index + 1}`,
+  }));
+  const key = await unwrapContentKey(env, IDENTITY_A, row.id, "pattern_documents.wrapped_document_key_enc", {
+    key_version: row.wrapped_document_key_version, nonce: row.wrapped_document_key_nonce, ciphertext: b64(row.wrapped_document_key_enc),
+  });
+  const nonce = randomNonce();
+  const cipher = await encryptUnderContentKey(internal, key, nonce, new TextEncoder().encode(JSON.stringify(["patternlike.pattern-document", 1, row.id, row.generation_id])));
+  await env.DB.prepare("UPDATE pattern_documents SET document_enc = ?, document_nonce = ?, content_hash = ? WHERE id = ?")
+    .bind(cipher, b64(nonce), await contentHash(JSON.stringify(internal)), row.id).run();
+  document = await (await user("/v1/pattern")).json() as PatternResponseV7;
+  expect(document.core_chapters).toHaveLength(count);
+}
+function adaptive(path: string, body?: unknown, flag = "1", protocol: string | null = "v2") {
+  const bindings = Object.defineProperty(enabledEnv(), "PATTERN_ADAPTIVE_PORTRAITS_ENABLED", { value: flag });
+  return app.fetch(new Request(`https://api.test${path}`, {
+    method: body === undefined ? "GET" : "POST", body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { "x-user-id": USER_A, "content-type": "application/json", "idempotency-key": "adaptive-portrait-test", authorization: `Bearer ${TOKEN}`,
+      ...(protocol === null ? {} : { "X-Patternlike-Portrait-Protocol": protocol }) },
+  }), bindings);
+}
+const adaptiveRequest = () => ({ ...request(), consent_policy_version: "2.0.0", chapter_count: document.core_chapters.length });
+const machinePath = "/codex-provider/v1/portraits";
+
+describe("adaptive artwork v2", () => {
+  it.each([3, 4, 5, 6])("creates and downloads all %i chapter images, retaining pending work when admission stops", async (count) => {
+    await replaceChapterCount(count);
+    const start = await adaptive("/v1/pattern-portrait-generations", adaptiveRequest());
+    expect(start.status, await start.clone().text()).toBe(202);
+    const portrait = await start.json() as PatternPortraitResponse;
+    expect(portrait).toMatchObject({ schema_version: "pattern-portrait/v2", chapter_count: count, completed_chapters: 0 });
+    expect(start.headers.get("vary")).toContain("X-Patternlike-Portrait-Protocol");
+    expect(await env.DB.prepare("SELECT chapter_count, protocol_version, consent_policy_version FROM pattern_portraits WHERE id = ?").bind(portrait.portrait_id).first())
+      .toEqual({ chapter_count: count, protocol_version: "v2", consent_policy_version: "2.0.0" });
+    expect((await machine("/claim", {})).status).toBe(204);
+    expect(await env.DB.prepare("SELECT SUM(attempts) AS attempts FROM pattern_portrait_jobs").first()).toEqual({ attempts: 0 });
+    expect(await (await user("/v1/pattern-portrait")).json()).toMatchObject({ schema_version: "pattern-portrait/v1", status: "unavailable", chapters: [] });
+    for (let index = 0; index < count; index++) {
+      const response = await adaptive(`${machinePath}/claim`, {}, "0");
+      expect(response.status).toBe(200);
+      const claim = await response.json() as CodexPortraitClaim;
+      expect(claim).toMatchObject({ schema_version: "codex-portrait-claim/v2", chapter_count: count, chapter_index: index, chapter_id: `chapter-${index + 1}`, document_revision: portrait.document_revision });
+      const result = await adaptive(`${machinePath}/${claim.job_id}/complete`, completed(claim), "0");
+      expect(result.status, await result.clone().text()).toBe(200);
+      const progress = await (await adaptive("/v1/pattern-portrait", undefined, "0")).json() as PatternPortraitResponse;
+      expect(progress.completed_chapters).toBe(index + 1);
+      expect(progress.status).toBe(index + 1 === count ? "ready" : "generating");
+      if (index + 1 < count) expect(progress.graph).toBeNull();
+    }
+    const query = new URLSearchParams({ pattern_id: document.pattern_id, chart_id: chartId, generated_at: document.generated_at });
+    const download = await adaptive(`/v1/pattern-portrait/download?${query}`, undefined, "0");
+    expect(download.status).toBe(200);
+    expect(download.headers.get("cache-control")).toContain("no-store");
+    const bundle = await download.json() as { schema_version: string; portrait: PatternPortraitResponse; images: unknown[] };
+    expect(bundle.schema_version).toBe("pattern-portrait-download/v2");
+    expect(bundle.images).toHaveLength(count);
+    expect(bundle.portrait.chapters.map(chapter => chapter.chapter_id)).toEqual(Array.from({ length: count }, (_, i) => `chapter-${i + 1}`));
+    expect(bundle.portrait.graph).toMatchObject({ engine_version: "constellation-v2", chapter_count: count });
+    expect(bundle.portrait.graph?.contributions).toHaveLength(count);
+  });
+
+  it("requires explicit capability, exact source count, and enabled admission before reserving work", async () => {
+    await replaceChapterCount(6);
+    expect((await adaptive("/v1/pattern-portrait-generations", adaptiveRequest(), "0")).status).toBe(503);
+    expect((await adaptive("/v1/pattern-portrait-generations", adaptiveRequest(), "invalid")).status).toBe(503);
+    expect((await adaptive("/v1/pattern-portrait-generations", adaptiveRequest(), "1", null)).status).toBe(400);
+    expect((await adaptive("/v1/pattern-portrait", undefined, "1", "v3")).status).toBe(400);
+    for (const count of [0, 2, 7]) expect((await adaptive("/v1/pattern-portrait-generations", { ...adaptiveRequest(), chapter_count: count })).status).toBe(400);
+    expect((await adaptive("/v1/pattern-portrait-generations", { ...adaptiveRequest(), chapter_count: 5 })).status).toBe(409);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM pattern_portrait_jobs").first()).toEqual({ n: 0 });
+  });
+
+  it("fences terminals against count, chapter, revision, source and protocol changes", async () => {
+    await replaceChapterCount(5);
+    expect((await adaptive("/v1/pattern-portrait-generations", adaptiveRequest())).status).toBe(202);
+    const claim = await (await adaptive(`${machinePath}/claim`, {})).json() as CodexPortraitClaim;
+    const value = completed(claim);
+    for (const change of [{ chapter_count: 6 }, { chapter_index: 1, chapter_id: "chapter-2" }, { document_revision: "stale" }, { source_sha256: "f".repeat(64) }]) {
+      expect((await adaptive(`${machinePath}/${claim.job_id}/complete`, { ...value, ...change })).status).toBe(409);
+    }
+    const { schema_version: _schema, chapter_count: _count, chapter_index: _index, chapter_id: _id, document_revision: _revision, ...legacy } = value as CodexPortraitCompletion & Record<string, unknown>;
+    expect((await machine(`/${claim.job_id}/complete`, legacy)).status).toBe(409);
+    expect((await machine(`/${claim.job_id}/fail`, { lease_token: claim.lease_token, code: "generation_failed" })).status).toBe(409);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM pattern_portrait_assets").first()).toEqual({ n: 0 });
+    expect((await adaptive(`${machinePath}/${claim.job_id}/complete`, value)).status).toBe(200);
+    expect((await adaptive(`${machinePath}/${claim.job_id}/complete`, value)).status).toBe(200);
+  });
+
+  it("serves saved v1 assets to new clients without reissuing the image budget", async () => {
+    const original = await ready();
+    const response = await adaptive("/v1/pattern-portrait-generations", adaptiveRequest(), "0");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(original);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM pattern_portrait_jobs").first()).toEqual({ n: 4 });
+    expect((await adaptive(`${machinePath}/claim`, {})).status).toBe(204);
+  });
 });

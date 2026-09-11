@@ -1,5 +1,5 @@
 import type { ZodiacSignName } from "./daily-sky-types.js";
-import { PORTRAIT_ENGINE_VERSION, type PortraitGraph } from "./portrait-types.js";
+import { PORTRAIT_ENGINE_VERSION, PORTRAIT_V2_ENGINE_VERSION, isPortraitChapterCount, type PortraitGraph, type PortraitGraphV1, type PortraitGraphV2 } from "./portrait-types.js";
 import { applySunLayout } from "./portrait-sun-layout.js";
 
 export interface PortraitImagePixels {
@@ -249,7 +249,7 @@ function sampleContour(points: Point[], count: number): Point[] {
  * luminance and image coordinates, not a reconstruction of hidden surfaces.
  * The serializable result is shared by server persistence and the viewer.
  */
-export function createPortraitGraph(images: readonly PortraitImagePixels[], sunSign: ZodiacSignName | null = null): PortraitGraph {
+export function createPortraitGraph(images: readonly PortraitImagePixels[], sunSign: ZodiacSignName | null = null): PortraitGraphV1 {
   if (!Array.isArray(images) || images.length !== 4) throw new Error("Image sculpture requires exactly four images");
   const evidence = Array.from(images, measure);
   const positions: number[] = []; const sourceIndices: number[] = []; const strengths: number[] = [];
@@ -349,8 +349,113 @@ export function createPortraitGraph(images: readonly PortraitImagePixels[], sunS
   };
 }
 
+export function createAdaptiveImageConstellation(images: readonly PortraitImagePixels[], sunSign: ZodiacSignName | null = null): PortraitGraphV2 {
+  if (!Array.isArray(images) || !isPortraitChapterCount(images.length)) throw new Error("Image sculpture requires three through six images");
+  const evidence = Array.from(images, measure);
+  const positions: number[] = []; const sourceIndices: number[] = []; const strengths: number[] = [];
+  const connections: Array<[number, number]> = [];
+  const keys = new Set<string>();
+  const groups: number[][] = [];
+  const connect = (a: number, b: number) => {
+    const key = `${Math.min(a, b)}:${Math.max(a, b)}`;
+    if (a !== b && !keys.has(key)) { keys.add(key); connections.push([a, b]); }
+  };
+  for (let sourceIndex = 0; sourceIndex < images.length; sourceIndex++) {
+    const source = evidence[sourceIndex]!;
+    const group: number[] = []; const localPoints: Point[] = [];
+    groups.push(group);
+    const [minX, minY, maxX, maxY] = source.bounds;
+    const unit = Math.min(1.2 / (maxY - minY), 1.3 / (maxX - minX));
+    const addStar = (point: Point, strength: number) => {
+      const duplicate = localPoints.findIndex((other) => distance(point, other) < 0.65);
+      if (duplicate >= 0) return group[duplicate]!;
+      if (group.length >= MAX_STARS) return -1;
+      const x = (point[0] - (minX + maxX) / 2) * unit;
+      const y = ((minY + maxY) / 2 - point[1]) * unit;
+      const px = clamp(Math.round(point[0]), 0, source.width - 1);
+      const py = clamp(Math.round(point[1]), 0, source.height - 1);
+      const light = source.luminance[py * source.width + px]!;
+      // A shallow, continuous curved relief keeps the drawing spatial during
+      // rotation. Its bends follow the actual sampled positions and luminance.
+      const z = 0.07 * Math.sin(x * Math.PI / 1.3) * Math.cos(y * Math.PI / 1.2) + (light - 0.5) * 0.04;
+      const positioned = applySunLayout([x, y, z], sourceIndex % 4, sunSign);
+      if (images.length !== 4) {
+        // Two ordered rows retain each measured fragment at its existing scale.
+        positioned[0] += Math.floor(sourceIndex / 4) * 2.8;
+      }
+      const index = positions.length / 3;
+      positions.push(...positioned); sourceIndices.push(sourceIndex); strengths.push(clamp(strength, 0, 1));
+      group.push(index); localPoints.push(point);
+      return index;
+    };
+    const main = source.contours[0]!;
+    const loops = [main, ...source.contours.slice(1).filter((contour) => Math.abs(contour.area) > Math.abs(main.area) * 0.012).slice(0, 2)];
+    for (let loopIndex = 0; loopIndex < loops.length; loopIndex++) {
+      const points = sampleContour(loops[loopIndex]!.points, loopIndex === 0 ? 40 : 12);
+      const vertices = points.map((point, i) => {
+        const before = points[(i + points.length - 1) % points.length]!;
+        const after = points[(i + 1) % points.length]!;
+        const turn = 1 - ((point[0] - before[0]) * (after[0] - point[0]) + (point[1] - before[1]) * (after[1] - point[1]))
+          / Math.max(0.001, distance(before, point) * distance(point, after));
+        return addStar(point, 0.3 + Math.min(0.6, turn * 0.8));
+      });
+      for (let i = 0; i < vertices.length; i++) if (vertices[i]! >= 0 && vertices[(i + 1) % vertices.length]! >= 0) connect(vertices[i]!, vertices[(i + 1) % vertices.length]!);
+    }
+    for (const line of source.lines) {
+      const count = Math.min(6, Math.max(3, Math.ceil(distance(line.a, line.b) / 10)));
+      if (group.length + count > MAX_STARS) continue;
+      let previous = -1;
+      for (let i = 0; i < count; i++) {
+        const fraction = i / (count - 1);
+        const point: Point = [line.a[0] + (line.b[0] - line.a[0]) * fraction, line.a[1] + (line.b[1] - line.a[1]) * fraction];
+        const index = addStar(point, (i === 0 || i === count - 1 ? 0.58 : 0.28) + line.strength * 0.32);
+        if (previous >= 0 && index >= 0) connect(previous, index);
+        previous = index;
+      }
+    }
+    // Join separate measured feature paths with the minimum number of shortest
+    // links. Retain their contours, rather than triangulating their interiors.
+    const parent = new Map(group.map((index) => [index, index]));
+    const root = (index: number): number => {
+      while (parent.get(index) !== index) index = parent.get(index)!;
+      return index;
+    };
+    for (const [a, b] of connections) if (parent.has(a) && parent.has(b)) parent.set(root(a), root(b));
+    const candidates: Array<{ a: number; b: number; length: number }> = [];
+    for (let a = 0; a < group.length; a++) for (let b = a + 1; b < group.length; b++) {
+      candidates.push({ a: group[a]!, b: group[b]!, length: distance(localPoints[a]!, localPoints[b]!) });
+    }
+    candidates.sort((a, b) => a.length - b.length || a.a - b.a || a.b - b.b);
+    for (const candidate of candidates) if (root(candidate.a) !== root(candidate.b)) {
+      connect(candidate.a, candidate.b); parent.set(root(candidate.a), root(candidate.b));
+    }
+  }
+  // A single ordered spine ties the ordered image fragments into one composition.
+  for (let source = 0; source < images.length - 1; source++) {
+    let pair: [number, number] = [groups[source]![0]!, groups[source + 1]![0]!];
+    let minimum = Infinity;
+    for (const a of groups[source]!) for (const b of groups[source + 1]!) {
+      const length = Math.hypot(positions[a * 3]! - positions[b * 3]!, positions[a * 3 + 1]! - positions[b * 3 + 1]!, positions[a * 3 + 2]! - positions[b * 3 + 2]!);
+      if (length < minimum) { minimum = length; pair = [a, b]; }
+    }
+    connect(...pair);
+    strengths[pair[0]] = 1; strengths[pair[1]] = 1;
+  }
+  return {
+    engine_version: PORTRAIT_V2_ENGINE_VERSION,
+    chapter_count: images.length,
+    positions: Array.from(new Float32Array(positions)),
+    source_indices: sourceIndices,
+    star_strengths: Array.from(new Float32Array(strengths)),
+    connections,
+    color: [0, 1, 2].map((channel) => evidence.reduce((sum, source) => sum + source.color[channel]!, 0) / images.length) as [number, number, number],
+    contributions: evidence.map((source, index) => ({ index, aspect: source.aspect, coverage: source.coverage,
+      opening_area: source.openingArea, skew: source.skew, stars: groups[index]!.length, interior_lines: source.lines.length })),
+  };
+}
+
 /** Validate stored/public graph data before allocating renderer buffers. */
-export function isPortraitGraph(value: unknown): value is PortraitGraph {
+export function isPortraitGraphV1(value: unknown): value is PortraitGraphV1 {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const graph = value as Record<string, unknown>;
   if (graph.engine_version !== PORTRAIT_ENGINE_VERSION) return false;
@@ -393,4 +498,57 @@ export function isPortraitGraph(value: unknown): value is PortraitGraph {
       && finite(c.skew) && Math.abs(c.skew) <= 1
       && Number.isInteger(c.interior_lines) && (c.interior_lines as number) >= 0 && (c.interior_lines as number) <= 8;
   });
+}
+
+export function isPortraitGraphV2(value: unknown): value is PortraitGraphV2 {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const graph = value as Record<string, unknown>;
+  if (graph.engine_version !== PORTRAIT_V2_ENGINE_VERSION || !isPortraitChapterCount(graph.chapter_count)) return false;
+  if (Object.keys(graph).length !== 8) return false;
+  const chapterCount = graph.chapter_count;
+  const { positions, source_indices: sources, star_strengths: strengths, connections, color, contributions } = graph;
+  if (!Array.isArray(positions) || !Array.isArray(sources) || !Array.isArray(strengths)
+    || !Array.isArray(connections) || !Array.isArray(color) || !Array.isArray(contributions)) return false;
+  const count = sources.length;
+  const finite = (number: unknown): number is number => typeof number === "number" && Number.isFinite(number);
+  if (count < chapterCount || count > MAX_STARS * chapterCount || positions.length !== count * 3 || strengths.length !== count
+    || connections.length < count - 1 || connections.length > count * 3 || color.length !== 3 || contributions.length !== chapterCount
+    || !positions.every((n) => finite(n) && Math.abs(n) <= 10)
+    || !sources.every((n) => Number.isInteger(n) && n >= 0 && n < chapterCount)
+    || !strengths.every((n) => finite(n) && n >= 0 && n <= 1)
+    || !color.every((n) => finite(n) && n >= 0 && n <= 1)) return false;
+  const counts: number[] = Array.from({ length: chapterCount }, () => 0);
+  for (const source of sources) counts[source]!++;
+  if (counts.some((n) => n === 0 || n > MAX_STARS)) return false;
+  const parent = Array.from({ length: count }, (_, index) => index);
+  const root = (index: number): number => {
+    while (parent[index] !== index) index = parent[index]!;
+    return index;
+  };
+  const seen = new Set<string>();
+  for (const edge of connections) {
+    if (!Array.isArray(edge) || edge.length !== 2
+      || !edge.every((n) => Number.isInteger(n) && n >= 0 && n < count) || edge[0] === edge[1]) return false;
+    const [a, b] = edge as [number, number];
+    const key = `${Math.min(a, b)}:${Math.max(a, b)}`;
+    if (seen.has(key)) return false;
+    seen.add(key); parent[root(a)] = root(b);
+  }
+  if (parent.some((_, index) => root(index) !== root(0))) return false;
+  return contributions.every((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const c = item as Record<string, unknown>;
+    return Object.keys(c).length === 7 && c.index === index && c.stars === counts[index]
+      && finite(c.aspect) && c.aspect > 0 && c.aspect <= 128
+      && finite(c.coverage) && c.coverage >= 0 && c.coverage <= 1
+      && finite(c.opening_area) && c.opening_area >= 0 && c.opening_area <= 1
+      && finite(c.skew) && Math.abs(c.skew) <= 1
+      && Number.isInteger(c.interior_lines) && (c.interior_lines as number) >= 0 && (c.interior_lines as number) <= 8;
+  });
+}
+
+export function isPortraitGraph(value: unknown): value is PortraitGraph {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  // Frozen v1 wire shapes are closed; a v2 count cannot be retagged as v1.
+  return (Object.keys(value).length === 7 && isPortraitGraphV1(value)) || isPortraitGraphV2(value);
 }

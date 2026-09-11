@@ -1,7 +1,8 @@
+import { isPortraitChapterCount, type PortraitChapterCount } from "./portrait-types.js";
 export const PORTRAIT_MESH_COMPILER_VERSION = "portrait-mesh-compiler/v1" as const;
 export type MeshPoint3 = [number, number, number];
 export type MeshPoint2 = [number, number];
-export interface MeshIdentity { chapterId: string; documentRevision: string; sourceImageSha256: string; sourceTextSha256: string; }
+export interface MeshIdentity { chapterId: string; documentRevision: string; sourceImageSha256: string; sourceTextSha256: string; chapterCount?: PortraitChapterCount; }
 export type PortraitMeshGeometry =
   | { kind: "box"; size: MeshPoint3; bevel: number }
   | { kind: "ellipsoid"; radii: MeshPoint3; segments: number }
@@ -17,7 +18,7 @@ export interface PortraitMeshPart {
   repeat: { count: number; translation: MeshPoint3; rotation: MeshPoint3 } | null;
   geometry: PortraitMeshGeometry;
 }
-export interface PortraitMeshProgram {
+export interface PortraitMeshProgramV1 {
   version: "portrait-mesh-program/v1";
   materials: PortraitMeshMaterial[];
   parts: PortraitMeshPart[];
@@ -124,7 +125,7 @@ function geometry(value: unknown): value is PortraitMeshGeometry {
 }
 
 /** The sole executable vocabulary is compiled from validated numbers, never evaluated strings. */
-export function parsePortraitMeshProgram(value: unknown): PortraitMeshProgram | null {
+function parsePortraitMeshProgramV1(value: unknown): PortraitMeshProgramV1 | null {
   if (!record(value) || !exact(value, ["version", "materials", "parts"]) || value.version !== "portrait-mesh-program/v1"
     || !Array.isArray(value.materials) || value.materials.length < 1 || value.materials.length > 4
     || !Array.isArray(value.parts) || value.parts.length < 1 || value.parts.length > 128) return null;
@@ -154,6 +155,29 @@ export function parsePortraitMeshProgram(value: unknown): PortraitMeshProgram | 
   try {
     const serialized = JSON.stringify(value);
     if (new TextEncoder().encode(serialized).length > 64 * 1024) return null;
-    return JSON.parse(serialized) as PortraitMeshProgram;
+    return JSON.parse(serialized) as PortraitMeshProgramV1;
   } catch { return null; }
+}
+
+export const PORTRAIT_MESH_V2_COMPILER_VERSION = "portrait-mesh-compiler/v2" as const;
+export interface PortraitMeshProgramV2 extends Omit<PortraitMeshProgramV1, "version"> {
+  version: "portrait-mesh-program/v2";
+  chapter_count: PortraitChapterCount;
+  chapter_id: string;
+}
+export type PortraitMeshProgram = PortraitMeshProgramV1 | PortraitMeshProgramV2;
+export const PORTRAIT_MESH_V2_PROGRAM_SCHEMA = object({
+  ...PORTRAIT_MESH_PROGRAM_SCHEMA.properties,
+  version: kind("portrait-mesh-program/v2"),
+  chapter_count: { type: "integer", enum: [3, 4, 5, 6] },
+  chapter_id: { type: "string", pattern: "^chapter-[1-6]$" },
+});
+export function parsePortraitMeshProgram(value: unknown): PortraitMeshProgram | null {
+  if (!record(value) || value.version !== "portrait-mesh-program/v2") return parsePortraitMeshProgramV1(value);
+  if (!exact(value, ["version", "chapter_count", "chapter_id", "materials", "parts"])
+    || !isPortraitChapterCount(value.chapter_count) || typeof value.chapter_id !== "string"
+    || !/^chapter-[1-6]$/.test(value.chapter_id) || Number(value.chapter_id.slice(8)) > value.chapter_count) return null;
+  const parsed = parsePortraitMeshProgramV1({ version: "portrait-mesh-program/v1", materials: value.materials, parts: value.parts });
+  if (!parsed || new TextEncoder().encode(JSON.stringify(value)).length > 64 * 1024) return null;
+  return { ...parsed, version: "portrait-mesh-program/v2", chapter_count: value.chapter_count, chapter_id: value.chapter_id };
 }

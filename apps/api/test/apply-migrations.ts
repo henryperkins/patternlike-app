@@ -26,6 +26,7 @@ const expectedTail = [
   "0030_reader_relationship_supports.sql",
   "0031_reading_feedback_events.sql",
   "0032_runtime_health.sql",
+  "0033_adaptive_portrait_artwork.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -54,6 +55,7 @@ const patternSourceRegenerationMigrationIndex = migrationNames.indexOf(expectedT
 const geoapifyMigrationIndex = migrationNames.indexOf(expectedTail[15]);
 const codexXhighMigrationIndex = migrationNames.indexOf(expectedTail[16]);
 const publicationReceiptMigrationIndex = migrationNames.indexOf(expectedTail[20]);
+const adaptivePortraitMigrationIndex = migrationNames.indexOf("0033_adaptive_portrait_artwork.sql");
 
 interface SchemaColumn {
   name: string;
@@ -1454,7 +1456,7 @@ for (const { name } of beforeReceiptTables.results) {
   const result = await upgradeDb.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
   beforeReceiptRows.set(name, JSON.stringify(result.results));
 }
-await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(publicationReceiptMigrationIndex));
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(publicationReceiptMigrationIndex, adaptivePortraitMigrationIndex));
 for (const [name, before] of beforeReceiptRows) {
   const after = await upgradeDb.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
   if (JSON.stringify(after.results) !== before) {
@@ -1476,3 +1478,80 @@ for (const db of [env.DB, upgradeDb]) {
   if (capture.results.length) throw new Error("0032 must not predeclare runtime measurement adoption");
   await assertDatabaseHealthy(db, "0032 additive apply");
 }
+
+// 0033 must preserve populated incoming references with D1 foreign keys enabled.
+// The stdlib SQLite regression also covers every job state and atomic failures;
+// this lane proves the reconstruct/copy/drop/rename form in the local D1 runtime.
+const adaptiveNow = "2026-09-11T12:00:00.000Z";
+const adaptiveRows: Record<string, Record<string, string | number | null>> = {
+  pattern_portraits: {
+    id: "portrait-upgrade-0033", user_id: migrationUserId, pattern_id: "pattern-upgrade-0033",
+    generation_id: "generation-upgrade-0033", chart_id: "chart-upgrade-0033",
+    chart_fingerprint_hash: leaseHash("ab"), document_revision: "revision-0033",
+    document_hash: leaseHash("cd"), generated_at: adaptiveNow, ontology_version: "ontology-v1",
+    processing_consent_id: "processing-0033", pattern_consent_id: "pattern-consent-0033",
+    consent_policy_version: "1.0.0", status: "generating", graph_asset_id: "graph-0033",
+    checked_at: adaptiveNow, created_at: adaptiveNow, updated_at: adaptiveNow,
+  },
+  portrait_automation_grants: {
+    id: "grant-0033", user_id: migrationUserId, chart_id: "chart-upgrade-0033",
+    chart_fingerprint_hash: leaseHash("ab"), policy_version: "1.1.0", enabled: 1,
+    created_at: adaptiveNow, updated_at: adaptiveNow,
+  },
+  pattern_portrait_jobs: {
+    id: "image-job-0033", portrait_id: "portrait-upgrade-0033", user_id: migrationUserId,
+    chapter_index: 3, source_sha256: leaseHash("ef"), status: "running", attempts: 2,
+    lease_hash: leaseHash("12"), lease_expires_at: "2026-09-11T12:15:00.000Z",
+    retry_at: adaptiveNow, completion_hash: null, image_asset_id: null, sample_asset_id: null,
+    completed_at: null, created_at: adaptiveNow, updated_at: adaptiveNow,
+  },
+  portrait_mesh_jobs: {
+    id: "mesh-job-0033", portrait_id: "portrait-upgrade-0033", user_id: migrationUserId,
+    grant_id: "grant-0033", image_asset_id: "image-0033", processing_consent_id: "processing-0033",
+    pattern_consent_id: "pattern-consent-0033", chapter_index: 0, source_text_sha256: leaseHash("ef"),
+    source_image_sha256: leaseHash("34"), document_revision: "revision-0033", compiler_version: "compiler-v1",
+    status: "complete", attempts: 1, retry_at: adaptiveNow, completion_hash: leaseHash("56"),
+    model_asset_id: "model-0033", provenance_asset_id: "provenance-0033", completed_at: adaptiveNow,
+    created_at: adaptiveNow, updated_at: adaptiveNow,
+  },
+  pattern_portrait_assets: {
+    id: "image-0033", portrait_id: "portrait-upgrade-0033", user_id: migrationUserId,
+    job_id: "image-job-0033", role: "image", object_key: "pattern-portraits/upgrade/0033/image",
+    plaintext_sha256: leaseHash("34"), byte_length: 1024, created_at: adaptiveNow,
+    cleanup_at: adaptiveNow, deleted_at: null,
+  },
+  portrait_mesh_assets: {
+    id: "model-0033", portrait_id: "portrait-upgrade-0033", user_id: migrationUserId,
+    job_id: "mesh-job-0033", role: "model", object_key: "portrait-meshes/upgrade/0033/model",
+    plaintext_sha256: leaseHash("78"), byte_length: 512, created_at: adaptiveNow,
+    cleanup_at: null, deleted_at: null,
+  },
+  portrait_start_outbox: {
+    id: "start-0033", user_id: migrationUserId, pattern_id: "pattern-upgrade-0033",
+    grant_id: "grant-0033", chart_id: "chart-upgrade-0033", status: "pending",
+    checked_at: adaptiveNow, created_at: adaptiveNow,
+  },
+};
+for (const [table, row] of Object.entries(adaptiveRows)) {
+  await upgradeDb.prepare(
+    `INSERT INTO ${table} (${Object.keys(row).join(",")}) VALUES (${Object.keys(row).map(() => "?").join(",")})`,
+  ).bind(...Object.values(row)).run();
+}
+const adaptiveBefore = new Map<string, { columns: string[]; rows: string }>();
+for (const table of Object.keys(adaptiveRows)) {
+  const columns = await upgradeDb.prepare(`PRAGMA table_info(${table})`).all<SchemaColumn>();
+  const rows = await upgradeDb.prepare(`SELECT * FROM ${table} ORDER BY id`).all();
+  adaptiveBefore.set(table, { columns: columns.results.map(({ name }) => name), rows: JSON.stringify(rows.results) });
+}
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(adaptivePortraitMigrationIndex));
+for (const [table, before] of adaptiveBefore) {
+  const after = await upgradeDb.prepare(`SELECT ${before.columns.join(",")} FROM ${table} ORDER BY id`).all();
+  if (JSON.stringify(after.results) !== before.rows) throw new Error(`0033 changed populated ${table} identity`);
+}
+const adaptiveLegacy = await upgradeDb.prepare(
+  "SELECT chapter_count,protocol_version FROM pattern_portraits WHERE id='portrait-upgrade-0033'",
+).first<{ chapter_count: number; protocol_version: string }>();
+if (adaptiveLegacy?.chapter_count !== 4 || adaptiveLegacy.protocol_version !== "v1") {
+  throw new Error("0033 did not preserve legacy four-chapter protocol identity");
+}
+await assertDatabaseHealthy(upgradeDb, "0033 populated apply");

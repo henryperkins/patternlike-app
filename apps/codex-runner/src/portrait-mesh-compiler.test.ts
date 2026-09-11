@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import type { MeshIdentity, PortraitMeshGeometry, PortraitMeshProgram } from "@patternlike/shared";
+import type { MeshIdentity, PortraitMeshGeometry, PortraitMeshProgram, PortraitMeshProgramV2 } from "@patternlike/shared";
 import { compilePortraitMesh } from "./portrait-mesh-compiler.js";
 import { validatePortraitMeshGlb } from "../../api/src/services/portrait-mesh-glb.js";
 
@@ -31,6 +31,23 @@ test("compiles deterministic source-bound GLB bytes that the real loader decodes
     node.geometry.dispose(); node.material.dispose();
   });
   assert.equal(meshes, 1);
+});
+
+test("compiles a six-chapter last-chapter v2 program with distinct compiler and authoring identity", async () => {
+  const source: PortraitMeshProgramV2 = { ...program(), version: "portrait-mesh-program/v2", chapter_count: 6, chapter_id: "chapter-6" };
+  const adaptiveIdentity: MeshIdentity = { ...identity, chapterId: "chapter-6", chapterCount: 6 };
+  const result = compilePortraitMesh(source, adaptiveIdentity);
+  assert.equal(result.compilerVersion, "portrait-mesh-compiler/v2");
+  const loaded = await new GLTFLoader().parseAsync(Uint8Array.from(result.glb).buffer, "");
+  assert.deepEqual(loaded.scene.children[0]!.userData, {
+    name: "chapter-6",
+    ...adaptiveIdentity,
+    programSha256: result.programSha256,
+    compilerVersion: "portrait-mesh-compiler/v2",
+    authoring: "codex-parametric/v2",
+  });
+  loaded.scene.traverse((node: any) => { if (node.isMesh) { node.geometry.dispose(); node.material.dispose(); } });
+  assert.throws(() => compilePortraitMesh(source, { ...adaptiveIdentity, chapterCount: 5 }), /identity|program/);
 });
 
 test("rejects unsafe declarations, excessive triangles, and wrong trusted identities", () => {

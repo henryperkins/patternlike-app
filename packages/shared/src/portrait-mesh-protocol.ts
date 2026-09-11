@@ -1,25 +1,25 @@
-import type { PatternPortraitDownload, PatternPortraitResponse } from "./portrait-types.js";
+import { isPortraitChapterCount, type PortraitChapterCount, type PortraitChapterBindingV2, type PatternPortraitDownload, type PatternPortraitResponseV1, type PatternPortraitResponseV2 } from "./portrait-types.js";
 import type { PatternResponseV7 } from "./m7-types.js";
-import type { PortraitMeshProgram } from "./portrait-mesh-program.js";
+import { parsePortraitMeshProgram, PORTRAIT_MESH_COMPILER_VERSION, PORTRAIT_MESH_V2_COMPILER_VERSION, type PortraitMeshProgramV1, type PortraitMeshProgramV2 } from "./portrait-mesh-program.js";
 
 export const PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION = "1.1.0" as const;
 export const PORTRAIT_MESH_AUTHORING = "codex-parametric/v1" as const;
 export const PORTRAIT_MESH_PROMPT_VERSION = "portrait-mesh/v1" as const;
 export const PORTRAIT_MESH_MAX_TRANSPORT_BYTES = 3 * 1024 * 1024;
-export interface PortraitAutomationPreference {
+export interface PortraitAutomationPreferenceV1 {
   schema_version: "portrait-automation/v1";
   available: boolean;
   chart_id: string | null;
   enabled: boolean;
   consent_policy_version: typeof PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION;
 }
-export interface PortraitAutomationRequest {
+export interface PortraitAutomationRequestV1 {
   chart_id: string;
   enabled: boolean;
   consent_policy_version: typeof PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION;
   confirm: "ENABLE AUTOMATIC PORTRAITS" | "DISABLE AUTOMATIC PORTRAITS";
 }
-export interface PortraitMeshModel {
+export interface PortraitMeshModelV1 {
   chapter_id: string;
   reference_id: string;
   sha256: string;
@@ -31,13 +31,13 @@ export interface PortraitMeshModel {
   authoring: typeof PORTRAIT_MESH_AUTHORING;
   document_revision: string;
 }
-export interface PatternPortraitExplorerResponse {
+export interface PatternPortraitExplorerResponseV1 {
   schema_version: "pattern-portrait-explorer/v1";
   status: "unavailable" | "not_started" | "generating" | "failed" | "ready";
-  portrait: PatternPortraitResponse;
+  portrait: PatternPortraitResponseV1;
   completed_models: number;
   retryable: boolean;
-  models: PortraitMeshModel[];
+  models: PortraitMeshModelV1[];
 }
 export interface PortraitMeshAudit {
   schema_version: "portrait-mesh-audit/v1";
@@ -49,7 +49,7 @@ export interface PortraitMeshAudit {
   view_count: 4;
   notes: string;
 }
-export interface CodexPortraitMeshClaim {
+export interface CodexPortraitMeshClaimV1 {
   schema_version: "codex-portrait-mesh-claim/v1";
   job_id: string;
   portrait_id: string;
@@ -67,9 +67,9 @@ export interface CodexPortraitMeshClaim {
   image_base64: string;
   compiler_version: string;
 }
-export interface CodexPortraitMeshCompletion {
+export interface CodexPortraitMeshCompletionV1 {
   lease_token: string;
-  program: PortraitMeshProgram;
+  program: PortraitMeshProgramV1;
   program_sha256: string;
   glb_base64: string;
   glb_sha256: string;
@@ -78,7 +78,7 @@ export interface CodexPortraitMeshCompletion {
   provider_request_id: string;
   audit_request_id: string;
 }
-export interface CodexPortraitMeshFailure {
+export interface CodexPortraitMeshFailureV1 {
   lease_token: string;
   code:
     | "generation_failed"
@@ -88,17 +88,17 @@ export interface CodexPortraitMeshFailure {
     | "visual_check_failed"
     | "authentication_failed";
 }
-export interface PatternPortraitExplorerDownload {
+export interface PatternPortraitExplorerDownloadV1 {
   schema_version: "pattern-portrait-explorer-download/v1";
   reading: PatternResponseV7;
-  explorer: PatternPortraitExplorerResponse;
+  explorer: PatternPortraitExplorerResponseV1;
   images: PatternPortraitDownload["images"];
   models: Array<{
     reference_id: string;
     content_type: "model/gltf-binary";
     sha256: string;
     data_base64: string;
-    program: PortraitMeshProgram;
+    program: PortraitMeshProgramV1;
     audit: PortraitMeshAudit;
     provider_request_id: string;
     audit_request_id: string;
@@ -147,9 +147,9 @@ export function isPortraitMeshAudit(v: unknown): v is PortraitMeshAudit {
     text(v.notes, 2000)
   );
 }
-export function isCodexPortraitMeshClaim(
+export function isCodexPortraitMeshClaimV1(
   v: unknown,
-): v is CodexPortraitMeshClaim {
+): v is CodexPortraitMeshClaimV1 {
   return (
     record(v) &&
     exact(v, [
@@ -197,9 +197,9 @@ export function isCodexPortraitMeshClaim(
   );
 }
 /** Program geometry is validated separately by the trusted shared compiler schema. */
-export function isCodexPortraitMeshCompletion(
+export function isCodexPortraitMeshCompletionV1(
   v: unknown,
-): v is CodexPortraitMeshCompletion {
+): v is CodexPortraitMeshCompletionV1 {
   return (
     record(v) &&
     exact(v, [
@@ -226,9 +226,9 @@ export function isCodexPortraitMeshCompletion(
     text(v.audit_request_id, 256)
   );
 }
-export function isCodexPortraitMeshFailure(
+export function isCodexPortraitMeshFailureV1(
   v: unknown,
-): v is CodexPortraitMeshFailure {
+): v is CodexPortraitMeshFailureV1 {
   return (
     record(v) &&
     exact(v, ["lease_token", "code"]) &&
@@ -243,4 +243,83 @@ export function isCodexPortraitMeshFailure(
       "authentication_failed",
     ].includes(String(v.code))
   );
+}
+
+export const PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION = "2.0.0" as const;
+export const PORTRAIT_MESH_V2_AUTHORING = "codex-parametric/v2" as const;
+export const PORTRAIT_MESH_V2_PROMPT_VERSION = "portrait-mesh/v2" as const;
+export interface PortraitAutomationPreferenceV2 extends Omit<PortraitAutomationPreferenceV1, "schema_version" | "consent_policy_version"> {
+  legacy_enabled: boolean;
+  schema_version: "portrait-automation/v2";
+  consent_policy_version: typeof PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION;
+}
+export interface PortraitAutomationRequestV2 extends Omit<PortraitAutomationRequestV1, "consent_policy_version"> {
+  consent_policy_version: typeof PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION;
+}
+export interface PortraitMeshModelV2 extends Omit<PortraitMeshModelV1, "authoring"> {
+  authoring: typeof PORTRAIT_MESH_V2_AUTHORING;
+  chapter_count: PortraitChapterCount;
+  chapter_index: number;
+}
+export interface PatternPortraitExplorerResponseV2 extends Omit<PatternPortraitExplorerResponseV1, "schema_version" | "portrait" | "models"> {
+  schema_version: "pattern-portrait-explorer/v2";
+  chapter_count: PortraitChapterCount | null;
+  document_revision: string | null;
+  portrait: PatternPortraitResponseV2;
+  models: PortraitMeshModelV2[];
+}
+export interface CodexPortraitMeshClaimV2 extends Omit<CodexPortraitMeshClaimV1, "schema_version" | "prompt_version"> {
+  schema_version: "codex-portrait-mesh-claim/v2";
+  chapter_count: PortraitChapterCount;
+  prompt_version: typeof PORTRAIT_MESH_V2_PROMPT_VERSION;
+}
+export interface CodexPortraitMeshCompletionV2 extends Omit<CodexPortraitMeshCompletionV1, "program">, PortraitChapterBindingV2 {
+  schema_version: "codex-portrait-mesh-completion/v2";
+  program: PortraitMeshProgramV2;
+}
+export interface CodexPortraitMeshFailureV2 extends CodexPortraitMeshFailureV1, PortraitChapterBindingV2 {
+  schema_version: "codex-portrait-mesh-failure/v2";
+}
+export interface PatternPortraitExplorerDownloadV2 extends Omit<PatternPortraitExplorerDownloadV1, "schema_version" | "explorer" | "models"> {
+  schema_version: "pattern-portrait-explorer-download/v2";
+  explorer: PatternPortraitExplorerResponseV2;
+  models: Array<Omit<PatternPortraitExplorerDownloadV1["models"][number], "program"> & { program: PortraitMeshProgramV2 }>;
+}
+export type PortraitAutomationPreference = PortraitAutomationPreferenceV1 | PortraitAutomationPreferenceV2;
+export type PortraitAutomationRequest = PortraitAutomationRequestV1 | PortraitAutomationRequestV2;
+export type PortraitMeshModel = PortraitMeshModelV1 | PortraitMeshModelV2;
+export type PatternPortraitExplorerResponse = PatternPortraitExplorerResponseV1 | PatternPortraitExplorerResponseV2;
+export type CodexPortraitMeshClaim = CodexPortraitMeshClaimV1 | CodexPortraitMeshClaimV2;
+export type CodexPortraitMeshCompletion = CodexPortraitMeshCompletionV1 | CodexPortraitMeshCompletionV2;
+export type CodexPortraitMeshFailure = CodexPortraitMeshFailureV1 | CodexPortraitMeshFailureV2;
+export type PatternPortraitExplorerDownload = PatternPortraitExplorerDownloadV1 | PatternPortraitExplorerDownloadV2;
+
+const bindingKeys = ["schema_version", "chapter_count", "chapter_index", "chapter_id", "document_revision"];
+function validBinding(v: Record<string, unknown>): boolean {
+  return isPortraitChapterCount(v.chapter_count) && Number.isInteger(v.chapter_index)
+    && Number(v.chapter_index) >= 0 && Number(v.chapter_index) < v.chapter_count
+    && v.chapter_id === `chapter-${Number(v.chapter_index) + 1}` && text(v.document_revision, 256);
+}
+function omitBinding(v: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(v).filter(([key]) => !bindingKeys.includes(key)));
+}
+export function isCodexPortraitMeshClaim(v: unknown): v is CodexPortraitMeshClaim {
+  if (!record(v) || v.schema_version !== "codex-portrait-mesh-claim/v2") return isCodexPortraitMeshClaimV1(v);
+  if (!validBinding(v) || v.prompt_version !== PORTRAIT_MESH_V2_PROMPT_VERSION || v.compiler_version !== PORTRAIT_MESH_V2_COMPILER_VERSION) return false;
+  const { chapter_count: _count, ...legacy } = v;
+  return isCodexPortraitMeshClaimV1({ ...legacy, schema_version: "codex-portrait-mesh-claim/v1",
+    chapter_index: 0, chapter_id: "chapter-1", prompt_version: PORTRAIT_MESH_PROMPT_VERSION,
+    compiler_version: PORTRAIT_MESH_COMPILER_VERSION })
+    && new TextEncoder().encode(JSON.stringify(v)).length <= PORTRAIT_MESH_MAX_TRANSPORT_BYTES;
+}
+export function isCodexPortraitMeshCompletion(v: unknown): v is CodexPortraitMeshCompletion {
+  if (!record(v) || v.schema_version !== "codex-portrait-mesh-completion/v2") return isCodexPortraitMeshCompletionV1(v);
+  if (!validBinding(v) || v.compiler_version !== PORTRAIT_MESH_V2_COMPILER_VERSION) return false;
+  const program = parsePortraitMeshProgram(v.program);
+  return !!program && program.version === "portrait-mesh-program/v2" && program.chapter_count === v.chapter_count
+    && program.chapter_id === v.chapter_id && isCodexPortraitMeshCompletionV1(omitBinding(v));
+}
+export function isCodexPortraitMeshFailure(v: unknown): v is CodexPortraitMeshFailure {
+  if (!record(v) || v.schema_version !== "codex-portrait-mesh-failure/v2") return isCodexPortraitMeshFailureV1(v);
+  return validBinding(v) && isCodexPortraitMeshFailureV1(omitBinding(v));
 }

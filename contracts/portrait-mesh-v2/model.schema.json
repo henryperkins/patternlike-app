@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/model.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chapter_id",
+    "reference_id",
+    "sha256",
+    "source_image_sha256",
+    "source_text_sha256",
+    "source_text",
+    "program_sha256",
+    "compiler_version",
+    "authoring",
+    "document_revision",
+    "chapter_count",
+    "chapter_index"
+  ],
+  "properties": {
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^chapter-[1-6]$"
+    },
+    "reference_id": {
+      "type": "string",
+      "pattern": "^ppmodel_[a-f0-9]{32}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_image_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_text_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
+    },
+    "program_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "compiler_version": {
+      "const": "portrait-mesh-compiler/v2"
+    },
+    "authoring": {
+      "const": "codex-parametric/v2"
+    },
+    "document_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "chapter_count": {
+      "type": "integer",
+      "enum": [
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "chapter_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 2
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 6
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-1"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-2"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-3"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-4"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-5"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-6"
+          }
+        }
+      }
+    }
+  ]
+}

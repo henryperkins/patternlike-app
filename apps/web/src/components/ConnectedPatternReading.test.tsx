@@ -41,7 +41,9 @@ describe("an exact Pattern connection", () => {
     await user.click(within(explorer).getByRole("button", { name: "Back to reading" }));
     await waitFor(() => expect(window.history.state).toEqual(originState));
     await waitFor(() => expect(globalThis.document.querySelector(`[data-reading-chapter="chapter-${count}"]`)).toHaveFocus());
-    expect(capturedFor("/v1/pattern-portrait/explorer")).toHaveLength(count === 4 ? 1 : 0);
+    const artworkReads = capturedFor("/v1/pattern-portrait/explorer");
+    expect(artworkReads).toHaveLength(1);
+    expect(artworkReads[0].headers.get("x-patternlike-portrait-protocol")).toBe("v2");
     expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
   });
 });

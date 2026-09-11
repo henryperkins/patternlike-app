@@ -1,0 +1,10 @@
+{
+  "lease_token": "12345678-1234-4234-9234-123456789abc",
+  "code": "generation_refused",
+  "chapter_count": 5,
+  "schema_version": "codex-portrait-failure/v2",
+  "chapter_index": 4,
+  "chapter_id": "chapter-5",
+  "document_revision": "revision-fictional",
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

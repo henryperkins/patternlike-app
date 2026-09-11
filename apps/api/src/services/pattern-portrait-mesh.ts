@@ -3,11 +3,16 @@ import {
   sha256Hex,
   contentHash,
   PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION,
+  PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION,
+  PORTRAIT_MESH_V2_AUTHORING,
+  PORTRAIT_MESH_V2_PROMPT_VERSION,
+  PORTRAIT_MESH_V2_COMPILER_VERSION,
   PORTRAIT_MESH_AUTHORING,
   PORTRAIT_MESH_PROMPT_VERSION,
   PORTRAIT_MESH_COMPILER_VERSION,
   isCodexPortraitMeshClaim,
   isCodexPortraitMeshCompletion,
+  isPortraitMeshAudit,
   parsePortraitMeshProgram,
   type PortraitAutomationPreference,
   type PortraitAutomationRequest,
@@ -33,6 +38,8 @@ import {
   PortraitError,
   PORTRAIT_LEASE_MS,
   portraitEnabled,
+  adaptivePortraitsEnabled,
+  adaptivePortraitSchema,
   portraitEmpty,
   currentPattern,
   authorizedCurrent,
@@ -47,6 +54,7 @@ import {
   type PortraitRow,
   type Current,
 } from "./pattern-portrait.js";
+import { type PortraitProtocol, portraitTerminalMatches } from "./portrait-protocol.js";
 import { validatePortraitMeshGlb } from "./portrait-mesh-glb.js";
 
 interface Grant {
@@ -55,6 +63,7 @@ interface Grant {
   chart_id: string;
   chart_fingerprint_hash: string;
   enabled: number;
+  policy_version: "1.1.0" | "2.0.0";
 }
 interface MeshJob {
   id: string;
@@ -101,10 +110,18 @@ const opaque = (prefix: string) =>
   `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 export const meshEnabled = (env: Env) =>
   portraitEnabled(env) && env.PATTERN_PORTRAIT_MESH_ENABLED === "1";
+/**
+ * 0027 created the table; 0033 rebuilt the portrait family this code joins
+ * against and widened its chapter bounds. The table alone is not enough: on a
+ * database at 0027-0032 the queries below reference pattern_portraits columns
+ * that do not exist, and the maintenance lane's answer to that is cancellation
+ * plus R2 deletion of accepted models. Require both before doing any work.
+ */
 async function migrated(env: Env) {
-  return !!(await env.DB.prepare(
+  const table = await env.DB.prepare(
     "SELECT 1 FROM sqlite_master WHERE type='table' AND name='portrait_mesh_jobs'",
-  ).first());
+  ).first();
+  return !!table && (await adaptivePortraitSchema(env));
 }
 async function available(env: Env) {
   return meshEnabled(env) && (await migrated(env));
@@ -114,10 +131,13 @@ const digest = async (bytes: Uint8Array) =>
     new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
     (x) => x.toString(16).padStart(2, "0"),
   ).join("");
-const grantFence = (env: Env, id: string, userId: string, chartId: string) =>
+const compilerFor = (protocol: PortraitProtocol) => protocol === "v2" ? PORTRAIT_MESH_V2_COMPILER_VERSION : PORTRAIT_MESH_COMPILER_VERSION;
+const authoringFor = (protocol: PortraitProtocol) => protocol === "v2" ? PORTRAIT_MESH_V2_AUTHORING : PORTRAIT_MESH_AUTHORING;
+const grantAllows = (grant: Grant, protocol: PortraitProtocol) => grant.policy_version === "2.0.0" || (protocol === "v1" && grant.policy_version === "1.1.0");
+const grantFence = (env: Env, id: string, userId: string, chartId: string, protocol: PortraitProtocol = "v1") =>
   env.DB.prepare(
-    `INSERT INTO assertion_probe(id,reason) SELECT 1,'portrait automation withdrawn' WHERE NOT EXISTS(SELECT 1 FROM portrait_automation_grants WHERE id=? AND user_id=? AND chart_id=? AND enabled=1 AND policy_version='1.1.0')`,
-  ).bind(id, userId, chartId);
+    `INSERT INTO assertion_probe(id,reason) SELECT 1,'portrait automation withdrawn' WHERE NOT EXISTS(SELECT 1 FROM portrait_automation_grants WHERE id=? AND user_id=? AND chart_id=? AND enabled=1 AND (policy_version='2.0.0' OR (?='v1' AND policy_version='1.1.0')))`,
+  ).bind(id, userId, chartId, protocol);
 async function liveGrant(env: Env, userId: string, chartId: string) {
   return env.DB.prepare(
     "SELECT * FROM portrait_automation_grants WHERE user_id=? AND chart_id=? AND enabled=1",
@@ -128,22 +148,22 @@ async function liveGrant(env: Env, userId: string, chartId: string) {
 export async function readPortraitAutomation(
   env: Env,
   userId: string,
+  protocol: PortraitProtocol = "v1",
 ): Promise<PortraitAutomationPreference> {
   const enabled = await available(env);
   const chart = enabled ? await loadActiveChart(env, userId) : null;
   const grant = chart ? await liveGrant(env, userId, chart.id) : null;
-  return {
-    schema_version: "portrait-automation/v1",
-    available: enabled,
-    chart_id: chart?.id ?? null,
-    enabled: !!grant,
-    consent_policy_version: PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION,
-  };
+  const base = { available: enabled && (protocol === "v1" || adaptivePortraitsEnabled(env)),
+    chart_id: chart?.id ?? null, enabled: !!grant && (protocol === "v1" || grant.policy_version === "2.0.0") };
+  return protocol === "v2"
+    ? { ...base, schema_version: "portrait-automation/v2", legacy_enabled: grant?.policy_version === "1.1.0", consent_policy_version: PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION }
+    : { ...base, schema_version: "portrait-automation/v1", consent_policy_version: PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION };
 }
 export async function setPortraitAutomation(
   env: Env,
   userId: string,
   input: PortraitAutomationRequest,
+  protocol: PortraitProtocol = "v1",
 ) {
   if (!(await available(env)))
     throw new PortraitError(503, "portrait_unavailable");
@@ -158,8 +178,10 @@ export async function setPortraitAutomation(
     )
       .bind(now.toISOString(), userId, chart.id)
       .run();
-    return readPortraitAutomation(env, userId);
+    return readPortraitAutomation(env, userId, protocol);
   }
+  if (input.consent_policy_version === "2.0.0" && !adaptivePortraitsEnabled(env))
+    throw new PortraitError(503, "portrait_unavailable");
   const processing = await loadLiveAccountProcessingGrant(env, userId, now);
   if (!processing) throw new PortraitError(409, "portrait_consent_required");
   const fingerprint = await hashChartFingerprint(chart.fingerprint);
@@ -176,12 +198,19 @@ export async function setPortraitAutomation(
         `INSERT INTO assertion_probe(id,reason) SELECT 1,'portrait chart changed' WHERE NOT EXISTS(SELECT 1 FROM chart_snapshots c JOIN birth_profiles b ON b.user_id=c.user_id AND b.version=c.profile_version JOIN users u ON u.id=c.user_id WHERE c.id=? AND c.user_id=? AND c.status='active' AND c.fingerprint=? AND b.status='active' AND u.status='active' AND u.crypto_write_fence IS NULL)`,
       ).bind(chart.id, userId, chart.fingerprint),
       env.DB.prepare(
-        `INSERT OR IGNORE INTO portrait_automation_grants(id,user_id,chart_id,chart_fingerprint_hash,policy_version,enabled,created_at,updated_at) VALUES(?,?,?,?,'1.1.0',1,?,?)`,
+        "INSERT INTO assertion_probe(id,reason) SELECT 1,'legacy client cannot replace adaptive grant' WHERE ?='1.1.0' AND EXISTS(SELECT 1 FROM portrait_automation_grants WHERE user_id=? AND chart_id=? AND enabled=1 AND policy_version='2.0.0')",
+      ).bind(input.consent_policy_version, userId, chart.id),
+      env.DB.prepare(
+        "UPDATE portrait_automation_grants SET enabled=0,updated_at=? WHERE user_id=? AND chart_id=? AND enabled=1 AND policy_version!=?",
+      ).bind(now.toISOString(), userId, chart.id, input.consent_policy_version),
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO portrait_automation_grants(id,user_id,chart_id,chart_fingerprint_hash,policy_version,enabled,created_at,updated_at) VALUES(?,?,?,?,?,1,?,?)`,
       ).bind(
         grantId,
         userId,
         chart.id,
         fingerprint,
+        input.consent_policy_version,
         now.toISOString(),
         now.toISOString(),
       ),
@@ -192,7 +221,7 @@ export async function setPortraitAutomation(
   } catch {
     throw new PortraitError(409, "portrait_revision_conflict");
   }
-  return readPortraitAutomation(env, userId);
+  return readPortraitAutomation(env, userId, protocol);
 }
 async function context(env: Env, job: MeshJob, now: Date) {
   const parent = await portraitById(env, job.portrait_id);
@@ -214,6 +243,9 @@ async function context(env: Env, job: MeshJob, now: Date) {
   if (
     !grant ||
     grant.id !== job.grant_id ||
+    !grantAllows(grant, row.protocol_version) ||
+    job.compiler_version !== compilerFor(row.protocol_version) ||
+    job.chapter_index < 0 || job.chapter_index >= row.chapter_count ||
     !image ||
     !accepted ||
     image.plaintext_sha256 !== job.source_image_sha256 ||
@@ -233,7 +265,7 @@ function fences(
 ) {
   return [
     ...guards(env, row, current, now),
-    grantFence(env, job.grant_id, job.user_id, row.chart_id),
+    grantFence(env, job.grant_id, job.user_id, row.chart_id, row.protocol_version),
     env.DB.prepare(
       `INSERT INTO assertion_probe(id,reason) SELECT 1,'mesh source changed' WHERE NOT EXISTS(SELECT 1 FROM pattern_portrait_jobs j JOIN pattern_portrait_assets a ON a.id=j.image_asset_id WHERE j.portrait_id=? AND j.chapter_index=? AND j.status='complete' AND a.id=? AND a.plaintext_sha256=? AND a.cleanup_at IS NULL)`,
     ).bind(
@@ -288,6 +320,14 @@ async function repair(env: Env, now: Date) {
           .run();
         continue;
       }
+      const protocol: PortraitProtocol = grant.policy_version === "2.0.0" ? "v2" : "v1";
+      if (protocol === "v1" && current.chapterCount !== 4) {
+        await env.DB.prepare("UPDATE portrait_start_outbox SET status='unsupported' WHERE id=? AND grant_id=? AND status='pending'")
+          .bind(entry.id, entry.grant_id).run();
+        continue;
+      }
+      // Admission is checked by startPortrait only for a new reservation. An
+      // explicit renewal may resume the existing bounded budget after rollback.
       await startPortrait(
         env,
         current.identity,
@@ -296,12 +336,14 @@ async function repair(env: Env, now: Date) {
           generated_at: current.document.generated_at,
           chart_id: current.chart.id,
           confirm: "CREATE MY PORTRAIT",
-          consent_policy_version: "1.0.0",
+          ...(protocol === "v2"
+            ? { consent_policy_version: "2.0.0" as const, chapter_count: current.chapterCount }
+            : { consent_policy_version: "1.0.0" as const }),
         },
         entry.grant_id,
       );
       await env.DB.batch([
-        grantFence(env, entry.grant_id, entry.user_id, entry.chart_id),
+        grantFence(env, entry.grant_id, entry.user_id, entry.chart_id, protocol),
         env.DB.prepare(
           "UPDATE portrait_start_outbox SET status='complete' WHERE id=? AND grant_id=? AND status='pending'",
         ).bind(entry.id, entry.grant_id),
@@ -322,9 +364,9 @@ async function repair(env: Env, now: Date) {
   }
   const rows = (
     await env.DB.prepare(
-      `SELECT j.id image_job_id,j.image_asset_id,j.chapter_index,j.source_sha256,p.*,g.id automation_grant_id,a.plaintext_sha256 image_sha FROM pattern_portrait_jobs j JOIN pattern_portraits p ON p.id=j.portrait_id JOIN portrait_automation_grants g ON g.user_id=p.user_id AND g.chart_id=p.chart_id AND g.enabled=1 JOIN pattern_portrait_assets a ON a.id=j.image_asset_id AND a.cleanup_at IS NULL WHERE j.status='complete' AND p.status IN('generating','ready','failed') AND NOT EXISTS(SELECT 1 FROM portrait_mesh_jobs m WHERE m.portrait_id=p.id AND m.chapter_index=j.chapter_index AND m.compiler_version=? AND NOT(m.status='cancelled' AND m.attempts<3 AND m.grant_id!=g.id)) ORDER BY j.created_at LIMIT 100`,
+      `SELECT j.id image_job_id,j.image_asset_id,j.chapter_index,j.source_sha256,p.*,g.id automation_grant_id,a.plaintext_sha256 image_sha FROM pattern_portrait_jobs j JOIN pattern_portraits p ON p.id=j.portrait_id JOIN portrait_automation_grants g ON g.user_id=p.user_id AND g.chart_id=p.chart_id AND g.enabled=1 AND (g.policy_version='2.0.0' OR (p.protocol_version='v1' AND g.policy_version='1.1.0')) JOIN pattern_portrait_assets a ON a.id=j.image_asset_id AND a.cleanup_at IS NULL WHERE j.status='complete' AND p.status IN('generating','ready','failed') AND NOT EXISTS(SELECT 1 FROM portrait_mesh_jobs m WHERE m.portrait_id=p.id AND m.chapter_index=j.chapter_index AND m.compiler_version=(CASE p.protocol_version WHEN 'v2' THEN ? ELSE ? END) AND NOT(m.status='cancelled' AND m.attempts<3 AND m.grant_id!=g.id)) ORDER BY j.created_at LIMIT 100`,
     )
-      .bind(PORTRAIT_MESH_COMPILER_VERSION)
+      .bind(PORTRAIT_MESH_V2_COMPILER_VERSION, PORTRAIT_MESH_COMPILER_VERSION)
       .all<
         PortraitRow & {
           automation_grant_id: string;
@@ -360,7 +402,7 @@ async function repair(env: Env, now: Date) {
         continue;
       await env.DB.batch([
         ...guards(env, authorization, current, now),
-        grantFence(env, row.automation_grant_id, row.user_id, row.chart_id),
+        grantFence(env, row.automation_grant_id, row.user_id, row.chart_id, row.protocol_version),
         env.DB.prepare(
           `INSERT OR IGNORE INTO portrait_mesh_jobs(id,user_id,portrait_id,grant_id,image_asset_id,processing_consent_id,pattern_consent_id,chapter_index,source_text_sha256,source_image_sha256,document_revision,compiler_version,status,retry_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?) ON CONFLICT(portrait_id,chapter_index,compiler_version) DO UPDATE SET grant_id=excluded.grant_id,processing_consent_id=excluded.processing_consent_id,pattern_consent_id=excluded.pattern_consent_id,status='pending',retry_at=excluded.retry_at,lease_hash=NULL,lease_expires_at=NULL,completion_hash=NULL,failure_code=NULL,updated_at=excluded.updated_at WHERE portrait_mesh_jobs.status='cancelled' AND portrait_mesh_jobs.attempts<3 AND portrait_mesh_jobs.grant_id!=excluded.grant_id AND portrait_mesh_jobs.source_text_sha256=excluded.source_text_sha256 AND portrait_mesh_jobs.source_image_sha256=excluded.source_image_sha256 AND portrait_mesh_jobs.document_revision=excluded.document_revision`,
         ).bind(
@@ -375,7 +417,7 @@ async function repair(env: Env, now: Date) {
           row.source_sha256,
           row.image_sha,
           current.revision,
-          PORTRAIT_MESH_COMPILER_VERSION,
+          compilerFor(row.protocol_version),
           now.toISOString(),
           now.toISOString(),
           now.toISOString(),
@@ -396,15 +438,16 @@ async function recover(env: Env, now: Date) {
 export async function claimPortraitMesh(
   env: Env,
   now = new Date(),
+  protocol: PortraitProtocol = "v1",
 ): Promise<CodexPortraitMeshClaim | null> {
   if (!(await available(env))) return null;
   await repair(env, now);
   await recover(env, now);
   const jobs = (
     await env.DB.prepare(
-      "SELECT j.* FROM portrait_mesh_jobs j JOIN users u ON u.id=j.user_id AND u.status='active' WHERE j.status='pending' AND j.attempts<3 AND j.retry_at<=? ORDER BY j.created_at,j.chapter_index LIMIT 8",
+      "SELECT j.* FROM portrait_mesh_jobs j JOIN users u ON u.id=j.user_id AND u.status='active' JOIN pattern_portraits p ON p.id=j.portrait_id WHERE (p.protocol_version='v1' OR ?='v2') AND j.status='pending' AND j.attempts<3 AND j.retry_at<=? ORDER BY j.created_at,j.chapter_index LIMIT 8",
     )
-      .bind(now.toISOString())
+      .bind(protocol, now.toISOString())
       .all<MeshJob>()
   ).results;
   for (const job of jobs) {
@@ -439,7 +482,9 @@ export async function claimPortraitMesh(
     }
     const lease = crypto.randomUUID();
     const claim: CodexPortraitMeshClaim = {
-      schema_version: "codex-portrait-mesh-claim/v1",
+      ...(auth.row.protocol_version === "v2"
+        ? { schema_version: "codex-portrait-mesh-claim/v2" as const, chapter_count: auth.row.chapter_count, prompt_version: PORTRAIT_MESH_V2_PROMPT_VERSION }
+        : { schema_version: "codex-portrait-mesh-claim/v1" as const, prompt_version: PORTRAIT_MESH_PROMPT_VERSION }),
       job_id: job.id,
       portrait_id: job.portrait_id,
       chapter_index: job.chapter_index,
@@ -447,7 +492,6 @@ export async function claimPortraitMesh(
       lease_token: lease,
       model: "gpt-5.6-sol",
       reasoning_effort: "xhigh",
-      prompt_version: PORTRAIT_MESH_PROMPT_VERSION,
       timeout_ms: 900000,
       source_text: auth.current.sources[job.chapter_index]!,
       source_text_sha256: job.source_text_sha256,
@@ -621,6 +665,18 @@ export async function completePortraitMesh(
     throw new PortraitError(400, "invalid_mesh");
   const job = await jobById(env, id);
   if (!job) throw new PortraitError(409, "portrait_mesh_conflict");
+  const parent = await portraitById(env, job.portrait_id);
+  // The download path already refuses a program whose chapter binding does not
+  // match the job it was claimed for. Checking only there accepts the bad
+  // program, marks the job complete and then 404s the model forever, and
+  // UNIQUE(portrait_id, chapter_index, compiler_version) makes that awkward to
+  // redo. An honest runner cannot produce it; the server should not need one.
+  if (!parent || !portraitTerminalMatches(parent, job.chapter_index, input, "codex-portrait-mesh-completion/v2")
+    || input.program.version !== (parent.protocol_version === "v2" ? "portrait-mesh-program/v2" : "portrait-mesh-program/v1")
+    || (input.program.version === "portrait-mesh-program/v2"
+      && (input.program.chapter_count !== parent.chapter_count
+        || input.program.chapter_id !== `chapter-${job.chapter_index + 1}`)))
+    throw new PortraitError(409, "portrait_mesh_conflict");
   const completionHash = await contentHash(canonicalJson(input));
   const leaseHash = await contentHash(input.lease_token);
   if (
@@ -647,7 +703,8 @@ export async function completePortraitMesh(
     sourceTextSha256: job.source_text_sha256,
     programSha256: programHash,
     compilerVersion: job.compiler_version,
-    authoring: PORTRAIT_MESH_AUTHORING,
+    authoring: authoringFor(auth.row.protocol_version),
+    ...(auth.row.protocol_version === "v2" ? { chapterCount: auth.row.chapter_count } : {}),
   };
   if (
     input.compiler_version !== job.compiler_version ||
@@ -676,7 +733,9 @@ export async function completePortraitMesh(
       source_text: auth.current.sources[job.chapter_index]!,
       program_sha256: programHash,
       compiler_version: job.compiler_version,
-      authoring: PORTRAIT_MESH_AUTHORING,
+      ...(auth.row.protocol_version === "v2"
+        ? { authoring: PORTRAIT_MESH_V2_AUTHORING, chapter_count: auth.row.chapter_count, chapter_index: job.chapter_index }
+        : { authoring: PORTRAIT_MESH_AUTHORING }),
       document_revision: job.document_revision,
     };
     const provenance: Provenance = {
@@ -740,6 +799,9 @@ export async function failPortraitMesh(
     throw new PortraitError(503, "portrait_unavailable");
   const job = await jobById(env, id);
   if (!job) throw new PortraitError(409, "portrait_mesh_conflict");
+  const parent = await portraitById(env, job.portrait_id);
+  if (!parent || !portraitTerminalMatches(parent, job.chapter_index, input, "codex-portrait-mesh-failure/v2"))
+    throw new PortraitError(409, "portrait_mesh_conflict");
   const auth = await context(env, job, now);
   const lease = await contentHash(input.lease_token);
   const failureHash = await contentHash(canonicalJson(input));
@@ -774,7 +836,7 @@ export async function failPortraitMesh(
     throw new PortraitError(409, "portrait_mesh_conflict");
   }
 }
-async function acceptedModel(env: Env, userId: string, referenceId: string) {
+async function acceptedModel(env: Env, userId: string, referenceId: string, protocol: PortraitProtocol = "v2") {
   const current = await currentPattern(env, userId);
   if (!current) throw new PortraitError(404, "portrait_model_not_found");
   const asset = await env.DB.prepare(
@@ -792,7 +854,11 @@ async function acceptedModel(env: Env, userId: string, referenceId: string) {
     .first<MeshAsset>();
   if (!asset) throw new PortraitError(404, "portrait_model_not_found");
   const job = await jobById(env, asset.job_id);
-  if (!job?.provenance_asset_id)
+  const parent = await portraitById(env, asset.portrait_id);
+  if (!job?.provenance_asset_id || !parent || parent.chapter_count !== current.chapterCount
+    || job.chapter_index < 0 || job.chapter_index >= parent.chapter_count
+    || job.compiler_version !== compilerFor(parent.protocol_version)
+    || (protocol === "v1" && parent.protocol_version === "v2"))
     throw new PortraitError(404, "portrait_model_not_found");
   const receipt = await env.DB.prepare(
     "SELECT * FROM portrait_mesh_assets WHERE id=? AND cleanup_at IS NULL",
@@ -813,6 +879,12 @@ async function acceptedModel(env: Env, userId: string, referenceId: string) {
     decoder.decode(await readMeshAsset(env, receipt, current)),
   ) as Provenance;
   const model = provenance.model;
+  const program = parsePortraitMeshProgram(provenance.program);
+  if (!program || !isPortraitMeshAudit(provenance.audit)
+    || program.version !== (parent.protocol_version === "v2" ? "portrait-mesh-program/v2" : "portrait-mesh-program/v1")
+    || (program.version === "portrait-mesh-program/v2" && (program.chapter_count !== parent.chapter_count
+      || program.chapter_id !== `chapter-${job.chapter_index + 1}`)))
+    throw new PortraitError(404, "portrait_model_not_found");
   const bytes = await readMeshAsset(env, asset, current);
   if (
     model.chapter_id !== `chapter-${job.chapter_index + 1}` ||
@@ -820,7 +892,9 @@ async function acceptedModel(env: Env, userId: string, referenceId: string) {
     model.source_image_sha256 !== job.source_image_sha256 ||
     model.source_text_sha256 !== job.source_text_sha256 ||
     model.compiler_version !== job.compiler_version ||
-    model.authoring !== PORTRAIT_MESH_AUTHORING ||
+    model.authoring !== authoringFor(parent.protocol_version) ||
+    (parent.protocol_version === "v2" && (!("chapter_count" in model)
+      || model.chapter_count !== parent.chapter_count || model.chapter_index !== job.chapter_index)) ||
     model.reference_id !== asset.id ||
     model.sha256 !== asset.plaintext_sha256 ||
     model.source_text !== current.sources[job.chapter_index] ||
@@ -834,7 +908,8 @@ async function acceptedModel(env: Env, userId: string, referenceId: string) {
       sourceTextSha256: job.source_text_sha256,
       programSha256: model.program_sha256,
       compilerVersion: job.compiler_version,
-      authoring: PORTRAIT_MESH_AUTHORING,
+      authoring: authoringFor(parent.protocol_version),
+      ...(parent.protocol_version === "v2" ? { chapterCount: parent.chapter_count } : {}),
     })
   )
     throw new PortraitError(404, "portrait_model_not_found");
@@ -844,11 +919,12 @@ export async function portraitModel(
   env: Env,
   userId: string,
   referenceId: string,
+  protocol: PortraitProtocol = "v1",
 ) {
   if (!(await available(env)))
     throw new PortraitError(404, "portrait_model_not_found");
   try {
-    return (await acceptedModel(env, userId, referenceId)).bytes;
+    return (await acceptedModel(env, userId, referenceId, protocol)).bytes;
   } catch {
     throw new PortraitError(404, "portrait_model_not_found");
   }
@@ -856,72 +932,54 @@ export async function portraitModel(
 export async function readPortraitExplorer(
   env: Env,
   userId: string,
+  protocol: PortraitProtocol = "v1",
 ): Promise<PatternPortraitExplorerResponse> {
   const enabled = await available(env);
-  const portrait = enabled ? await readPortrait(env, userId) : portraitEmpty();
-  const response: PatternPortraitExplorerResponse = {
-    schema_version: "pattern-portrait-explorer/v1",
-    status: enabled ? "not_started" : "unavailable",
-    portrait,
-    completed_models: 0,
-    retryable: false,
-    models: [],
-  };
-  if (!enabled) return response;
+  const portrait = enabled ? await readPortrait(env, userId, protocol) : portraitEmpty("unavailable", protocol);
+  const base = { status: enabled ? "not_started" as const : "unavailable" as const,
+    completed_models: 0, retryable: false };
+  const response: PatternPortraitExplorerResponse = portrait.schema_version === "pattern-portrait/v2"
+    ? { ...base, schema_version: "pattern-portrait-explorer/v2", chapter_count: portrait.chapter_count,
+      document_revision: portrait.document_revision, portrait, models: [] }
+    : { ...base, schema_version: "pattern-portrait-explorer/v1", portrait, models: [] };
+  if (!enabled || portrait.status === "unavailable") return { ...response, status: "unavailable" };
   const current = await currentPattern(env, userId);
   if (!current) return { ...response, status: "unavailable" };
   if (!portrait.portrait_id) {
     const start = await env.DB.prepare(
       "SELECT status FROM portrait_start_outbox WHERE user_id=? AND pattern_id=?",
-    )
-      .bind(userId, current.document.id)
-      .first<{ status: string }>();
+    ).bind(userId, current.document.id).first<{ status: string }>();
     const cancelled = await env.DB.prepare(
       "SELECT 1 FROM pattern_portraits WHERE user_id=? AND pattern_id=? AND status='cancelled'",
-    )
-      .bind(userId, current.document.id)
-      .first();
-    return {
-      ...response,
-      status:
-        cancelled || start?.status === "cancelled"
-          ? "failed"
-          : start?.status === "unsupported"
-            ? "unavailable"
-            : (await liveGrant(env, userId, current.chart.id))
-              ? "generating"
-              : "not_started",
-    };
+    ).bind(userId, current.document.id).first();
+    return { ...response, status: cancelled || start?.status === "cancelled" ? "failed"
+      : start?.status === "unsupported" ? "unavailable"
+        : (await liveGrant(env, userId, current.chart.id)) ? "generating" : "not_started" };
   }
-  const jobs = (
-    await env.DB.prepare(
-      "SELECT * FROM portrait_mesh_jobs WHERE portrait_id=? AND compiler_version=? ORDER BY chapter_index",
-    )
-      .bind(portrait.portrait_id, PORTRAIT_MESH_COMPILER_VERSION)
-      .all<MeshJob>()
-  ).results;
-  response.completed_models = jobs.filter(
-    (j) => j.status === "complete",
-  ).length;
-  response.retryable = jobs.some(
-    (j) => j.status === "pending" || j.status === "running",
-  );
-  response.status =
-    response.retryable || portrait.status === "generating"
-      ? "generating"
-      : jobs.some((j) => j.status === "failed" || j.status === "cancelled") ||
-          portrait.status === "failed"
-        ? "failed"
-        : jobs.length || (await liveGrant(env, userId, current.chart.id))
-          ? "generating"
-          : "not_started";
-  if (response.completed_models === 4 && portrait.status === "ready") {
+  const parent = await portraitById(env, portrait.portrait_id);
+  if (!parent || parent.chapter_count !== current.chapterCount) return { ...response, status: "unavailable" };
+  const jobs = (await env.DB.prepare(
+    "SELECT * FROM portrait_mesh_jobs WHERE portrait_id=? AND compiler_version=? ORDER BY chapter_index",
+  ).bind(parent.id, compilerFor(parent.protocol_version)).all<MeshJob>()).results;
+  response.completed_models = jobs.filter(job => job.status === "complete").length;
+  response.retryable = jobs.some(job => job.status === "pending" || job.status === "running");
+  response.status = response.retryable || portrait.status === "generating" ? "generating"
+    : jobs.some(job => job.status === "failed" || job.status === "cancelled") || portrait.status === "failed"
+      ? "failed" : jobs.length || (await liveGrant(env, userId, current.chart.id)) ? "generating" : "not_started";
+  if (jobs.length === parent.chapter_count && jobs.every((job, index) => job.chapter_index === index
+    && job.status === "complete" && job.document_revision === parent.document_revision) && portrait.status === "ready") {
     try {
-      for (const job of jobs)
-        response.models.push(
-          (await acceptedModel(env, userId, job.model_asset_id!)).provenance
-            .model,
-        );
+      const models: PortraitMeshModel[] = [];
+      for (const job of jobs) models.push((await acceptedModel(env, userId, job.model_asset_id!, protocol)).provenance.model);
+      if (response.schema_version === "pattern-portrait-explorer/v2") {
+        const compatible = models.filter(model => model.authoring === PORTRAIT_MESH_V2_AUTHORING);
+        if (compatible.length !== parent.chapter_count) throw new Error("mesh protocol mismatch");
+        response.models = compatible;
+      } else {
+        const compatible = models.filter(model => model.authoring === PORTRAIT_MESH_AUTHORING);
+        if (compatible.length !== parent.chapter_count) throw new Error("mesh protocol mismatch");
+        response.models = compatible;
+      }
       response.status = "ready";
       response.retryable = false;
     } catch {
@@ -936,39 +994,31 @@ export async function portraitExplorerDownload(
   env: Env,
   userId: string,
   expected: URLSearchParams,
+  protocol: PortraitProtocol = "v1",
 ): Promise<PatternPortraitExplorerDownload> {
-  const explorer = await readPortraitExplorer(env, userId);
-  if (explorer.status !== "ready")
-    throw new PortraitError(409, "portrait_not_ready");
-  const legacy = await portraitDownload(env, userId, expected);
+  const explorer = await readPortraitExplorer(env, userId, protocol);
+  if (explorer.status !== "ready") throw new PortraitError(409, "portrait_not_ready");
+  const images = await portraitDownload(env, userId, expected, protocol);
   const current = await currentPattern(env, userId);
   if (!current || current.revision !== explorer.portrait.document_revision)
     throw new PortraitError(409, "portrait_revision_conflict");
-  const models: PatternPortraitExplorerDownload["models"] = [];
+  const models = [];
   for (const item of explorer.models) {
-    const { bytes, provenance } = await acceptedModel(
-      env,
-      userId,
-      item.reference_id,
-    );
-    models.push({
-      reference_id: item.reference_id,
-      content_type: "model/gltf-binary",
-      sha256: item.sha256,
-      data_base64: b64(bytes),
-      program: provenance.program,
-      audit: provenance.audit,
-      provider_request_id: provenance.provider_request_id,
-      audit_request_id: provenance.audit_request_id,
-    });
+    const { bytes, provenance } = await acceptedModel(env, userId, item.reference_id, protocol);
+    models.push({ reference_id: item.reference_id, content_type: "model/gltf-binary" as const,
+      sha256: item.sha256, data_base64: b64(bytes), program: provenance.program, audit: provenance.audit,
+      provider_request_id: provenance.provider_request_id, audit_request_id: provenance.audit_request_id });
   }
-  return {
-    schema_version: "pattern-portrait-explorer-download/v1",
-    reading: current.published,
-    explorer,
-    images: legacy.images as PatternPortraitExplorerDownload["images"],
-    models,
-  };
+  if (explorer.schema_version === "pattern-portrait-explorer/v2") {
+    const compatible = models.filter((model): model is typeof model & { program: Extract<typeof model.program, { version: "portrait-mesh-program/v2" }> } => model.program.version === "portrait-mesh-program/v2");
+    if (compatible.length !== explorer.chapter_count) throw new PortraitError(409, "portrait_not_ready");
+    return { schema_version: "pattern-portrait-explorer-download/v2", reading: current.published,
+      explorer, images: images.images, models: compatible };
+  }
+  const compatible = models.filter((model): model is typeof model & { program: Extract<typeof model.program, { version: "portrait-mesh-program/v1" }> } => model.program.version === "portrait-mesh-program/v1");
+  if (compatible.length !== 4) throw new PortraitError(409, "portrait_not_ready");
+  return { schema_version: "pattern-portrait-explorer-download/v1", reading: current.published,
+    explorer, images: images.images, models: compatible };
 }
 export async function maintainPortraitMeshes(env: Env, now = new Date()) {
   if (!(await migrated(env))) return;

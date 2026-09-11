@@ -51,7 +51,7 @@ export const READER_COPY: Record<ReadinessReason, string> = {
   deleted: "This Pattern was deleted and cannot be regenerated for this chart.", withdrawn: "The interpretation basis for this Pattern was withdrawn.",
   observation_unavailable: "Current status could not be checked. Reload status before starting more work.",
   stale_observation: "This status needs to be refreshed before starting more work.", scope_mismatch: "This status no longer matches the current account, chart, or edition.",
-  unsupported_artwork: "Saved artwork supports four-chapter Patterns. Your complete reading remains available.",
+  unsupported_artwork: "Saved artwork supports Patterns with three to six chapters. Your complete reading remains available.",
   automation_disabled: "Automatic artwork is paused. Saved artwork and your reading remain available.",
   artwork_unavailable: "Optional artwork is unavailable. Your complete reading remains available.",
   not_generated: "No published reading is available yet. Check status again to see whether it has appeared.",
@@ -132,9 +132,9 @@ export function selectReaderReadiness(input: ReaderReadinessInput): Record<Reade
     }
   }
   let artwork = unavailable("artwork", input.artwork);
-  if (input.chapterCount !== undefined && input.chapterCount !== 4) artwork = make("artwork", "unavailable", "unsupported_artwork");
+  if (input.chapterCount !== undefined && ![3, 4, 5, 6].includes(input.chapterCount)) artwork = make("artwork", "unavailable", "unsupported_artwork");
   else if (input.artwork && !observationReason(input.artwork, scope, requestGeneration, now) && input.artwork.value.status === "ready") artwork = make("artwork", "ready", "ready", input.artwork);
-  else if (input.automation && !observationReason(input.automation, scope, requestGeneration, now) && input.automation.value.available && input.automation.value.chart_id === scope.chartId && !input.automation.value.enabled) artwork = make("artwork", "paused", "automation_disabled", input.automation);
+  else if (input.automation && !observationReason(input.automation, scope, requestGeneration, now) && input.automation.value.available && input.automation.value.chart_id === scope.chartId && !input.automation.value.enabled && !(input.automation.value.schema_version === "portrait-automation/v2" && input.automation.value.legacy_enabled)) artwork = make("artwork", "paused", "automation_disabled", input.automation);
   else if (input.artwork && !observationReason(input.artwork, scope, requestGeneration, now)) artwork = make("artwork", input.artwork.value.status === "generating" ? "working" : "unavailable", input.artwork.value.status === "generating" ? "preparing" : "artwork_unavailable", input.artwork, reload);
   return { daily, pattern, patternReplacement, artwork };
 }

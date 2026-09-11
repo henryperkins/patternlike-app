@@ -30,11 +30,11 @@ describe("reader readiness composition", () => {
   it("rejects contradictory replacement eligibility", () => {
     expect(select(observe(state({ regeneration: { eligible: false, failure, generation: null } }))).patternReplacement.actions.map(a => a.type)).toEqual(["reload_status"]);
   });
-  it.each([3, 5, 6])("keeps %s chapter reading usable with unsupported generated artwork", chapterCount => {
+  it.each([3, 5, 6])("keeps %s chapter reading usable while optional artwork status is unknown", chapterCount => {
     const result = select(observe(state()), { chapterCount });
     expect(result.pattern.code).toBe("ready");
-    expect(result.artwork.reason).toBe("unsupported_artwork");
-    expect(result.artwork.actions).toEqual([]);
+    expect(result.artwork.reason).toBe("observation_unavailable");
+    expect(result.artwork.actions.map(action => action.type)).toEqual(["reload_status"]);
   });
   it.each([
     { scope: { ...scope, accountId: "account-b" } },

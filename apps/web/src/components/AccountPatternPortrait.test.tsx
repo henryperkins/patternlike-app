@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { webcrypto } from "node:crypto";
 import { Blob as NodeBlob } from "node:buffer";
-import type { PatternPortraitResponse, PatternResponseV7, PatternStatePattern, PortraitGraph } from "@patternlike/shared";
+import type { PatternPortraitResponseV1 as PatternPortraitResponse, PatternResponseV7, PatternStatePattern, PortraitGraphV1 as PortraitGraph } from "@patternlike/shared";
 import { ApiError, downloadPatternPortrait, getPatternPortrait, getPatternPortraitImage, startPatternPortraitGeneration } from "../lib/api-client.js";
 import { LegacyAccountPatternPortrait as AccountPatternPortrait } from "./AccountPatternPortrait.js";
 import { PatternPortrait } from "./PatternPortrait.js";
@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.mocked(getPatternPortrait).mockResolvedValue(response());
   vi.mocked(getPatternPortraitImage).mockResolvedValue(new Blob([bytes], { type: "image/png" }));
   vi.mocked(startPatternPortraitGeneration).mockResolvedValue(response({ status: "generating" }));
-  vi.mocked(downloadPatternPortrait).mockResolvedValue(new Blob(["{}"], { type: "application/json" }));
+  vi.mocked(downloadPatternPortrait).mockResolvedValue(new Blob([JSON.stringify({ schema_version: "pattern-portrait-download/v1", portrait: ready(), images: ready().chapters.map(chapter => ({ reference_id: chapter.reference_id, content_type: "image/png", sha256: chapter.reference_sha256, data_base64: "AQID" })) })], { type: "application/json" }));
   let serial = 0;
   vi.stubGlobal("URL", class extends URL { static createObjectURL = vi.fn(() => `blob:http://localhost/${++serial}`); static revokeObjectURL = vi.fn(); });
 });
@@ -251,9 +251,21 @@ describe("account Pattern portrait", () => {
     expect(downloadPatternPortrait).not.toHaveBeenCalled();
     await userEvent.click(button);
     expect(downloadPatternPortrait).toHaveBeenCalledWith({ chart_id: props.chartId, pattern_id: document.pattern_id, generated_at: document.generated_at }, expect.any(AbortSignal));
-    expect(click).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
     expect(click.mock.instances[0]).toMatchObject({ download: "pattern-portrait.json", href: "blob:http://localhost/1" });
     view.unmount();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:http://localhost/1");
   });
+});
+
+import { adaptiveFixture } from "../test/adaptive-portrait-fixture.js";
+it.each([3, 4, 5, 6] as const)("requests explicit complete-reading generation for %i chapters", async count => {
+  const f = adaptiveFixture(count);
+  const notStarted = { ...f.portrait, status: "not_started" as const, completed_chapters: 0, chapters: [], graph: null };
+  vi.mocked(getPatternPortrait).mockResolvedValue(notStarted);
+  vi.mocked(startPatternPortraitGeneration).mockResolvedValue({ ...notStarted, status: "generating" });
+  show({ chartId: "chart-fictional", document: f.document, pattern: { ...pattern, pattern_id: f.document.pattern_id, generated_at: f.document.generated_at } });
+  await userEvent.click(await screen.findByRole("button", { name: "Create my constellation" }));
+  expect(startPatternPortraitGeneration).toHaveBeenCalledWith(expect.objectContaining({ chapter_count: count, consent_policy_version: "2.0.0" }), expect.any(String), expect.any(AbortSignal));
+  expect(await screen.findByText(new RegExp(`0 of ${count} chapter images`))).toBeInTheDocument();
 });

@@ -41,6 +41,13 @@ describe("portrait image decoding", () => {
     expect(bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
   });
 
+  it.each([3, 5, 6])("decodes every supported reference for %i chapters", async count => {
+    decodeMock.mockReset().mockImplementation(async () => ({ width: 64, height: 64, close: vi.fn() }));
+    const references = Array.from({ length: count }, (_, i) => `/image-${i}.png`);
+    expect(await loadPortraitImages(references, new AbortController().signal)).toHaveLength(count);
+    expect(fetchMock).toHaveBeenCalledTimes(count);
+  });
+
   it("preserves small references without upscaling and bounds landscape references", async () => {
     bitmaps[0].width = 40;
     bitmaps[0].height = 60;
@@ -51,8 +58,8 @@ describe("portrait image decoding", () => {
     expect([images[1].width, images[1].height]).toEqual([128, 64]);
   });
 
-  it.each([[], urls.slice(0, 3), [...urls, "/extra.png"], ["", ...urls.slice(1)]].map((input) => ({ input })))("rejects invalid input count or missing URLs before any request: $input", async ({ input }) => {
-    await expect(loadPortraitImages(input, new AbortController().signal)).rejects.toThrow("four image references");
+  it.each([[], urls.slice(0, 2), [...urls, "/extra1.png", "/extra2.png", "/extra3.png"], ["", ...urls.slice(1)]].map((input) => ({ input })))("rejects invalid input count or missing URLs before any request: $input", async ({ input }) => {
+    await expect(loadPortraitImages(input, new AbortController().signal)).rejects.toThrow("three through six image references");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

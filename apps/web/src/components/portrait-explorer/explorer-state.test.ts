@@ -113,8 +113,10 @@ describe("portrait explorer navigation", () => {
   it("restores nested image inspection to comparison before returning to its chapter", () => {
     const origin = act(createExplorerState(chapterIds), { type: "select", chapterId: "chapter-1" }, { type: "facet", facet: "resources" });
     const compare = explorerReducer(origin, { type: "compare", chapterId: "chapter-4" });
-    const inspecting = explorerReducer(compare, { type: "inspect", open: true });
+    const inspecting = explorerReducer(compare, { type: "inspect", open: true, chapterId: "chapter-4" });
     expect(inspecting.inspectImage).toBe(true);
+    expect(inspecting.inspectChapterId).toBe("chapter-4");
+    expect(explorerReducer(compare, { type: "inspect", open: true, chapterId: "chapter-2" })).toBe(compare);
     expect(explorerReducer(inspecting, { type: "inspect", open: false })).toEqual(compare);
     expect(act(inspecting, { type: "back" }, { type: "back" })).toEqual(origin);
   });

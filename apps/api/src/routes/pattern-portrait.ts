@@ -1,9 +1,10 @@
 import { Hono, type Context } from "hono";
-import { isUsablePortraitImage, isRecordedPortraitImageModelProvenance, PORTRAIT_CONSENT_POLICY_VERSION, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest } from "@patternlike/shared";
+import { isUsablePortraitImage, isRecordedPortraitImageModelProvenance, isPortraitChapterCount, PORTRAIT_CONSENT_POLICY_VERSION, PORTRAIT_V2_CONSENT_POLICY_VERSION, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { loadUserIdentity } from "../db/users.js";
 import { PortraitError, claimPortrait, completePortrait, failPortrait, portraitDownload, portraitImage, readPortrait, startPortrait } from "../services/pattern-portrait.js";
+import { PORTRAIT_PROTOCOL_HEADER, portraitProtocol, validPortraitBinding, type PortraitProtocol } from "../services/portrait-protocol.js";
 
 type Ctx = Context<{ Bindings: Env; Variables: AppVariables }>;
 export const patternPortraitRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -43,8 +44,12 @@ function png(bytes: Uint8Array): boolean {
   }
   return false;
 }
-function completion(value: unknown): CodexPortraitCompletion {
-  if (!record(value) || !exact(value,["lease_token","source_sha256","label","rationale","image_base64","original_sha256","pixels","provider_request_id","image_request_id","image_model",...(Object.hasOwn(value,"image_model_provenance") ? ["image_model_provenance"] : [])]) || !text(value.lease_token,36) || !leasePattern.test(value.lease_token) || !text(value.source_sha256,71) || !hashPattern.test(value.source_sha256) || !text(value.original_sha256,71) || !hashPattern.test(value.original_sha256) || !text(value.label,80) || !text(value.rationale,800) || !text(value.provider_request_id,256) || !text(value.image_request_id,256) || value.image_model !== "gpt-image-2" || !record(value.pixels) || !exact(value.pixels,["width","height","rgba_base64"]) || value.pixels.width !== 128 || value.pixels.height !== 128
+const bindingKeys = ["schema_version", "chapter_count", "chapter_index", "chapter_id", "document_revision"];
+function completion(value: unknown, protocol: PortraitProtocol): CodexPortraitCompletion {
+  if (!record(value)) throw new PortraitError(400,"invalid_request");
+  const adaptive = Object.hasOwn(value, "schema_version");
+  if (adaptive && (protocol !== "v2" || value.schema_version !== "codex-portrait-completion/v2" || !validPortraitBinding(value))) throw new PortraitError(400,"invalid_request");
+  if (!exact(value,["lease_token","source_sha256","label","rationale","image_base64","original_sha256","pixels","provider_request_id","image_request_id","image_model",...(adaptive ? bindingKeys : []),...(Object.hasOwn(value,"image_model_provenance") ? ["image_model_provenance"] : [])]) || !text(value.lease_token,36) || !leasePattern.test(value.lease_token) || !text(value.source_sha256,71) || !hashPattern.test(value.source_sha256) || !text(value.original_sha256,71) || !hashPattern.test(value.original_sha256) || !text(value.label,80) || !text(value.rationale,800) || !text(value.provider_request_id,256) || !text(value.image_request_id,256) || value.image_model !== "gpt-image-2" || !record(value.pixels) || !exact(value.pixels,["width","height","rgba_base64"]) || value.pixels.width !== 128 || value.pixels.height !== 128
     || (Object.hasOwn(value,"image_model_provenance") && !isRecordedPortraitImageModelProvenance(value.image_model_provenance))) throw new PortraitError(400,"invalid_request");
   const pixels = decode64(value.pixels.rgba_base64,128*128*4);
   if (!png(decode64(value.image_base64,2*1024*1024)) || pixels.length !== 128*128*4 || !isUsablePortraitImage({width:128,height:128,data:new Uint8ClampedArray(pixels)})) throw new PortraitError(400,"invalid_image");
@@ -52,15 +57,18 @@ function completion(value: unknown): CodexPortraitCompletion {
 }
 async function respond(c: Ctx, work: () => Promise<Response>) {
   c.header("cache-control","private, no-store"); c.header("x-content-type-options","nosniff");
-  try { return await work(); } catch (error) {
+  c.header("vary", PORTRAIT_PROTOCOL_HEADER, { append: true });
+  try { portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)); return await work(); } catch (error) {
     if (error instanceof PortraitError) return c.json({ error:{ code:error.code,message:"Portrait request could not be completed",request_id:c.get("requestId") } },error.status);
     throw error;
   }
 }
-patternPortraitRoutes.get("/v1/pattern-portrait", (c) => respond(c,async () => c.json(await readPortrait(c.env,c.get("userId")))));
+patternPortraitRoutes.get("/v1/pattern-portrait", (c) => respond(c,async () => c.json(await readPortrait(c.env,c.get("userId"),portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER))))));
 patternPortraitRoutes.post("/v1/pattern-portrait-generations", (c) => respond(c,async () => {
   const value = await boundedJson(c.req.raw,4096);
-  if (!record(value) || !exact(value,["pattern_id","generated_at","chart_id","confirm","consent_policy_version"]) || !text(value.pattern_id,100) || !text(value.chart_id,100) || !text(value.generated_at,32) || value.confirm !== "CREATE MY PORTRAIT" || value.consent_policy_version !== PORTRAIT_CONSENT_POLICY_VERSION || !text(c.req.header("idempotency-key"),128) || c.req.header("idempotency-key")!.length < 8) throw new PortraitError(400,"invalid_request");
+  if (!record(value)) throw new PortraitError(400,"invalid_request");
+  const adaptive = value.consent_policy_version === PORTRAIT_V2_CONSENT_POLICY_VERSION;
+  if (!exact(value,["pattern_id","generated_at","chart_id","confirm","consent_policy_version",...(adaptive ? ["chapter_count"] : [])]) || !text(value.pattern_id,100) || !text(value.chart_id,100) || !text(value.generated_at,32) || value.confirm !== "CREATE MY PORTRAIT" || (adaptive ? portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)) !== "v2" || !isPortraitChapterCount(value.chapter_count) : value.consent_policy_version !== PORTRAIT_CONSENT_POLICY_VERSION) || !text(c.req.header("idempotency-key"),128) || c.req.header("idempotency-key")!.length < 8) throw new PortraitError(400,"invalid_request");
   const identity = await loadUserIdentity(c.env,c.get("userId"));
   if (!identity) throw new PortraitError(409,"portrait_revision_conflict");
   const result = await startPortrait(c.env,identity,value as unknown as PatternPortraitGenerationRequest);
@@ -72,21 +80,25 @@ patternPortraitRoutes.get("/v1/pattern-portrait/images/:referenceId",(c) => resp
   c.header("content-type","image/png"); return c.body(bytes.slice().buffer);
 }));
 patternPortraitRoutes.get("/v1/pattern-portrait/download",(c) => respond(c,async () => {
-  const bundle = await portraitDownload(c.env,c.get("userId"),new URL(c.req.url).searchParams);
+  const bundle = await portraitDownload(c.env,c.get("userId"),new URL(c.req.url).searchParams,portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)));
   c.header("content-disposition",'attachment; filename="pattern-portrait.json"');return c.json(bundle);
 }));
 codexPortraitRoutes.post("/v1/portraits/claim",(c) => respond(c,async () => {
   const body = await boundedJson(c.req.raw,32);if (!record(body) || Object.keys(body).length !== 0) throw new PortraitError(400,"invalid_request");
-  const claim = await claimPortrait(c.env);return claim ? c.json(claim) : c.body(null,204);
+  const claim = await claimPortrait(c.env,new Date(),portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)));return claim ? c.json(claim) : c.body(null,204);
 }));
 codexPortraitRoutes.post("/v1/portraits/:jobId/complete",(c) => respond(c,async () => {
   if (!/^ppjob_[a-f0-9]{32}$/.test(c.req.param("jobId"))) throw new PortraitError(400,"invalid_request");
-  await completePortrait(c.env,c.req.param("jobId"),completion(await boundedJson(c.req.raw,MAX_COMPLETION_BYTES)));
-  return c.json({schema_version:"codex-portrait-terminal/v1",status:"accepted"});
+  const value = completion(await boundedJson(c.req.raw,MAX_COMPLETION_BYTES),portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)));
+  await completePortrait(c.env,c.req.param("jobId"),value);
+  return c.json({schema_version:"schema_version" in value ? "codex-portrait-terminal/v2" : "codex-portrait-terminal/v1",status:"accepted"});
 }));
 codexPortraitRoutes.post("/v1/portraits/:jobId/fail",(c) => respond(c,async () => {
   const value = await boundedJson(c.req.raw,1024);
-  if (!/^ppjob_[a-f0-9]{32}$/.test(c.req.param("jobId")) || !record(value) || !exact(value,["lease_token","code"]) || !text(value.lease_token,36) || !leasePattern.test(value.lease_token) || !["generation_failed","generation_refused","image_invalid","authentication_failed"].includes(String(value.code))) throw new PortraitError(400,"invalid_request");
+  if (!record(value)) throw new PortraitError(400,"invalid_request");
+  const adaptive = Object.hasOwn(value, "schema_version");
+  if (adaptive && (portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)) !== "v2" || value.schema_version !== "codex-portrait-failure/v2" || !validPortraitBinding(value) || !text(value.source_sha256,64) || !hashPattern.test(value.source_sha256))) throw new PortraitError(400,"invalid_request");
+  if (!/^ppjob_[a-f0-9]{32}$/.test(c.req.param("jobId")) || !exact(value,["lease_token","code",...(adaptive ? [...bindingKeys,"source_sha256"] : [])]) || !text(value.lease_token,36) || !leasePattern.test(value.lease_token) || !["generation_failed","generation_refused","image_invalid","authentication_failed"].includes(String(value.code))) throw new PortraitError(400,"invalid_request");
   await failPortrait(c.env,c.req.param("jobId"),value as unknown as CodexPortraitFailure);
-  return c.json({schema_version:"codex-portrait-terminal/v1",status:"accepted"});
+  return c.json({schema_version:adaptive ? "codex-portrait-terminal/v2" : "codex-portrait-terminal/v1",status:"accepted"});
 }));

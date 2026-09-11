@@ -1,0 +1,14 @@
+{
+  "chapter_count": 5,
+  "chapter_index": 5,
+  "chapter_id": "chapter-5",
+  "reference_id": "ppmodel_55555555555555555555555555555555",
+  "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_image_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_text": "{\"title\":\"Chapter 1\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}",
+  "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "compiler_version": "portrait-mesh-compiler/v2",
+  "authoring": "codex-parametric/v2",
+  "document_revision": "revision-fictional"
+}

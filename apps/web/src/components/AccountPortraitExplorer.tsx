@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PatternPortraitExplorerResponse, PatternResponseV7, PatternStatePattern } from "@patternlike/shared";
 import { ApiError, downloadPatternPortraitExplorer, getPatternPortraitExplorer, getPatternPortraitImage, getPatternPortraitModel } from "../lib/api-client.js";
-import { bindingsFor, validateResponse, verifyImage } from "../lib/account-portrait.js";
+import { bindingsFor, validateExplorerResponse, verifyPortraitDownloadBlob, verifyImage } from "../lib/account-portrait.js";
 import { selectReaderReadiness } from "../lib/reader-readiness.js";
 import { ReaderReadiness, useReaderScope } from "./ReaderReadiness.js";
 import { withRequestId } from "../lib/api-status.js";
@@ -21,39 +21,13 @@ interface Props {
   defaultOpen?: boolean;
 }
 interface LoadedPortrait { identity: string; bindings: PortraitObjectBinding[]; bundle: PortraitMeshBundle; }
-const mismatch = "This 3D portrait no longer matches the current Pattern. Refresh its status to continue.";
-const isHash = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-
-function validate(response: PatternPortraitExplorerResponse, chartId: string, document: PatternResponseV7): void {
-  if (response.schema_version !== "pattern-portrait-explorer/v1"
-    || !["unavailable", "not_started", "generating", "failed", "ready"].includes(response.status)
-    || !Number.isInteger(response.completed_models) || response.completed_models < 0 || response.completed_models > 4
-    || typeof response.retryable !== "boolean"
-    || !Array.isArray(response.models)) throw new Error("This 3D portrait format is not supported.");
-  if (response.status === "unavailable") return;
-  validateResponse(response.portrait, chartId, document);
-  if (response.status !== "ready") return;
-  if (response.portrait.status !== "ready" || response.completed_models !== 4 || response.models.length !== 4
-    || new Set(response.models.map((model) => model.chapter_id)).size !== 4
-    || new Set(response.models.map((model) => model.reference_id)).size !== 4) throw new Error(mismatch);
-  for (const model of response.models) {
-    const chapter = response.portrait.chapters.find((chapter) => chapter.chapter_id === model.chapter_id);
-    if (!chapter || model.source_text !== chapter.source_text || model.source_image_sha256 !== chapter.reference_sha256
-      || model.document_revision !== response.portrait.document_revision || model.authoring !== "codex-parametric/v1"
-      || model.compiler_version !== "portrait-mesh-compiler/v1" || typeof model.reference_id !== "string" || !model.reference_id.trim()
-      || ![model.sha256, model.source_image_sha256, model.source_text_sha256, model.program_sha256].every(isHash)) throw new Error(mismatch);
-  }
-}
-
 export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthorized, children, sky, initialChapterIndex, defaultOpen }: Props) {
   const accountScope = useReaderScope();
   const [observedAt, setObservedAt] = useState<number | null>(null);
   const requestGeneration = useRef(0);
   const sourceMatches = patternMatchesDocument(pattern, document);
   const canRender = sourceMatches && document.core_chapters.length >= 3 && document.core_chapters.length <= 6;
-  // The v1 generated-artwork service is optional and supports four chapters.
-  // Its eligibility must never gate the locally rendered observatory.
-  const artworkEligible = sourceMatches && document.core_chapters.length === 4;
+  const artworkEligible = canRender;
   const [response, setResponse] = useState<PatternPortraitExplorerResponse | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +75,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
     const controller = new AbortController(); statusRequest.current = controller;
     void getPatternPortraitExplorer(controller.signal).then((next) => {
       if (controller.signal.aborted || generation !== requestGeneration.current) return;
-      validate(next, chartId, document);
+      validateExplorerResponse(next, chartId, document);
       setObservedAt(Date.now());
       if (session.verified && session.verified.identity !== JSON.stringify(next)) session.verified = null;
       if (next.status !== "ready") discardArtifacts();
@@ -139,8 +113,9 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
         const model = saved.models.find((model) => model.chapter_id === chapter.chapter_id)!;
         const asset: PortraitMeshAsset = { chapterId: model.chapter_id, url: "", sha256: model.sha256,
           sourceImageSha256: model.source_image_sha256, sourceText: model.source_text,
-          provenance: { authoring: "codex-parametric/v1", documentRevision: model.document_revision,
-            sourceTextSha256: model.source_text_sha256, programSha256: model.program_sha256, compilerVersion: "portrait-mesh-compiler/v1" } };
+          provenance: { authoring: model.authoring, documentRevision: model.document_revision,
+            sourceTextSha256: model.source_text_sha256, programSha256: model.program_sha256, compilerVersion: model.compiler_version as "portrait-mesh-compiler/v1" | "portrait-mesh-compiler/v2",
+            ...("chapter_count" in model ? { chapterCount: model.chapter_count } : {}) } };
         const [image, mesh] = await Promise.all([
           getPatternPortraitImage(chapter.reference_id, controller.signal).then((blob) => verifyImage(blob, chapter.reference_sha256, controller.signal)),
           getPatternPortraitModel(model.reference_id, controller.signal),
@@ -161,7 +136,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
         for (const url of artifactUrls.current) { URL.revokeObjectURL(url); ownedUrls.current.delete(url); }
         artifactUrls.current = nextUrls; artifactIdentity.current = identity;
         setLoaded({ identity: identity!, bindings: bindingsFor(saved.portrait, imageUrls), bundle: {
-          version: "portrait-mesh-1", authoring: "codex-parametric/v1", documentRevision: saved.portrait.document_revision!, assets,
+          version: "portrait-mesh-1", authoring: saved.schema_version === "pattern-portrait-explorer/v2" ? "codex-parametric/v2" : "codex-parametric/v1", documentRevision: saved.portrait.document_revision!, assets,
         } });
       } catch (cause) {
         for (const url of nextUrls) { URL.revokeObjectURL(url); ownedUrls.current.delete(url); }
@@ -184,6 +159,8 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
     const controller = new AbortController(); downloadRequest.current = controller; setDownloading(true); setError(null);
     try {
       const blob = await downloadPatternPortraitExplorer({ chart_id: chartId, pattern_id: document.pattern_id, generated_at: document.generated_at }, controller.signal);
+      controller.signal.throwIfAborted();
+      await verifyPortraitDownloadBlob(blob, chartId, document, controller.signal, true);
       controller.signal.throwIfAborted();
       const url = URL.createObjectURL(blob); ownedUrls.current.add(url);
       const anchor = globalThis.document.createElement("a"); anchor.href = url; anchor.download = "pattern-portrait-complete.json"; anchor.click();

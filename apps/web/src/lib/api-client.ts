@@ -1401,22 +1401,28 @@ export function getGeneratedPattern(signal?: AbortSignal): Promise<PatternRespon
   });
 }
 
+function portraitRequestHeaders(options: HeaderOptions = {}): Headers {
+  const headers = requestHeaders(options);
+  headers.set("X-Patternlike-Portrait-Protocol", "v2");
+  return headers;
+}
+
 export function getPatternPortrait(signal?: AbortSignal): Promise<PatternPortraitResponse> {
-  return request<PatternPortraitResponse>("/v1/pattern-portrait", { method: "GET", headers: requestHeaders(), signal });
+  return request<PatternPortraitResponse>("/v1/pattern-portrait", { method: "GET", headers: portraitRequestHeaders(), signal });
 }
 
 export function getPortraitAutomation(signal?: AbortSignal): Promise<PortraitAutomationPreference> {
-  return request<PortraitAutomationPreference>("/v1/pattern-portrait/automation", { method: "GET", headers: requestHeaders(), signal });
+  return request<PortraitAutomationPreference>("/v1/pattern-portrait/automation", { method: "GET", headers: portraitRequestHeaders(), signal });
 }
 
 export function setPortraitAutomation(input: PortraitAutomationRequest, idempotencyKey: string, signal?: AbortSignal): Promise<PortraitAutomationPreference> {
   return request<PortraitAutomationPreference>("/v1/pattern-portrait/automation", {
-    method: "PUT", headers: requestHeaders({ json: true, idempotencyKey }), body: JSON.stringify(input), signal,
+    method: "PUT", headers: portraitRequestHeaders({ json: true, idempotencyKey }), body: JSON.stringify(input), signal,
   });
 }
 
 export function getPatternPortraitExplorer(signal?: AbortSignal): Promise<PatternPortraitExplorerResponse> {
-  return request<PatternPortraitExplorerResponse>("/v1/pattern-portrait/explorer", { method: "GET", headers: requestHeaders(), signal });
+  return request<PatternPortraitExplorerResponse>("/v1/pattern-portrait/explorer", { method: "GET", headers: portraitRequestHeaders(), signal });
 }
 
 export function getPatternPortraitModel(referenceId: string, signal?: AbortSignal): Promise<Blob> {
@@ -1433,13 +1439,13 @@ export function startPatternPortraitGeneration(
   signal?: AbortSignal,
 ): Promise<PatternPortraitResponse> {
   return request<PatternPortraitResponse>("/v1/pattern-portrait-generations", {
-    method: "POST", headers: requestHeaders({ json: true, idempotencyKey }), body: JSON.stringify(expected), signal,
+    method: "POST", headers: portraitRequestHeaders({ json: true, idempotencyKey }), body: JSON.stringify(expected), signal,
   });
 }
 
 async function requestPortraitBlob(path: string, contentType: string, maxBytes: number, signal?: AbortSignal): Promise<Blob> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
-    method: "GET", headers: requestHeaders(), credentials: "include", cache: "no-store", signal,
+    method: "GET", headers: portraitRequestHeaders(), credentials: "include", cache: "no-store", signal,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: { code: "unexpected_response", message: `The API returned HTTP ${response.status}.` } })) as ErrorBody;

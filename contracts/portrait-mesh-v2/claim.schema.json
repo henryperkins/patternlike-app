@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/claim.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job_id",
+    "portrait_id",
+    "chapter_index",
+    "chapter_id",
+    "lease_token",
+    "model",
+    "reasoning_effort",
+    "prompt_version",
+    "timeout_ms",
+    "source_text",
+    "source_text_sha256",
+    "source_image_sha256",
+    "document_revision",
+    "image_base64",
+    "compiler_version",
+    "chapter_count"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "codex-portrait-mesh-claim/v2"
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^ppmesh_[a-f0-9]{32}$"
+    },
+    "portrait_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "chapter_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^chapter-[1-6]$"
+    },
+    "lease_token": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "reasoning_effort": {
+      "const": "xhigh"
+    },
+    "prompt_version": {
+      "const": "portrait-mesh/v2"
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 900000
+    },
+    "source_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
+    },
+    "source_text_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_image_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "document_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "image_base64": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2796204,
+      "contentEncoding": "base64"
+    },
+    "compiler_version": {
+      "const": "portrait-mesh-compiler/v2"
+    },
+    "chapter_count": {
+      "type": "integer",
+      "enum": [
+        3,
+        4,
+        5,
+        6
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 2
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 6
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-1"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-2"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-3"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-4"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-5"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-6"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,479 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/program.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "portrait-mesh-program/v2"
+    },
+    "materials": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "metalness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "roughness": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "id",
+          "color",
+          "metalness",
+          "roughness"
+        ]
+      }
+    },
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "material": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -8,
+              "maximum": 8
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "rotation": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -6.283185307179586,
+              "maximum": 6.283185307179586
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "scale": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 8
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "repeat": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 64
+                  },
+                  "translation": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": -8,
+                      "maximum": 8
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "rotation": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": -6.283185307179586,
+                      "maximum": 6.283185307179586
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                },
+                "required": [
+                  "count",
+                  "translation",
+                  "rotation"
+                ]
+              }
+            ]
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "box"
+                  },
+                  "size": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0.005,
+                      "maximum": 8
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "bevel": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "size",
+                  "bevel"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "ellipsoid"
+                  },
+                  "radii": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0.005,
+                      "maximum": 4
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 32
+                  }
+                },
+                "required": [
+                  "kind",
+                  "radii",
+                  "segments"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "cylinder"
+                  },
+                  "radiusTop": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 4
+                  },
+                  "radiusBottom": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 4
+                  },
+                  "height": {
+                    "type": "number",
+                    "minimum": 0.005,
+                    "maximum": 8
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 64
+                  }
+                },
+                "required": [
+                  "kind",
+                  "radiusTop",
+                  "radiusBottom",
+                  "height",
+                  "segments"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "torus"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "minimum": 0.005,
+                    "maximum": 4
+                  },
+                  "tube": {
+                    "type": "number",
+                    "minimum": 0.005,
+                    "maximum": 2
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 64
+                  }
+                },
+                "required": [
+                  "kind",
+                  "radius",
+                  "tube",
+                  "segments"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "lathe"
+                  },
+                  "profile": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": -8,
+                        "maximum": 8
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minItems": 3,
+                    "maxItems": 64
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 64
+                  }
+                },
+                "required": [
+                  "kind",
+                  "profile",
+                  "segments"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "extrude"
+                  },
+                  "outline": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": -8,
+                        "maximum": 8
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minItems": 3,
+                    "maxItems": 64
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0.005,
+                    "maximum": 8
+                  },
+                  "bevel": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "outline",
+                  "depth",
+                  "bevel"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "path"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": -8,
+                        "maximum": 8
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "minItems": 2,
+                    "maxItems": 64
+                  },
+                  "radius": {
+                    "type": "number",
+                    "minimum": 0.005,
+                    "maximum": 4
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 192
+                  },
+                  "closed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "points",
+                  "radius",
+                  "segments",
+                  "closed"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "braid"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": -8,
+                        "maximum": 8
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "minItems": 2,
+                    "maxItems": 64
+                  },
+                  "radius": {
+                    "type": "number",
+                    "minimum": 0.005,
+                    "maximum": 4
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 192
+                  },
+                  "closed": {
+                    "type": "boolean"
+                  },
+                  "strands": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 3
+                  },
+                  "twists": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32
+                  }
+                },
+                "required": [
+                  "kind",
+                  "points",
+                  "radius",
+                  "segments",
+                  "closed",
+                  "strands",
+                  "twists"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "material",
+          "position",
+          "rotation",
+          "scale",
+          "repeat",
+          "geometry"
+        ]
+      }
+    },
+    "chapter_count": {
+      "type": "integer",
+      "enum": [
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^chapter-[1-6]$"
+    }
+  },
+  "required": [
+    "version",
+    "materials",
+    "parts",
+    "chapter_count",
+    "chapter_id"
+  ]
+}

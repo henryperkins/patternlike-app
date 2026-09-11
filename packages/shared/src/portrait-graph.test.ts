@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPortraitGraph, isPortraitGraph, isUsablePortraitImage } from "./portrait-graph.js";
+import { createPortraitGraph, createAdaptiveImageConstellation, isPortraitGraph, isUsablePortraitImage } from "./portrait-graph.js";
 
 function reference(shape: number) {
   const width = 64; const height = 64;
@@ -68,4 +69,43 @@ test("chapter admission rejects unusable samples before accepting an immutable i
   }
   for (const image of [blank, transparent, faint]) assert.equal(isUsablePortraitImage(image), false);
   for (let shape = 0; shape < 4; shape++) assert.equal(isUsablePortraitImage(reference(shape)), true);
+});
+
+test("adaptive graphs retain every chapter and enforce source/count bounds", () => {
+  for (const chapterCount of [3, 4, 5, 6]) {
+    const images = Array.from({ length: chapterCount }, (_, i) => reference(i % 4));
+    const graph = createAdaptiveImageConstellation(images, "leo");
+    assert.equal(graph.chapter_count, chapterCount);
+    assert.equal(isPortraitGraph(JSON.parse(JSON.stringify(graph))), true);
+    assert.deepEqual(graph.contributions.map(({ index }) => index), Array.from({ length: chapterCount }, (_, i) => i));
+    assert.ok(graph.source_indices.length <= chapterCount * 84);
+    for (const contribution of graph.contributions) {
+      assert.equal(contribution.stars, graph.source_indices.filter(index => index === contribution.index).length);
+    }
+    const corruptions = [
+      { ...graph, chapter_count: 2 }, { ...graph, chapter_count: 7 }, { ...graph, chapter_count: 3.5 },
+      { ...graph, chapter_count: chapterCount === 3 ? 4 : 3 },
+      { ...graph, engine_version: "constellation-v1" }, { ...graph, engine_version: "constellation-v3" },
+      { ...graph, source_indices: [chapterCount, ...graph.source_indices.slice(1)] },
+      { ...graph, source_indices: [1.5, ...graph.source_indices.slice(1)] },
+      { ...graph, positions: [NaN, ...graph.positions.slice(1)] },
+      { ...graph, positions: [Infinity, ...graph.positions.slice(1)] },
+      { ...graph, contributions: [graph.contributions[0], ...graph.contributions.slice(0, -1)] },
+      { ...graph, contributions: graph.contributions.slice(1) },
+      { ...graph, connections: [...graph.connections, graph.connections[0]] },
+      { ...graph, injected: true },
+    ];
+    for (const corrupted of corruptions) assert.equal(isPortraitGraph(corrupted), false);
+    if (chapterCount === 4) {
+      const { chapter_count: _count, ...adaptive } = graph;
+      assert.deepEqual({ ...adaptive, engine_version: "constellation-v1" }, createPortraitGraph(images, "leo"));
+    }
+  }
+  for (const count of [0, 2, 7]) assert.throws(() => createAdaptiveImageConstellation(Array.from({ length: count }, () => reference(0))));
+});
+
+test("frozen v1 graph retains the recorded pre-v2 byte fingerprint", () => {
+  const graph = createPortraitGraph([0, 1, 2, 3].map(reference), "leo");
+  assert.equal(createHash("sha256").update(JSON.stringify(graph)).digest("hex"),
+    "a354ab5e276328147c3cf8af82a0f01fa87301e8c97678b62e9844e0e76c0955");
 });

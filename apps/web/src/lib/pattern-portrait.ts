@@ -1,4 +1,4 @@
-import { ZODIAC_SIGNS, type BirthTimeAccuracy, type PatternResponseV7, type PatternStatePattern, type ZodiacSignName } from "@patternlike/shared";
+import { isPortraitChapterCount, ZODIAC_SIGNS, type BirthTimeAccuracy, type PatternResponseV7, type PatternStatePattern, type ZodiacSignName } from "@patternlike/shared";
 
 export interface PortraitChapter {
   id: string;
@@ -52,9 +52,9 @@ export function patternMatchesDocument(pattern: PatternStatePattern | null, docu
     && pattern.effective_accuracy === document.effective_accuracy;
 }
 
-/** Reader metadata stays upstream: only four asset locations cross into image loading. */
+/** Reader metadata stays upstream: only chapter asset locations cross into image loading. */
 export function portraitImageUrls(manifest: PortraitManifest): readonly string[] | null {
-  if (manifest.chapters.length !== 4) return null;
+  if (!isPortraitChapterCount(manifest.chapters.length) || new Set(manifest.chapters.map(chapter => chapter.id)).size !== manifest.chapters.length) return null;
   const urls: string[] = [];
   for (const chapter of manifest.chapters) {
     const reference = chapter.object;

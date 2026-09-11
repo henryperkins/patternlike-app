@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/completion.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lease_token",
+    "program",
+    "program_sha256",
+    "glb_base64",
+    "glb_sha256",
+    "compiler_version",
+    "audit",
+    "provider_request_id",
+    "audit_request_id",
+    "schema_version",
+    "chapter_count",
+    "chapter_index",
+    "chapter_id",
+    "document_revision"
+  ],
+  "properties": {
+    "lease_token": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "program": {
+      "$ref": "./program.schema.json"
+    },
+    "program_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "glb_base64": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000000,
+      "contentEncoding": "base64"
+    },
+    "glb_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "compiler_version": {
+      "const": "portrait-mesh-compiler/v2"
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "accepted",
+        "recognizable",
+        "substantial",
+        "source_correspondence",
+        "no_severe_intersections",
+        "view_count",
+        "notes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "portrait-mesh-audit/v1"
+        },
+        "accepted": {
+          "const": true
+        },
+        "recognizable": {
+          "const": true
+        },
+        "substantial": {
+          "const": true
+        },
+        "source_correspondence": {
+          "const": true
+        },
+        "no_severe_intersections": {
+          "const": true
+        },
+        "view_count": {
+          "const": 4
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      }
+    },
+    "provider_request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "audit_request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "schema_version": {
+      "const": "codex-portrait-mesh-completion/v2"
+    },
+    "chapter_count": {
+      "type": "integer",
+      "enum": [
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "chapter_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^chapter-[1-6]$"
+    },
+    "document_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 2
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 6
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_index": {
+            "maximum": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-1"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-2"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-3"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-4"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-5"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_index": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapter_id": {
+            "const": "chapter-6"
+          }
+        }
+      }
+    }
+  ]
+}

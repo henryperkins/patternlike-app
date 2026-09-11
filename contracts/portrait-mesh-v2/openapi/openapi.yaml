@@ -1,0 +1,368 @@
+openapi: 3.1.0
+info:
+  title: Adaptive portrait mesh v2
+  version: 2.0.0
+paths:
+  /v1/pattern-portrait/explorer:
+    get:
+      security:
+      - sessionCookie: []
+      parameters:
+      - &id001
+        in: header
+        name: X-Patternlike-Portrait-Protocol
+        required: true
+        schema:
+          type: string
+          const: v2
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: https://patternlike.app/contracts/portrait-mesh-v2/explorer-response.schema.json
+                - $ref: '#/components/schemas/LegacyExplorerResponse'
+      description: Read the negotiated complete artwork. Existing v1 artwork is returned
+        in its original envelope without regeneration.
+  /v1/pattern-portrait/explorer/download:
+    get:
+      security:
+      - sessionCookie: []
+      parameters:
+      - *id001
+      - in: query
+        name: pattern_id
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - in: query
+        name: generated_at
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+          format: date-time
+      - in: query
+        name: chart_id
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: https://patternlike.app/contracts/portrait-mesh-v2/explorer-download.schema.json
+                - $ref: '#/components/schemas/LegacyExplorerDownload'
+      description: Read the negotiated complete artwork. Existing v1 artwork is returned
+        in its original envelope without regeneration.
+  /v1/pattern-portrait/automation:
+    get:
+      security:
+      - sessionCookie: []
+      parameters:
+      - *id001
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-mesh-v2/automation-response.schema.json
+    put:
+      security:
+      - sessionCookie: []
+      parameters:
+      - in: header
+        name: X-Patternlike-Portrait-Protocol
+        required: true
+        schema:
+          type: string
+          const: v2
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-mesh-v2/automation-response.schema.json
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: https://patternlike.app/contracts/portrait-mesh-v2/automation-request.schema.json
+  /codex-provider/v1/portrait-meshes/claim:
+    post:
+      security:
+      - runnerBearer: []
+      parameters:
+      - *id001
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: https://patternlike.app/contracts/portrait-mesh-v2/claim.schema.json
+                - $ref: https://patternlike.dev/contracts/portrait-mesh-v1/claim.schema.json
+        '204':
+          description: No eligible pending job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              maxProperties: 0
+  /codex-provider/v1/portrait-meshes/{jobId}/complete:
+    post:
+      security:
+      - runnerBearer: []
+      parameters:
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          pattern: ^ppmesh_[a-f0-9]{32}$
+      - in: header
+        name: X-Patternlike-Portrait-Protocol
+        required: true
+        schema:
+          type: string
+          const: v2
+      responses:
+        '200':
+          description: Terminal result accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - schema_version
+                - status
+                properties:
+                  schema_version:
+                    enum:
+                    - codex-portrait-mesh-terminal/v2
+                    - codex-portrait-mesh-terminal/v1
+                  status:
+                    const: accepted
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: https://patternlike.app/contracts/portrait-mesh-v2/completion.schema.json
+              - $ref: https://patternlike.dev/contracts/portrait-mesh-v1/completion.schema.json
+      description: Submit the terminal version and chapter identity matching the stored
+        lease.
+  /codex-provider/v1/portrait-meshes/{jobId}/fail:
+    post:
+      security:
+      - runnerBearer: []
+      parameters:
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          pattern: ^ppmesh_[a-f0-9]{32}$
+      - in: header
+        name: X-Patternlike-Portrait-Protocol
+        required: true
+        schema:
+          type: string
+          const: v2
+      responses:
+        '200':
+          description: Terminal result accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - schema_version
+                - status
+                properties:
+                  schema_version:
+                    enum:
+                    - codex-portrait-mesh-terminal/v2
+                    - codex-portrait-mesh-terminal/v1
+                  status:
+                    const: accepted
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: https://patternlike.app/contracts/portrait-mesh-v2/failure.schema.json
+              - $ref: https://patternlike.dev/contracts/portrait-mesh-v1/failure.schema.json
+      description: Submit the terminal version and chapter identity matching the stored
+        lease.
+  /v1/pattern-portrait/models/{referenceId}:
+    get:
+      security:
+      - sessionCookie: []
+      parameters:
+      - in: header
+        name: X-Patternlike-Portrait-Protocol
+        required: true
+        schema:
+          type: string
+          const: v2
+      - in: path
+        name: referenceId
+        required: true
+        schema:
+          type: string
+          pattern: ^ppmodel_[a-f0-9]{32}$
+      responses:
+        '200':
+          description: Private source-bound GLB for the current accepted portrait
+          content:
+            model/gltf-binary:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Model unavailable or not compatible with this account, source
+            or protocol
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    runnerBearer:
+      type: http
+      scheme: bearer
+  schemas:
+    LegacyExplorerResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - schema_version
+      - status
+      - portrait
+      - completed_models
+      - retryable
+      - models
+      properties:
+        schema_version:
+          const: pattern-portrait-explorer/v1
+        status:
+          enum:
+          - unavailable
+          - not_started
+          - generating
+          - failed
+          - ready
+        portrait:
+          $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/response
+        completed_models:
+          type: integer
+          minimum: 0
+          maximum: 4
+        retryable:
+          type: boolean
+        models:
+          type: array
+          maxItems: 4
+          items:
+            $ref: https://patternlike.dev/contracts/portrait-mesh-v1/model.schema.json
+      allOf:
+      - if:
+          properties:
+            status:
+              const: ready
+        then:
+          properties:
+            portrait:
+              properties:
+                status:
+                  const: ready
+            completed_models:
+              const: 4
+            models:
+              minItems: 4
+    LegacyExplorerDownload:
+      type: object
+      additionalProperties: false
+      required:
+      - schema_version
+      - reading
+      - explorer
+      - images
+      - models
+      properties:
+        schema_version:
+          const: pattern-portrait-explorer-download/v1
+        reading:
+          $ref: https://patternlike.app/contracts/m7/pattern-response.schema.json#/$defs/patternResponse
+        explorer:
+          allOf:
+          - $ref: '#/components/schemas/LegacyExplorerResponse'
+          - properties:
+              status:
+                const: ready
+        images:
+          $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/download/properties/images
+        models:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - reference_id
+            - content_type
+            - sha256
+            - data_base64
+            - program
+            - audit
+            - provider_request_id
+            - audit_request_id
+            properties:
+              reference_id:
+                type: string
+                pattern: ^ppmodel_[a-f0-9]{32}$
+              content_type:
+                const: model/gltf-binary
+              sha256:
+                type: string
+                pattern: ^[a-f0-9]{64}$
+              data_base64:
+                type: string
+                minLength: 1
+                maxLength: 1000000
+                contentEncoding: base64
+              program:
+                $ref: https://patternlike.dev/contracts/portrait-mesh-v1/program.schema.json
+              audit:
+                $ref: https://patternlike.dev/contracts/portrait-mesh-v1/audit.schema.json
+              provider_request_id:
+                type: string
+                minLength: 1
+                maxLength: 256
+              audit_request_id:
+                type: string
+                minLength: 1
+                maxLength: 256

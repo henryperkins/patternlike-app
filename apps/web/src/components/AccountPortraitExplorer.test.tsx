@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { webcrypto, createHash } from "node:crypto";
 import { Blob as NodeBlob } from "node:buffer";
-import type { PatternPortraitResponse, PatternPortraitExplorerResponse, PatternResponseV7, PatternStatePattern, PortraitGraph } from "@patternlike/shared";
+import type { PatternPortraitResponseV1 as PatternPortraitResponse, PatternPortraitExplorerResponse, PatternResponseV7, PatternStatePattern, PortraitGraphV1 as PortraitGraph } from "@patternlike/shared";
 import { ApiError, getPatternPortraitExplorer, getPatternPortraitImage, getPatternPortraitModel, downloadPatternPortraitExplorer, getPatternState, getGeneratedPattern, deleteGeneratedPattern } from "../lib/api-client.js";
 import type { PortraitSky } from "../lib/portrait-sky.js";
 import { AccountPortraitExplorer } from "./AccountPortraitExplorer.js";
@@ -290,11 +290,22 @@ describe("automated account portrait delivery", () => {
     expect(getPatternPortraitModel).not.toHaveBeenCalled();
   });
   it("downloads the complete saved portrait with the current source identity", async () => {
-    vi.mocked(downloadPatternPortraitExplorer).mockResolvedValue(new Blob(["{}"], { type: "application/json" }));
+    const explorer = saved();
+    const download = { schema_version: "pattern-portrait-explorer-download/v1", reading: document, explorer,
+      images: explorer.portrait.chapters.map(c => ({ reference_id: c.reference_id, content_type: "image/png", sha256: c.reference_sha256, data_base64: "AQID" })),
+      models: explorer.models.map(m => ({ reference_id: m.reference_id, content_type: "model/gltf-binary", sha256: m.sha256, data_base64: "AAAA",
+        program: { version: "portrait-mesh-program/v1", materials: [{ id: "oak", color: "#ad8151", metalness: 0, roughness: 0.7 }], parts: [{ name: "body", material: "oak", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], repeat: null, geometry: { kind: "box", size: [1, 1, 1], bevel: 0.04 } }] },
+        audit: { schema_version: "portrait-mesh-audit/v1", accepted: true, recognizable: true, substantial: true, source_correspondence: true, no_severe_intersections: true, view_count: 4, notes: "Four views checked." } })) };
+    for (const [index, model] of download.models.entries()) {
+      const bytes = new Uint8Array(await modelBlobs.get(model.reference_id)!.arrayBuffer());
+      model.data_base64 = Buffer.from(bytes).toString("base64");
+      explorer.models[index].program_sha256 = hash(JSON.stringify(model.program));
+    }
+    vi.mocked(downloadPatternPortraitExplorer).mockResolvedValue(new Blob([JSON.stringify(download)], { type: "application/json" }));
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     show(); await userEvent.click(await screen.findByRole("button", { name: "Download complete portrait" }));
     expect(downloadPatternPortraitExplorer).toHaveBeenCalledWith({ chart_id: props.chartId, pattern_id: document.pattern_id, generated_at: document.generated_at }, expect.any(AbortSignal));
-    expect(click).toHaveBeenCalledOnce();
+    await waitFor(() => expect(click).toHaveBeenCalledOnce());
   });
   it("aborts private downloads and ignores late assets after unmount", async () => {
     let release!: (value: Blob) => void;
@@ -376,4 +387,29 @@ describe("automated account portrait delivery", () => {
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(8);
     expect(vi.mocked(PortraitExplorer).mock.lastCall![0].navigation!.state.view).toMatchObject({ kind: "chapter", chapterId: "chapter-2" });
   });
+});
+
+import { adaptiveFixture } from "../test/adaptive-portrait-fixture.js";
+it.each([3, 4, 5, 6] as const)("hydrates every accepted image/model for a %i-chapter adaptive portrait", async count => {
+  const f = adaptiveFixture(count);
+  for (const [index, chapter] of f.portrait.chapters.entries()) {
+    chapter.reference_sha256 = imageHash;
+    const model = f.explorer.models[index];
+    model.source_image_sha256 = imageHash; model.source_text_sha256 = hash(model.source_text);
+    const glb = modelBytes({ chapterId: model.chapter_id, chapterCount: count, documentRevision: model.document_revision,
+      sourceImageSha256: imageHash, sourceTextSha256: model.source_text_sha256, programSha256: model.program_sha256,
+      compilerVersion: model.compiler_version, authoring: model.authoring });
+    const json = new TextDecoder().decode(glb.subarray(20)).trim().replace('"name":"chapter-1"', `"name":"${model.chapter_id}"`);
+    glb.fill(32, 20); glb.set(new TextEncoder().encode(json), 20);
+    model.sha256 = hash(glb); modelBlobs.set(model.reference_id, new Blob([glb], { type: "model/gltf-binary" }));
+  }
+  vi.mocked(getPatternPortraitExplorer).mockResolvedValue(f.explorer);
+  show({ chartId: "chart-fictional", document: f.document, pattern: { ...pattern, pattern_id: f.document.pattern_id, generated_at: f.document.generated_at } });
+  await waitFor(() => expect(vi.mocked(PortraitExplorer).mock.lastCall?.[0].meshBundle?.assets).toHaveLength(count));
+  const delivered = vi.mocked(PortraitExplorer).mock.lastCall![0];
+  expect(delivered.objectBindings).toHaveLength(count);
+  expect(delivered.objectBindings?.at(-1)?.chapterId).toBe(`chapter-${count}`);
+  expect(delivered.meshBundle?.authoring).toBe("codex-parametric/v2");
+  expect(getPatternPortraitImage).toHaveBeenCalledTimes(count);
+  expect(getPatternPortraitModel).toHaveBeenCalledTimes(count);
 });

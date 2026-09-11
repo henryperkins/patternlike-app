@@ -85,3 +85,18 @@ The command captures untouched authored JSON, compiled GLB, four rendered views,
 6. Opt in a dedicated authorized canary account and verify publication → image jobs → mesh jobs → saved account explorer without manually enqueueing jobs.
 
 Keep exact Worker version/traffic, runner revision, migration ledger and canary identities in the release record. Disabling feature flags pauses generation/delivery; it does not erase stored artifacts. Scheduled cleanup must remain running. A pushed commit alone does not prove that the runner, migrations, flags or live generation are active.
+
+### Adaptive artwork v2
+
+This runner advertises `X-Patternlike-Portrait-Protocol: v2` and accepts either
+v1 claims from an older Worker or count-bound v2 claims. V2 covers each chapter
+of a three-to-six-chapter Pattern, with the same per-job limits and four-view
+mesh audit. Completion and failure receipts bind the claim's protocol, chapter,
+count and document revision. Mesh authoring uses the distinct v2 program,
+compiler and artifact identity; saved v1 artifacts retain their original format.
+
+Follow the [adaptive rollout](../../docs/deploy/adaptive-portrait-artwork.md).
+Migration 0033 and compatible Worker/runner/client support must precede adaptive
+producer enablement. `PATTERN_ADAPTIVE_PORTRAITS_ENABLED` remains `0` in the
+committed Worker configuration. Policy 2.0.0 requires an explicit reader action;
+neither installation nor protocol capability grants generation permission.

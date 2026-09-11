@@ -35,6 +35,10 @@
 .observatory-explorer .explorer-introduction { padding:26px 0 0; }
 .observatory-explorer .explorer-introduction [data-reader-heading] { font-size:clamp(2rem, 3.1vw, 3.1rem); line-height:1.08; letter-spacing:-.03em; }
 .observatory-explorer .explorer-intro-note { margin-top:24px; }
+.explorer-artwork { margin-bottom:18px; font-family:var(--sans, system-ui, sans-serif); font-size:.875rem; line-height:1.65; }
+.explorer-artwork summary { min-height:44px; padding:10px 0; cursor:pointer; }
+.explorer-artwork p { color:var(--ink-soft, #4e625b); }
+.explorer-artwork .explorer-text-button { max-width:100%; text-align:left; overflow-wrap:anywhere; }
 .observatory-controls { padding:10px 0 0; }
 .observatory-environment, .observatory-workbench { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
 .observatory-environment { justify-content:space-between; }

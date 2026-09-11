@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { PORTRAIT_CONSENT_POLICY_VERSION, type PatternPortraitResponse, type PatternResponseV7, type PatternStatePattern } from "@patternlike/shared";
+import { PORTRAIT_V2_CONSENT_POLICY_VERSION, isPortraitChapterCount, type PatternPortraitResponse, type PatternResponseV7, type PatternStatePattern } from "@patternlike/shared";
 import { ApiError, downloadPatternPortrait, getPatternPortrait, getPatternPortraitImage, newIdempotencyKey, startPatternPortraitGeneration } from "../lib/api-client.js";
 import { patternMatchesDocument } from "../lib/pattern-portrait.js";
 import type { PortraitSky } from "../lib/portrait-sky.js";
 import { withRequestId } from "../lib/api-status.js";
-import { bindingsFor, validateResponse, verifyImage } from "../lib/account-portrait.js";
+import { bindingsFor, validateResponse, verifyPortraitDownloadBlob, verifyImage } from "../lib/account-portrait.js";
 import { AccountPortraitExplorer } from "./AccountPortraitExplorer.js";
 import { PatternPortrait } from "./PatternPortrait.js";
 import "./account-pattern-portrait.css";
@@ -20,7 +20,8 @@ interface AccountPatternPortraitProps {
 }
 
 function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnauthorized, children }: AccountPatternPortraitProps) {
-  const eligible = patternMatchesDocument(pattern, document) && document.core_chapters.length === 4;
+  const chapterCount = document.core_chapters.length;
+  const eligible = patternMatchesDocument(pattern, document) && isPortraitChapterCount(document.core_chapters.length);
   const [response, setResponse] = useState<PatternPortraitResponse | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -83,11 +84,11 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
   }, [response?.status]);
 
   const saved = response?.status === "ready" ? response : null;
-  // The saved envelope and graph remain stable as the four verified thumbnails arrive.
+  // The saved envelope and graph remain stable as the verified chapter thumbnails arrive.
   const bindings = useMemo(() => saved ? bindingsFor(saved, urls) : [], [saved, urls]);
   const source = useMemo(() => ({ status: "ready" as const, document, sunSign: saved?.sun_sign ?? null }), [document, saved?.sun_sign]);
   useEffect(() => {
-    if (!open || !saved || urls.length === 4) return;
+    if (!open || !saved || urls.length === chapterCount) return;
     const controller = new AbortController();
     setImageError(false);
     void Promise.all(saved.chapters.map(async (chapter) => verifyImage(await getPatternPortraitImage(chapter.reference_id, controller.signal), chapter.reference_sha256, controller.signal)))
@@ -127,14 +128,14 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
   }, [open]);
 
   const create = async () => {
-    if (busy || actionRequest.current || !eligible || !canCreate) return;
+    if (busy || actionRequest.current || !eligible || !canCreate || !isPortraitChapterCount(chapterCount)) return;
     const controller = new AbortController();
     actionRequest.current = controller;
     createKey.current ??= newIdempotencyKey("web-pattern-portrait");
     setBusy(true);
     setError(null);
     try {
-      const next = await startPatternPortraitGeneration({ chart_id: chartId, pattern_id: document.pattern_id, generated_at: document.generated_at, confirm: "CREATE MY PORTRAIT", consent_policy_version: PORTRAIT_CONSENT_POLICY_VERSION }, createKey.current, controller.signal);
+      const next = await startPatternPortraitGeneration({ chart_id: chartId, pattern_id: document.pattern_id, generated_at: document.generated_at, confirm: "CREATE MY PORTRAIT", ...(response?.schema_version === "pattern-portrait/v2" ? { chapter_count: chapterCount, consent_policy_version: PORTRAIT_V2_CONSENT_POLICY_VERSION } : { consent_policy_version: "1.0.0" as const }) }, createKey.current, controller.signal);
       if (controller.signal.aborted) return;
       acceptResponse(next);
       createKey.current = null;
@@ -151,6 +152,8 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
     try {
       const blob = await downloadPatternPortrait({ chart_id: chartId, pattern_id: document.pattern_id, generated_at: document.generated_at }, controller.signal);
       if (controller.signal.aborted) return;
+      await verifyPortraitDownloadBlob(blob, chartId, document, controller.signal);
+      controller.signal.throwIfAborted();
       const url = URL.createObjectURL(blob);
       ownedUrls.current.add(url);
       const anchor = globalThis.document.createElement("a");
@@ -164,28 +167,28 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
 
   return <>
     {eligible ? <section className="account-portrait" aria-label="Your constellation">
-      <div className="account-portrait__heading"><p className="kicker">Your constellation</p><h3>Four chapters, a shape of your own</h3></div>
+      <div className="account-portrait__heading"><p className="kicker">Your constellation</p><h3>Your complete reading, a shape of your own</h3></div>
       {!response && !error ? <p role="status">Checking your saved constellation.</p> : null}
       {response?.status === "unavailable" ? <p>Constellation creation is not available right now. Your reading is ready below.</p> : null}
       {response?.status === "not_started" || response?.status === "failed" ? <>
-        <p>Creating a constellation sends each chapter’s text to Codex to generate one object image. The four saved images shape your constellation, arranged with your calculated Sun sign when available.</p>
+        <p>Creating a constellation sends each chapter’s text to Codex to generate one object image. The {chapterCount} saved images shape your constellation, arranged with your calculated Sun sign when available.</p>
         <p>Your images are saved privately with this Pattern. Opening it again reuses them.</p>
-        {response.status === "failed" ? <p role="status">The constellation could not be completed. {response.completed_chapters} of 4 chapter images are saved.</p> : null}
+        {response.status === "failed" ? <p role="status">The constellation could not be completed. {response.completed_chapters} of {chapterCount} chapter images are saved.</p> : null}
         {canCreate && (response.status === "not_started" || response.retryable) ? <button className="button" type="button" disabled={busy} onClick={() => void create()}>{response.status === "failed" ? "Retry constellation creation" : "Create my constellation"}</button> : <p>New image creation is unavailable. Your published reading remains available.</p>}
       </> : null}
-      {response?.status === "generating" ? <><p role="status">Creating your constellation · {response.completed_chapters} of 4 chapter images saved.</p><p>You can keep reading or return later.</p></> : null}
+      {response?.status === "generating" ? <><p role="status">Creating your constellation · {response.completed_chapters} of {chapterCount} chapter images saved.</p><p>You can keep reading or return later.</p></> : null}
       {saved ? <>
-        <p>Your constellation is saved. Its four images and shape will be reused whenever you open it.</p>
+        <p>Your constellation is saved. Its {chapterCount} images and shape will be reused whenever you open it.</p>
         <div className="account-portrait__actions">
           <button className="button" type="button" aria-expanded={open} onClick={() => { moved.current = true; setOpen((value) => !value); }}>{open ? "Back to reading" : "View constellation"}</button>
           <button className="button button--secondary" type="button" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download constellation"}</button>
         </div>
-        <p className="account-portrait__detail">The private download contains these four images and the saved shape. It is separate from your account data export.</p>
+        <p className="account-portrait__detail">The private download contains these {chapterCount} images and the saved shape. It is separate from your account data export.</p>
       </> : null}
       {error ? <div className="account-portrait__error" role="alert"><p>{error}</p>{!response ? <button className="button button--secondary" type="button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Refresh constellation status</button> : null}</div> : null}
     </section> : null}
     {open && saved ? <div className="account-portrait__view" ref={viewRef} tabIndex={-1}>
-      {imageError ? <p role="status">Chapter images could not be loaded. Your saved constellation and reading are still available. <button type="button" onClick={() => setImageAttempt((value) => value + 1)}>Retry chapter images</button></p> : urls.length !== 4 ? <p role="status">Loading the four chapter images. The saved constellation is ready to explore.</p> : null}
+      {imageError ? <p role="status">Chapter images could not be loaded. Your saved constellation and reading are still available. <button type="button" onClick={() => setImageAttempt((value) => value + 1)}>Retry chapter images</button></p> : urls.length !== chapterCount ? <p role="status">Loading all {chapterCount} chapter images. The saved constellation is ready to explore.</p> : null}
       <PatternPortrait source={source} objectBindings={bindings} graph={saved.graph!} />
     </div> : <div ref={readingRef} tabIndex={-1}>{children}</div>}
   </>;

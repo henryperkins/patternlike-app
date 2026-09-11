@@ -1,0 +1,44 @@
+{
+  "version": "portrait-mesh-program/v2",
+  "chapter_count": 5,
+  "chapter_id": "chapter-7",
+  "materials": [
+    {
+      "id": "oak",
+      "color": "#ad8151",
+      "metalness": 0,
+      "roughness": 0.7
+    }
+  ],
+  "parts": [
+    {
+      "name": "body",
+      "material": "oak",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "box",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "bevel": 0.04
+      }
+    }
+  ]
+}

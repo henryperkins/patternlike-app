@@ -104,3 +104,39 @@ test("the versioned program contract matches the trusted parser schema", () => {
   delete contract.$schema;
   assert.deepEqual(contract, PORTRAIT_MESH_PROGRAM_SCHEMA);
 });
+
+import { isCodexPortraitMeshCompletion, PORTRAIT_MESH_V2_PROMPT_VERSION } from "./portrait-mesh-protocol.js";
+import { PORTRAIT_MESH_V2_PROGRAM_SCHEMA, PORTRAIT_MESH_V2_COMPILER_VERSION } from "./portrait-mesh-program.js";
+test("adaptive claims and terminal receipts bind count, index, revision and version", () => {
+  for (const chapterCount of [3, 4, 5, 6]) {
+    const binding = { chapter_count: chapterCount, chapter_index: chapterCount - 1, chapter_id: `chapter-${chapterCount}`, document_revision: "revision-fictional" };
+    const claim = { ...fixture("valid/claim.json"), ...binding, schema_version: "codex-portrait-mesh-claim/v2",
+      prompt_version: PORTRAIT_MESH_V2_PROMPT_VERSION, compiler_version: PORTRAIT_MESH_V2_COMPILER_VERSION };
+    const failure = { ...fixture("valid/failure.json"), ...binding, schema_version: "codex-portrait-mesh-failure/v2" };
+    assert.equal(isCodexPortraitMeshClaim(claim), true);
+    assert.equal(isCodexPortraitMeshFailure(failure), true);
+    for (const patch of [{ chapter_count: 2 }, { chapter_count: 7 }, { chapter_index: chapterCount },
+      { chapter_index: 1.5 }, { chapter_id: "chapter-0" }, { document_revision: "" }, { private: true }]) {
+      assert.equal(isCodexPortraitMeshClaim({ ...claim, ...patch }), false);
+      assert.equal(isCodexPortraitMeshFailure({ ...failure, ...patch }), false);
+    }
+    assert.equal(isCodexPortraitMeshClaim({ ...claim, prompt_version: "portrait-mesh/v1" }), false);
+    assert.equal(isCodexPortraitMeshClaim({ ...claim, compiler_version: "portrait-mesh-compiler/v1" }), false);
+    const program = { version: "portrait-mesh-program/v2", chapter_count: chapterCount, chapter_id: binding.chapter_id,
+      materials: [{ id: "oak", color: "#ad8151", metalness: 0, roughness: 0.7 }],
+      parts: [{ name: "body", material: "oak", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], repeat: null,
+        geometry: { kind: "box", size: [1, 1, 1], bevel: 0.04 } }] };
+    const completion = { ...binding, schema_version: "codex-portrait-mesh-completion/v2", lease_token: claim.lease_token,
+      program, program_sha256: "a".repeat(64), glb_base64: "AAAA", glb_sha256: "b".repeat(64),
+      compiler_version: PORTRAIT_MESH_V2_COMPILER_VERSION, audit, provider_request_id: "request", audit_request_id: "audit" };
+    assert.equal(isCodexPortraitMeshCompletion(completion), true);
+    assert.equal(isCodexPortraitMeshCompletion({ ...completion, program: { ...program, chapter_id: "chapter-1" } }), false);
+    assert.equal(isCodexPortraitMeshCompletion({ ...completion, audit: { ...audit, view_count: chapterCount === 4 ? 6 : chapterCount } }), false);
+    assert.equal(isCodexPortraitMeshCompletion({ ...completion, schema_version: "codex-portrait-mesh-completion/v1" }), false);
+  }
+});
+test("adaptive program structured-output schema matches the published contract", () => {
+  const contract = JSON.parse(readFileSync(new URL("../../../contracts/portrait-mesh-v2/program.schema.json", import.meta.url), "utf8"));
+  delete contract.$id; delete contract.$schema;
+  assert.deepEqual(contract, PORTRAIT_MESH_V2_PROGRAM_SCHEMA);
+});

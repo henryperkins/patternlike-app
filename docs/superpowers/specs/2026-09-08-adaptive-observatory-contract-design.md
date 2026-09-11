@@ -4,7 +4,7 @@ Date: 2026-09-08
 
 Reconciled: 2026-09-09 against the [updated alignment roadmap](../../reviews/2026-09-07-mind-map-alignment-roadmap.md), especially section 6.5.
 
-Status: immediate reader continuity is substantially implemented through [Slice 4, now separately deployed](../plans/2026-09-09-reader-journey-production-implementation.md). Exact chapter entry, source-bound return, full text, and artwork-independent access have application, component and a rendered journey’s evidence. The broader rendered count/recovery matrix, signed-in production journey observation and human comprehension review remain open. Generated-artwork expansion remains unselected; its contracts and producer are not implemented.
+Status: immediate reader continuity is substantially implemented through [Slice 4, now separately deployed](../plans/2026-09-09-reader-journey-production-implementation.md). On September 11, 2026 the owner selected the generated-artwork v2 expansion: images must cover every chapter, including Patterns longer than four chapters. Implementation and verification are tracked in the [all-chapter artwork plan](../plans/2026-09-11-all-chapter-artwork.md). Deployment, runner installation, production migration and producer enablement remain separate operations. Signed-in production journey observation and human comprehension review remain open.
 
 Parent: [12+1 delivery ledger](../plans/2026-09-07-mind-map-alignment-slices.md). Related state/queue interface: [Slices 7–8](2026-09-08-readiness-runner-fairness-design.md).
 
@@ -14,13 +14,13 @@ Original source review: commit `6e706741f03253f2807d33380afb529161f3481f` plus t
 
 The integration exercised the real `ConnectedPatternReading` and observatory components with fictional exact-edition documents containing 3, 4, 5 and 6 chapters and repeated long paragraphs. All sixteen combinations of desktop/mobile (1440×1000 and 390×844), chapter count and reduced/default motion completed exact last-chapter entry, focused heading, complete-text checks, injected WebGL context loss, retry/recovery, preserved source history, return focus, complete-reading access and no horizontal overflow. Requests remained GET-only; the optional artwork endpoint was requested only for four-chapter documents. No generated artwork, provider or real account was involved.
 
-The temporary harness and screenshots are in `/tmp/patternlike-roadmap-browser/`; the integration report records their evidence boundary. This closes the specified local rendered chapter-count/recovery matrix. Physical-device coverage, authenticated production navigation and measured human comprehension remain unobserved. Conditional wider generated artwork remains unselected.
+The temporary harness and screenshots are in `/tmp/patternlike-roadmap-browser/`; the integration report records their evidence boundary. This closes the specified local rendered chapter-count/recovery matrix. Physical-device coverage, authenticated production navigation and measured human comprehension remain unobserved. Wider generated artwork was subsequently selected as recorded above.
 
 ## Decision and source boundary
 
 [AccountPortraitExplorer](../../../apps/web/src/components/AccountPortraitExplorer.tsx) already defaults to local stations for a matching three-, four-, five-, or six-chapter Pattern. The [manifest builder](../../../apps/web/src/lib/pattern-portrait.ts) retains every published chapter in order, including its sections, tensions, resources, and counter-expression, as well as additional signatures and uncertainty. The [scene](../../../apps/web/src/components/portrait-explorer/PortraitScene.tsx) uses authored reading folios when verified artwork is absent or cannot be loaded. The [reader](../../../apps/web/src/components/portrait-explorer/PortraitExplorer.tsx) already supplies comparison, guided exploration, source-passage navigation, and a complete reading with retained navigation state.
 
-The optional [portrait-generation service](../../../apps/api/src/services/pattern-portrait.ts) still admits exactly four chapters. That artwork limitation spans its admission/jobs, [generated-asset client validation](../../../apps/web/src/lib/account-portrait.ts), [shared types](../../../packages/shared/src/portrait-types.ts), graph generation, image/mesh claim schemas, and D1. Both [portrait image jobs](../../../db/d1/0026_pattern_portraits.sql) and [mesh jobs](../../../db/d1/0027_portrait_mesh_automation.sql) restrict `chapter_index` to 0–3; artwork completion/readiness checks also compare against four. These constraints do not prevent local three-to-six-chapter reading stations from opening.
+At the original review baseline, the optional [portrait-generation service](../../../apps/api/src/services/pattern-portrait.ts) admitted exactly four chapters. That limitation spanned admission/jobs, client validation, shared types, graph generation, image/mesh claim schemas, and D1. The frozen [image](../../../db/d1/0026_pattern_portraits.sql) and [mesh](../../../db/d1/0027_portrait_mesh_automation.sql) migrations restrict `chapter_index` to 0–3. V2 adds migration 0033 and separate contracts; it does not rewrite these historical migrations or v1 artifacts.
 
 Preserve every chapter field and the complete reading. Do not force four chapters, invent missing chapters, concatenate chapters, or choose an undisclosed subset to satisfy artwork eligibility. Generated images and meshes are optional derivatives; authored folios are part of the room, not additional interpretations or evidence.
 
@@ -34,13 +34,13 @@ Extend the current chapter/source navigation and retained session behavior where
 
 Immediate acceptance is a supported entry into the intended chapter, an understandable explanation of the connection, and return to the exact accessible origin without losing reading context. Slice 4 implements and tests exact entry/return across 3/4/5/6 chapters, preserves complete text without artwork, and revalidates source identity and access. Its [rendered evidence](../../reviews/artifacts/reader-journey/2026-09-09-authorized-implementation/README.md) covers one actual application journey at desktop/mobile sizes, including observatory chapter 3 and return. This does not establish the full rendered 3/4/5/6 long-text, reduced-motion, graphics-loss/recovery matrix or human comprehension. Complete those remaining checks before recording immediate acceptance as fully evaluated. Broader artwork generation is independent of this work.
 
-## Conditional scope: generated-artwork expansion
+## Selected scope: generated-artwork expansion
 
-The remaining design preserves the detailed v2 artwork proposal for review **only if** broader image/mesh eligibility is judged to add enough reader value to justify its contract, consent, capacity, and operational cost. Record that product decision before scheduling this expansion. Its schemas, migrations, protocol header, consent versions, and switch are planned contracts, not current implementation.
+The September 11 owner request selects the following v2 artwork design. Implement separate schemas, migration, protocol negotiation and explicit consent for complete readings of three to six chapters. Keep the producer switch off until the operational rollout is authorized.
 
-This expansion does not gate the immediate navigation work, the connected reader journey, or the existing three-to-six-chapter observatory experience. If it is not selected, existing four-chapter artwork and local reading folios remain the supported paths.
+This expansion does not gate the immediate navigation work, the connected reader journey, or the existing three-to-six-chapter observatory experience. Local reading folios remain available throughout generation and recovery.
 
-If selected, keep existing v1 responses, accepted image/model/graph bytes, per-chapter source serialization, and historical provenance readable. Expanded artwork support uses versioned contracts and explicit compatibility dispatch; do not widen a frozen v1 schema or retag accepted v1 bytes as newly generated v2 material.
+Keep existing v1 responses, accepted image/model/graph bytes, per-chapter source serialization, and historical provenance readable. Expanded artwork support uses versioned contracts and explicit compatibility dispatch; do not widen a frozen v1 schema or retag accepted v1 bytes as newly generated v2 material.
 
 ### Source identity and count invariants
 

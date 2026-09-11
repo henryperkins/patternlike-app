@@ -6,7 +6,8 @@ import {
 } from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
-import { canonicalJson, parsePortraitMeshProgram, PORTRAIT_MESH_COMPILER_VERSION,
+import { canonicalJson, isPortraitChapterCount, parsePortraitMeshProgram, PORTRAIT_MESH_AUTHORING, PORTRAIT_MESH_COMPILER_VERSION,
+  PORTRAIT_MESH_V2_AUTHORING, PORTRAIT_MESH_V2_COMPILER_VERSION,
   type MeshIdentity, type MeshPoint3, type PortraitMeshGeometry, type PortraitMeshMaterial, type PortraitMeshProgram } from "@patternlike/shared";
 
 const MAX_TRIANGLES = 20_000;
@@ -14,7 +15,7 @@ const MAX_BYTES = 750_000;
 const hash = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 export interface CompiledPortraitMesh {
   glb: Uint8Array; sha256: string; programSha256: string; triangles: number;
-  bounds: { min: MeshPoint3; max: MeshPoint3 }; compilerVersion: typeof PORTRAIT_MESH_COMPILER_VERSION;
+  bounds: { min: MeshPoint3; max: MeshPoint3 }; compilerVersion: typeof PORTRAIT_MESH_COMPILER_VERSION | typeof PORTRAIT_MESH_V2_COMPILER_VERSION;
 }
 export interface CompiledMeshModel {
   groups: Array<{ geometry: BufferGeometry; material: PortraitMeshMaterial }>;
@@ -25,7 +26,10 @@ function validateIdentity(identity: MeshIdentity) {
   if (!identity || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(identity.chapterId)
     || typeof identity.documentRevision !== "string" || !identity.documentRevision.trim() || identity.documentRevision.length > 512
     || /[\u0000-\u001f]/.test(identity.documentRevision) || !/^[a-f0-9]{64}$/.test(identity.sourceImageSha256)
-    || !/^[a-f0-9]{64}$/.test(identity.sourceTextSha256)) throw new Error("Invalid mesh identity");
+    || !/^[a-f0-9]{64}$/.test(identity.sourceTextSha256)
+    || (identity.chapterCount !== undefined && (!isPortraitChapterCount(identity.chapterCount)
+      || !/^chapter-[1-6]$/.test(identity.chapterId)
+      || Number(identity.chapterId.slice(8)) > identity.chapterCount))) throw new Error("Invalid mesh identity");
 }
 
 function compact(source: BufferGeometry): BufferGeometry {
@@ -126,6 +130,8 @@ export function createPortraitMeshModel(input: PortraitMeshProgram, identity: Me
   validateIdentity(identity);
   const program = parsePortraitMeshProgram(input);
   if (!program) throw new Error("Invalid mesh program");
+  if (program.version === "portrait-mesh-program/v2"
+    && (identity.chapterCount !== program.chapter_count || identity.chapterId !== program.chapter_id)) throw new Error("Mesh program identity mismatch");
   const parts: Array<{ geometry: BufferGeometry; material: string }> = [];
   const groups: CompiledMeshModel["groups"] = [];
   let triangles = 0;
@@ -195,15 +201,21 @@ export function createPortraitMeshModel(input: PortraitMeshProgram, identity: Me
 
 /** Indexed opaque self-contained glTF. No loader plugins, images, animations, or executable metadata. */
 export function compilePortraitMesh(program: PortraitMeshProgram, identity: MeshIdentity): CompiledPortraitMesh {
-  const model = createPortraitMeshModel(program, identity);
+  const parsed = parsePortraitMeshProgram(program);
+  if (!parsed) throw new Error("Invalid mesh program");
+  const v2 = parsed.version === "portrait-mesh-program/v2";
+  const compilerVersion = v2 ? PORTRAIT_MESH_V2_COMPILER_VERSION : PORTRAIT_MESH_COMPILER_VERSION;
+  const authoring = v2 ? PORTRAIT_MESH_V2_AUTHORING : PORTRAIT_MESH_AUTHORING;
+  const model = createPortraitMeshModel(parsed, identity);
   try {
     const json = {
-      asset: { version: "2.0", generator: PORTRAIT_MESH_COMPILER_VERSION }, scene: 0,
+      asset: { version: "2.0", generator: compilerVersion }, scene: 0,
       scenes: [{ nodes: [0] }],
       nodes: [{ name: identity.chapterId, mesh: 0, extras: {
         chapterId: identity.chapterId, documentRevision: identity.documentRevision, sourceImageSha256: identity.sourceImageSha256,
         sourceTextSha256: identity.sourceTextSha256, programSha256: model.programSha256,
-        compilerVersion: PORTRAIT_MESH_COMPILER_VERSION, authoring: "codex-parametric/v1",
+        compilerVersion, authoring,
+        ...(v2 ? { chapterCount: parsed.chapter_count } : {}),
       } }],
       meshes: [{ name: `${identity.chapterId}-object`, primitives: [] as Array<{ attributes: { POSITION: number; NORMAL: number }; indices: number; material: number; mode: number }> }],
       materials: model.groups.map(({ material }) => ({ name: material.id, pbrMetallicRoughness: {
@@ -244,6 +256,6 @@ export function compilePortraitMesh(program: PortraitMeshProgram, identity: Mesh
     const binaryOffset = 20 + jsonChunk.length;
     glb.writeUInt32LE(offset, binaryOffset); glb.writeUInt32LE(0x004e4942, binaryOffset + 4);
     Buffer.concat(chunks).copy(glb, binaryOffset + 8);
-    return { glb, sha256: hash(glb), programSha256: model.programSha256, triangles: model.triangles, bounds: model.bounds, compilerVersion: PORTRAIT_MESH_COMPILER_VERSION };
+    return { glb, sha256: hash(glb), programSha256: model.programSha256, triangles: model.triangles, bounds: model.bounds, compilerVersion };
   } finally { for (const group of model.groups) group.geometry.dispose(); }
 }

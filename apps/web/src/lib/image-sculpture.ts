@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createPortraitGraph, isPortraitGraph, type PortraitGraph, type PortraitImagePixels, type ZodiacSignName } from "@patternlike/shared";
+import { createAdaptiveImageConstellation, createPortraitGraph, isPortraitGraph, type PortraitGraph, type PortraitImagePixels, type ZodiacSignName } from "@patternlike/shared";
 
 export type ImagePixels = PortraitImagePixels;
 
@@ -28,5 +28,5 @@ export function sculptureFromGraph(graph: PortraitGraph) {
 
 /** Both geometry buffers belong to the caller and must be disposed. */
 export function createImageSculpture(images: readonly ImagePixels[], sunSign: ZodiacSignName | null = null) {
-  return sculptureFromGraph(createPortraitGraph(images, sunSign));
+  return sculptureFromGraph(images.length === 4 ? createPortraitGraph(images, sunSign) : createAdaptiveImageConstellation(images, sunSign));
 }
