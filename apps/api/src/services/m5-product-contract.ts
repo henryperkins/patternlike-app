@@ -1,40 +1,5 @@
-import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
-import { lazy } from "./lazy-validator.js";
-import m0Common from "../../../../contracts/m0/common.schema.json";
-import m3Common from "../../../../contracts/m3/common.schema.json";
-import m5Common from "../../../../contracts/m5/common.schema.json";
-import m5DailyReading from "../../../../contracts/m5/daily-reading.schema.json";
-import m5ReadingEvidence from "../../../../contracts/m5/reading-evidence.schema.json";
-
-const validators = lazy(() => {
-  const ajv = new Ajv2020({ strict: false });
-  addFormats(ajv);
-  for (const schema of [
-    m0Common,
-    m3Common,
-    m5Common,
-    m5DailyReading,
-    m5ReadingEvidence,
-  ]) {
-    ajv.addSchema(schema);
-  }
-
-  function requiredValidator(schemaId: string): ValidateFunction {
-    const validator = ajv.getSchema(schemaId);
-    if (!validator) throw new Error("Frozen M5 product response schema is unavailable");
-    return validator;
-  }
-
-  return {
-    todayResponseV5: requiredValidator(
-      `${m5DailyReading.$id}#/$defs/dailyReadingResponseV5`,
-    ),
-    evidenceGraphV5: requiredValidator(
-      `${m5ReadingEvidence.$id}#/$defs/readingEvidenceGraphV5`,
-    ),
-  };
-});
+import type { ValidateFunction } from "ajv";
+import { validateTodayResponseV5, validateEvidenceGraphV5 } from "../generated/reading-validators.js";
 
 function assertProjection(validator: ValidateFunction, value: unknown): void {
   if (!validator(value)) {
@@ -90,14 +55,14 @@ function hasValidEvidencePolicy(value: unknown): boolean {
 }
 
 export function assertM5TodayResponse(value: unknown): void {
-  assertProjection(validators().todayResponseV5, value);
+  assertProjection(validateTodayResponseV5, value);
   if (!hasValidTodayPolicy(value)) {
     throw new Error("Stored V5 product projection is invalid");
   }
 }
 
 export function assertM5EvidenceResponse(value: unknown): void {
-  assertProjection(validators().evidenceGraphV5, value);
+  assertProjection(validateEvidenceGraphV5, value);
   if (!hasValidEvidencePolicy(value)) {
     throw new Error("Stored V5 product projection is invalid");
   }
