@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { serializeRunnerLogEvent } from "./safe-log.js";
 
 import { CodexProviderClient } from "./client.js";
 import {
@@ -12,10 +13,7 @@ import {
 } from "./runner.js";
 
 function log(event: RunnerLogEvent | { event: "codex_runner_started" | "codex_runner_stopped" | "codex_runner_fatal" }) {
-  process.stdout.write(`${JSON.stringify({
-    timestamp: new Date().toISOString(),
-    ...event,
-  })}\n`);
+  process.stdout.write(`${serializeRunnerLogEvent(event)}\n`);
 }
 
 export async function main(): Promise<void> {

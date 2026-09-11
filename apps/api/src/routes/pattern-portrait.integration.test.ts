@@ -1,3 +1,4 @@
+import { sampleRuntimeHealth } from "../services/runtime-health.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
 import type { CodexPortraitCompletion, CodexPortraitClaim, PatternPortraitResponse, PatternResponseV7 } from "@patternlike/shared";
@@ -176,9 +177,40 @@ describe("portrait durable completion and privacy",() => {
     await seedUser(IDENTITY_B);expect((await user(`/v1/pattern-portrait/images/${result.chapters[0]!.reference_id}`,undefined,USER_B)).status).toBe(404);
   });
   it("replays the same completion, rejects changed content, and resumes only missing chapters",async () => {
-    await start();const claim=await take();await finish(claim);await finish(claim);
+    await start();const claim=await take();const before = Date.now();await finish(claim);
+    const first = await env.DB.prepare("SELECT completed_at FROM pattern_portrait_jobs WHERE id = ?").bind(claim.job_id).first<{completed_at: string}>();
+    expect(Date.parse(first!.completed_at)).toBeGreaterThanOrEqual(before);
+    await finish(claim);
+    expect(await env.DB.prepare("SELECT completed_at FROM pattern_portrait_jobs WHERE id = ?").bind(claim.job_id).first()).toEqual(first);
     expect((await machine(`/${claim.job_id}/complete`,{...completed(claim),label:"Different object"})).status).toBe(409);
     const partial=await (await user("/v1/pattern-portrait")).json() as PatternPortraitResponse;expect(partial.status).toBe("generating");expect(partial.completed_chapters).toBe(1);expect(partial.graph).toBeNull();expect((await take()).chapter_index).toBe(1);
+  });
+  it("samples immutable pending ages, retries, active/expired leases, successful quantiles and missing history",async () => {
+    await start();
+    const claim = await take();
+    await finish(claim);
+    const now = new Date();
+    const created = new Date(now.getTime()-10000).toISOString();
+    await env.DB.prepare("UPDATE runtime_health_capture SET started_at=? WHERE work_class='portrait'").bind(new Date(now.getTime()-86400001).toISOString()).run();
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET created_at=?,completed_at=? WHERE id=?").bind(created,new Date(now.getTime()-8000).toISOString(),claim.job_id).run();
+    const pending = (await env.DB.prepare("SELECT id FROM pattern_portrait_jobs WHERE status='pending' ORDER BY chapter_index").all<{id:string}>()).results;
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET created_at=?,retry_at=?,updated_at=? WHERE status='pending'").bind(created,now.toISOString(),now.toISOString()).run();
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET retry_at=? WHERE id=?").bind(new Date(now.getTime()+1000).toISOString(),pending[0]!.id).run();
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET attempts=3 WHERE id=?").bind(pending[1]!.id).run();
+    let portrait = (await sampleRuntimeHealth(env,now)).work_classes[1];
+    expect(portrait).toMatchObject({observation:"known",pending_count:3,scheduled_pending_count:1,dispatchable_pending_count:1,oldest_pending_age_ms:10000,oldest_dispatchable_pending_age_ms:10000,completion_latency:{successful_count:1,p50_ms:2000,p95_ms:2000,coverage:"complete"}});
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET status='running',lease_hash='synthetic',lease_expires_at=? WHERE id=?").bind(now.toISOString(),pending[0]!.id).run();
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET status='running',lease_hash='synthetic',lease_expires_at=? WHERE id=?").bind(new Date(now.getTime()+1).toISOString(),pending[2]!.id).run();
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET status='failed' WHERE id=?").bind(pending[1]!.id).run();
+    portrait = (await sampleRuntimeHealth(env,now)).work_classes[1];
+    expect(portrait).toMatchObject({pending_count:0,oldest_pending_age_ms:null,active_lease_count:1,expired_lease_count:1,failed_count:1,retry_exhausted_count:1});
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET completed_at=NULL WHERE id=?").bind(claim.job_id).run();
+    portrait = (await sampleRuntimeHealth(env,now)).work_classes[1];
+    expect(portrait.completion_latency).toMatchObject({successful_count:0,p50_ms:null,missing_timestamp_count:1,coverage:"partial"});
+    for (const invalid of [new Date(now.getTime()+1).toISOString(), "not-a-timestamp", "2026-02-30T12:00:00.000Z"]) {
+      await env.DB.prepare("UPDATE pattern_portrait_jobs SET created_at=? WHERE id=?").bind(invalid,pending[1]!.id).run();
+      expect((await sampleRuntimeHealth(env,now)).work_classes[1]).toMatchObject({observation:"unavailable",reason:"invalid_timestamp",pending_count:null});
+    }
   });
   it("expires a claim and refuses its late result without overwriting a successor",async () => {
     await start();const old=await take();
@@ -295,6 +327,10 @@ it("keeps account deletion working before 0026 when portrait rollout is absent",
     expect((await env.DB.prepare("SELECT status FROM users WHERE id = ?").bind(USER_A).first<{status:string}>())?.status).toBe("deleted");
   } finally {
     for (const migration of migrations) await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
+    // The compatibility probe drops current asset tables; restore their later
+    // additive instrumentation too, without recreating surviving audit/text state.
+    const runtime = env.TEST_MIGRATIONS.find(item=>item.name==="0032_runtime_health.sql")!;
+    await env.DB.batch(runtime.queries.filter(query=>/pattern_portrait_jobs|portrait_mesh_jobs/.test(query)).map(query=>env.DB.prepare(query)));
   }
 });
 

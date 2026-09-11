@@ -1,3 +1,4 @@
+import { expireRuntimeHealthAccess } from "./services/runtime-health.js";
 import { maintainPortraitMeshes } from "./services/pattern-portrait-mesh.js";
 import { maintainPortraits } from "./services/pattern-portrait.js";
 import type { Env } from "./env.js";
@@ -74,6 +75,11 @@ async function runIncumbentMaintenance(
     await maintainPortraitMeshes(env, scheduledAt);
   } catch (error) {
     if (laneFailure === undefined) laneFailure = error;
+  }
+  try {
+    await expireRuntimeHealthAccess(env, scheduledAt);
+  } catch {
+    if (laneFailure === undefined) laneFailure = new Error("runtime_health_audit_maintenance_failed");
   }
   if (laneFailure !== undefined) throw laneFailure;
 }

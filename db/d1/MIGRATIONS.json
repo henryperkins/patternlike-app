@@ -156,6 +156,11 @@
       "id": "0031_reading_feedback_events",
       "file": "0031_reading_feedback_events.sql",
       "description": "Add encrypted categorical feedback events with exact-edition owner binding, same-row idempotency, separate seven-day effect and 24-calendar-month retention deadlines, and cascading reading deletion. Existing resonance rows and frozen commands stay unchanged."
+    },
+    {
+      "id": "0032_runtime_health",
+      "file": "0032_runtime_health.sql",
+      "description": "Add nullable successful asset completion timestamps without backfill, capture start, bounded metric indexes, and separate restricted aggregate audit with 13-calendar-month expiry."
     }
   ],
   "notes": [
@@ -197,7 +202,8 @@
     "2026-09-06 09:08:54 UTC: 0028 APPLIED to production (patternlike-ops 1305a75d-0a8a-4a21-b201-d94fda0aaf93, ENAM) before the compatible Reading History/Save Worker release. It was the only pending migration; Wrangler 4.116.0 executed 3 commands in 0.63ms. Prior Worker f95ff574-29a5-42c8-957b-57832c5e6c62 served 100% and Builds mapped it to eccddcc. Immediate pre-apply bookmark: 000001e6-00000018-000050de-1367f38c0d994de14df0609cd4e72dad; post-apply bookmark: 000001e6-0000001c-000050de-cdaefaa3f4445ab7b7ad4959a8049c40. Private SQL export: /home/henry/patternlike-backups/20260906-reading-history-save/before-0028.sql, mode 0600, 8488079 bytes, sha256 8e951c44bec97e04151b05faeb96c1df781abbcb81bb2595cc5bc45aa5e9c9c9; receipts are in the same mode-0700 directory. Unchanged migration sha256 74ad6048d8c72c6c01a6973d2db282b60089f40480616be6173f90f1ed826e23 was rehearsed on that export under sqlite3 3.46.1: all 64 existing table row counts and content hashes preserved, foreign_key_check empty and quick_check ok. Post-apply: 28 migration records, nothing pending, reading_saves and its descending owner/timestamp/id index and composite ownership foreign key exist, Save table empty, users 4, daily_readings 37, reading_sources 128, assertion_probe empty, foreign_key_check empty, quick_check ok. No encrypted data, runner configuration, or rollout flag was changed. Once saves exist, any Worker rollback must retain Save-aware account deletion.",
     "2026-09-07: 0029 is forward-only and additive, and is NOT applied by this source change. Apply before compatible Worker runtime. Receipt metadata survives provider cleanup and account erasure; active publication proof requires the retained reading and succeeded/published job. Record actual migration observations in excluded release-evidence paths after the source gate.",
     "2026-09-09: 0030 is forward-only and additive, and is NOT applied to production by this source change. Apply before compatible Worker runtime. Accepted passage support is user-DEK encrypted, rotates with the existing inventory, and is erased with its document during deletion, Pattern replacement, or restore replay. Older documents remain without support; no reconstruction or retention extension.",
-    "2026-09-09: 0031 is forward-only and additive; tested locally, not applied to production. Apply before compatible Worker code. Register event ciphertext for rotation, erasure, export, retention and restore replay before release. No event backfill or new provider permission."
+    "2026-09-09: 0031 is forward-only and additive; tested locally, not applied to production. Apply before compatible Worker code. Register event ciphertext for rotation, erasure, export, retention and restore replay before release. No event backfill or new provider permission.",
+    "2026-09-11: 0032 is additive and not applied to production by this source change. Apply before compatible Worker writes. No ciphertext or prior response shape changes; historical completion time remains unknown; capture starts only on instrumented adoption or sampling."
   ],
   "apply_hint": "wrangler d1 migrations apply patternlike-ops --local   (add --env production --remote for the live database)"
 }

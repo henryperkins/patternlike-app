@@ -240,6 +240,7 @@ async function adminRequest(
 describe("Cloudflare Access Pattern administration", () => {
   beforeEach(async () => {
     await resetDb();
+    await env.DB.prepare("DELETE FROM runtime_health_access_events").run();
     await seedUser(IDENTITY_A);
     await seedGeneration();
     __resetAdminAccessJwksCacheForTests();
@@ -257,6 +258,96 @@ describe("Cloudflare Access Pattern administration", () => {
   });
 
   afterEach(() => fetchSpy.mockRestore());
+
+  it("audits aggregate access without inventing a target and rejects wrong/repeated purpose", async () => {
+    const response = await adminRequest("/admin/runtime-health?purpose=incident_response");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json() as {schema_version:string};
+    expect(body.schema_version).toBe("runtime-health/v1");
+    expect(JSON.stringify(body)).not.toContain(GENERATION_ID);
+    expect(await env.DB.prepare("SELECT admin_subject,purpose_class,result FROM runtime_health_access_events").first()).toEqual({admin_subject:"access-subject-alice",purpose_class:"incident_response",result:"granted"});
+    expect((await env.DB.prepare("SELECT * FROM pattern_admin_access_events").all()).results).toHaveLength(0);
+    for (const query of ["", "purpose=quality_review", "purpose=incident_response&purpose=incident_response"]) expect((await adminRequest(`/admin/runtime-health?${query}`)).status).toBe(400);
+    expect((await env.DB.prepare("SELECT result FROM runtime_health_access_events WHERE result='denied'").all()).results).toHaveLength(3);
+  });
+  it("reports explicit durable publication failure separately from uncollected retries", async () => {
+    await env.DB.prepare("UPDATE pattern_generation_jobs SET stage='failed',failure_class='publication_safety_failed' WHERE generation_id=?").bind(GENERATION_ID).run();
+    const response = await adminRequest("/admin/runtime-health?purpose=incident_response");
+    expect(response.status).toBe(200);
+    expect((await response.json() as {publication:unknown}).publication).toEqual({observation:"known",reason:"observed",publication_safety_failed_count:1,retry_failures:{observation:"unavailable",reason:"not_collected",count:null}});
+  });
+  it("rejects reader/runner credentials and fails closed if aggregate audit storage is unavailable", async () => {
+    for (const headers of [new Headers({"x-user-id":USER_A}),new Headers({authorization:"Bearer runner-token"})]) {
+      const response = await app.request("/admin/runtime-health?purpose=incident_response",{headers},env);
+      expect(response.status).toBe(401);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+    }
+    await env.DB.prepare("ALTER TABLE runtime_health_access_events RENAME TO runtime_health_access_events_unavailable").run();
+    try { expect((await adminRequest("/admin/runtime-health?purpose=incident_response")).status).toBe(503); }
+    finally { await env.DB.prepare("ALTER TABLE runtime_health_access_events_unavailable RENAME TO runtime_health_access_events").run(); }
+  });
+
+  it("serves separately audited diagnostic facts without opening artifacts", async () => {
+    await env.DB.prepare("UPDATE pattern_generation_jobs SET stage = 'failed', failure_class = 'publication_safety_failed', public_failure_stage = 'checking_claims', finished_at = updated_at WHERE generation_id = ?").bind(GENERATION_ID).run();
+    await env.DB.prepare("UPDATE jobs SET status = 'failed' WHERE id = ?").bind(JOB_ID).run();
+    const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ schema_version: "pattern-diagnostics/v1", generation_id: GENERATION_ID, stage: "failed", failure_class: "publication_safety_failed", provider: null, revision_reason: null });
+    expect(JSON.stringify(body)).not.toMatch(/user_id|object_key|prompt|artifact|ciphertext/);
+    const audit = await env.DB.prepare("SELECT generation_id, purpose_class, artifact_classes_json, result FROM pattern_admin_access_events WHERE generation_id = ?").bind(GENERATION_ID).all();
+    expect(audit.results).toEqual([{ generation_id: GENERATION_ID, purpose_class: "incident_response", artifact_classes_json: "[]", result: "granted" }]);
+  });
+
+  it("diagnostic projection closes unrestricted failure strings and requires exact purpose and Access", async () => {
+    await env.DB.prepare("UPDATE pattern_generation_jobs SET failure_class = ? WHERE generation_id = ?").bind("private raw provider output", GENERATION_ID).run();
+    const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=quality_review`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ failure_class: "unknown_failure" });
+    for (const query of ["", "?purpose=incident_response&purpose=quality_review", "?purpose=bogus"]) {
+      expect((await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics${query}`)).status).toBe(400);
+    }
+    for (const authorization of [undefined, "Bearer reader-token", "Bearer runner-token"]) {
+      const denied = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`, { audience: "none", authorization });
+      expect(denied.status).toBe(401);
+      expect(denied.headers.get("cache-control")).toBe("no-store");
+    }
+    expect((await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`, { audience: "wrong" })).status).toBe(401);
+  });
+
+  it("scopes provider evidence to the current exact pass and attempt without decrypting an exchange", async () => {
+    for (const [suffix, generation, attempt] of [["1", 2, 0], ["2", 1, 0], ["3", 2, 1]] as const) {
+      await env.DB.prepare(`INSERT INTO codex_provider_jobs (
+        id,pipeline,owner_id,user_id,pass,stage_generation,stage_attempt,
+        request_hash,request_object_key,request_envelope_hash,request_ciphertext_hash,request_key_id,request_nonce,request_byte_length,
+        model,reasoning_effort,prompt_version,timeout_ms,daily_call_limit,status,available_at,created_at,updated_at
+      ) VALUES (?, 'pattern', ?, ?, 'writer', ?, ?, ?, ?, ?, ?, 'diagnostic-test', ?, 1,
+        'synthetic', 'xhigh', 'synthetic', 900000, 1, 'pending', ?, ?, ?)`)
+        .bind(`cpjob_${suffix.repeat(32)}`, GENERATION_ID, USER_A, generation, attempt,
+          `sha256:${"1".repeat(64)}`, `codex-provider-jobs/diagnostic-${suffix}`, `sha256:${"2".repeat(64)}`, `sha256:${"3".repeat(64)}`, suffix.repeat(16), CREATED_AT, CREATED_AT, CREATED_AT).run();
+    }
+    const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ provider: { pass: "writer", status: "pending", available_at: CREATED_AT, completed_at: null } });
+    await env.DB.prepare("UPDATE pattern_generation_jobs SET writer_attempts = 2 WHERE generation_id = ?").bind(GENERATION_ID).run();
+    const missing = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`);
+    expect(await missing.json()).toMatchObject({ provider: null });
+  });
+
+  it("audits a missing exact generation and returns no diagnostic facts when the scoped audit fails", async () => {
+    const missingId = `pgen_${"0".repeat(32)}`;
+    expect((await adminRequest(`/admin/pattern-generations/${missingId}/diagnostics?purpose=retention_audit`)).status).toBe(404);
+    expect(await env.DB.prepare("SELECT target_user_id, result, artifact_classes_json FROM pattern_admin_access_events WHERE generation_id = ?").bind(missingId).first()).toEqual({ target_user_id: null, result: "not_found", artifact_classes_json: "[]" });
+    await env.DB.prepare("CREATE TRIGGER reject_diagnostic_audit BEFORE INSERT ON pattern_admin_access_events BEGIN SELECT RAISE(ABORT, 'unavailable'); END").run();
+    try {
+      const unavailable = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`);
+      expect(unavailable.status).toBe(500);
+      expect(unavailable.headers.get("cache-control")).toBe("no-store");
+      expect(await unavailable.text()).not.toContain("pattern-diagnostics/v1");
+    } finally { await env.DB.prepare("DROP TRIGGER reject_diagnostic_audit").run(); }
+  });
 
   it("returns the normative metadata document and mints a scoped administrator session", async () => {
     const response = await adminRequest(

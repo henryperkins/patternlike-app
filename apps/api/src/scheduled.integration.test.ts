@@ -771,3 +771,14 @@ describe("scheduled Worker entry point", () => {
     )).resolves.toBeUndefined();
   });
 });
+
+it("expires restricted runtime audit records in scheduled maintenance without touching current records", async () => {
+  const scheduledTime = new Date("2026-09-11T12:00:00.000Z").getTime();
+  for (const [id, expiry] of [["expired", "2026-09-11T12:00:00.000Z"], ["retained", "2026-09-12T12:00:00.000Z"]]) {
+    await env.DB.prepare("INSERT INTO runtime_health_access_events VALUES(?,'admin','incident_response','granted','2025-08-11T12:00:00.000Z',?)").bind(id,expiry).run();
+  }
+  const ctx = createExecutionContext();
+  await worker.scheduled(createScheduledController({scheduledTime,cron:"*/15 * * * *"}),hybridEnv(),ctx);
+  await waitOnExecutionContext(ctx);
+  expect((await env.DB.prepare("SELECT id FROM runtime_health_access_events").all()).results).toEqual([{id:"retained"}]);
+});

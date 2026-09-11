@@ -1,0 +1,565 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/runtime-health-v1/runtime-health.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sampled_at",
+    "work_classes",
+    "publication"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "runtime-health/v1"
+    },
+    "sampled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "work_classes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/workClass"
+            },
+            {
+              "properties": {
+                "work_class": {
+                  "const": "text"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/workClass"
+            },
+            {
+              "properties": {
+                "work_class": {
+                  "const": "portrait"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/workClass"
+            },
+            {
+              "properties": {
+                "work_class": {
+                  "const": "mesh"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation",
+        "reason",
+        "publication_safety_failed_count",
+        "retry_failures"
+      ],
+      "properties": {
+        "observation": {
+          "enum": [
+            "known",
+            "unavailable"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "observed",
+            "query_failed",
+            "sample_limit_exceeded"
+          ]
+        },
+        "publication_safety_failed_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "retry_failures": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observation",
+            "reason",
+            "count"
+          ],
+          "properties": {
+            "observation": {
+              "const": "unavailable"
+            },
+            "reason": {
+              "const": "not_collected"
+            },
+            "count": {
+              "type": "null"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "observation": {
+                "const": "unavailable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "publication_safety_failed_count": {
+                "type": "null"
+              },
+              "reason": {
+                "enum": [
+                  "query_failed",
+                  "sample_limit_exceeded"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "publication_safety_failed_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reason": {
+                "const": "observed"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "workClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_class",
+        "observation",
+        "reason",
+        "runner_enabled",
+        "retry_exhaustion_observation",
+        "pending_count",
+        "scheduled_pending_count",
+        "dispatchable_pending_count",
+        "active_lease_count",
+        "expired_lease_count",
+        "failed_count",
+        "retry_exhausted_count",
+        "oldest_pending_age_ms",
+        "oldest_dispatchable_pending_age_ms",
+        "completion_latency"
+      ],
+      "properties": {
+        "work_class": {
+          "enum": [
+            "text",
+            "portrait",
+            "mesh"
+          ]
+        },
+        "observation": {
+          "enum": [
+            "known",
+            "unavailable"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "observed",
+            "schema_unavailable",
+            "query_failed",
+            "sample_limit_exceeded",
+            "invalid_timestamp"
+          ]
+        },
+        "runner_enabled": {
+          "type": "null"
+        },
+        "retry_exhaustion_observation": {
+          "enum": [
+            "known",
+            "not_collected"
+          ]
+        },
+        "pending_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "scheduled_pending_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "dispatchable_pending_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "active_lease_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expired_lease_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "failed_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "retry_exhausted_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "oldest_pending_age_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "oldest_dispatchable_pending_age_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "completion_latency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "successful_count",
+            "p50_ms",
+            "p95_ms",
+            "missing_timestamp_count",
+            "measurement_started_at",
+            "window_started_at",
+            "coverage"
+          ],
+          "properties": {
+            "successful_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "p50_ms": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "p95_ms": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "missing_timestamp_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "measurement_started_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "window_started_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "coverage": {
+              "enum": [
+                "complete",
+                "partial",
+                "unavailable"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "successful_count": {
+                    "const": 0
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "p50_ms": {
+                    "type": "null"
+                  },
+                  "p95_ms": {
+                    "type": "null"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "successful_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "p50_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "p95_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "observation": {
+                "const": "unavailable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pending_count": {
+                "type": "null"
+              },
+              "scheduled_pending_count": {
+                "type": "null"
+              },
+              "dispatchable_pending_count": {
+                "type": "null"
+              },
+              "active_lease_count": {
+                "type": "null"
+              },
+              "expired_lease_count": {
+                "type": "null"
+              },
+              "failed_count": {
+                "type": "null"
+              },
+              "retry_exhausted_count": {
+                "type": "null"
+              },
+              "oldest_pending_age_ms": {
+                "type": "null"
+              },
+              "oldest_dispatchable_pending_age_ms": {
+                "type": "null"
+              },
+              "reason": {
+                "enum": [
+                  "schema_unavailable",
+                  "query_failed",
+                  "sample_limit_exceeded",
+                  "invalid_timestamp"
+                ]
+              },
+              "completion_latency": {
+                "properties": {
+                  "successful_count": {
+                    "type": "null"
+                  },
+                  "p50_ms": {
+                    "type": "null"
+                  },
+                  "p95_ms": {
+                    "type": "null"
+                  },
+                  "missing_timestamp_count": {
+                    "type": "null"
+                  },
+                  "measurement_started_at": {
+                    "type": "null"
+                  },
+                  "coverage": {
+                    "const": "unavailable"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reason": {
+                "const": "observed"
+              },
+              "pending_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "scheduled_pending_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "dispatchable_pending_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "active_lease_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "expired_lease_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "failed_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completion_latency": {
+                "properties": {
+                  "coverage": {
+                    "enum": [
+                      "complete",
+                      "partial"
+                    ]
+                  },
+                  "measurement_started_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "successful_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "missing_timestamp_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "work_class": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "retry_exhausted_count": {
+                "type": "null"
+              },
+              "retry_exhaustion_observation": {
+                "const": "not_collected"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "work_class": {
+                "enum": [
+                  "portrait",
+                  "mesh"
+                ]
+              },
+              "observation": {
+                "const": "known"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "retry_exhausted_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "retry_exhaustion_observation": {
+                "const": "known"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

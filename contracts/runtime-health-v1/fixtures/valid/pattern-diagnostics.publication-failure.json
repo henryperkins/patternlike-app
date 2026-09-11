@@ -1,0 +1,24 @@
+{
+  "schema_version": "pattern-diagnostics/v1",
+  "generation_id": "pgen_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "observed_at": "2026-09-11T00:00:00.000Z",
+  "stage": "failed",
+  "stage_generation": 2,
+  "created_at": "2026-09-10T23:59:00.000Z",
+  "updated_at": "2026-09-11T00:00:00.000Z",
+  "finished_at": "2026-09-11T00:00:00.000Z",
+  "failure_class": "publication_safety_failed",
+  "public_failure_stage": "checking_claims",
+  "cancellation_reason": null,
+  "reservation_reason": "first_open_retry",
+  "revision_reason": null,
+  "planner_attempts": 1,
+  "writer_attempts": 1,
+  "verifier_attempts": 1,
+  "schedule": {
+    "status": "failed",
+    "available_at": null,
+    "lease_expires_at": null
+  },
+  "provider": null
+}

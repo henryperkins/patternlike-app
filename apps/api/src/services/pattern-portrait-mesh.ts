@@ -696,16 +696,18 @@ export async function completePortraitMesh(
       leaseHash,
       now,
     );
+    const adoptedAt = new Date(Math.max(now.getTime(), Date.now()));
     await env.DB.batch([
-      ...fences(env, job, auth.row, auth.current, new Date()),
-      leaseFence(env, id, leaseHash, new Date()),
+      ...fences(env, job, auth.row, auth.current, adoptedAt),
+      leaseFence(env, id, leaseHash, adoptedAt),
       env.DB.prepare(
-        "UPDATE portrait_mesh_jobs SET status='complete',completion_hash=?,model_asset_id=?,provenance_asset_id=?,updated_at=? WHERE id=? AND status='running' AND lease_hash=?",
+        "UPDATE portrait_mesh_jobs SET status='complete',completion_hash=?,model_asset_id=?,provenance_asset_id=?,completed_at=?,updated_at=? WHERE id=? AND status='running' AND lease_hash=?",
       ).bind(
         completionHash,
         model.id,
         receipt.id,
-        now.toISOString(),
+        adoptedAt.toISOString(),
+        adoptedAt.toISOString(),
         id,
         leaseHash,
       ),
