@@ -17,12 +17,14 @@ export interface RunnerConfiguration {
   meshesEnabled?: true;
 }
 
-export type RunnerLogEvent = Readonly<{
-  event:
-    | "codex_runner_idle"
-    | "codex_runner_job_processed"
-    | "codex_runner_poll_failed";
-}>;
+type WorkClass = "text" | "portrait" | "mesh";
+const SCHEDULING_POLICY = "weighted-work-classes/v1";
+const WORK_SLOTS: readonly WorkClass[] = ["text", "text", "text", "text", "portrait", "mesh"];
+
+export type RunnerLogEvent = Readonly<{ policy: typeof SCHEDULING_POLICY } & (
+  | { event: "codex_runner_idle" }
+  | { event: "codex_runner_job_processed" | "codex_runner_poll_failed"; work_class: WorkClass }
+)>;
 
 type RunnerClient = Pick<CodexProviderClient, "claim" | "complete" | "fail">;
 type ExecuteInvocation = (claim: CodexProviderClaim) => Promise<CodexInvocationOutcome>;
@@ -226,6 +228,7 @@ export interface CodexPollLoopOptions {
   pollMs: number;
   signal: AbortSignal;
   random?: () => number;
+  now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
   log?: (event: RunnerLogEvent) => void;
   portraits?: PortraitRunnerOptions;
@@ -234,30 +237,49 @@ export interface CodexPollLoopOptions {
 
 export async function runCodexPollLoop(options: CodexPollLoopOptions): Promise<void> {
   const random = options.random ?? Math.random;
+  const now = options.now ?? (() => performance.now());
   const sleep = options.sleep ?? ((milliseconds: number) =>
     abortableSleep(milliseconds, options.signal));
   const log = options.log ?? (() => undefined);
+  const lanes: Record<WorkClass, (() => Promise<"empty" | "processed">) | undefined> = {
+    text: () => runOneCodexJob(options.client, options.execute),
+    portrait: options.portraits ? () => runOnePortraitJob(options.portraits!) : undefined,
+    mesh: options.meshes ? () => runOnePortraitMeshJob(options.meshes!) : undefined,
+  };
+  const cooldownUntil: Record<WorkClass, number> = { text: 0, portrait: 0, mesh: 0 };
+  let cursor = 0;
   while (!options.signal.aborted) {
-    let status: "empty" | "processed";
-    try {
-      status = await runOneCodexJob(options.client, options.execute);
-      if (status === "empty" && options.portraits && !options.signal.aborted) {
-        status = await runOnePortraitJob(options.portraits);
+    const unavailable = new Set<WorkClass>();
+    let processed = false;
+    for (let scanned = 0; scanned < WORK_SLOTS.length && !options.signal.aborted; scanned++) {
+      const workClass = WORK_SLOTS[cursor]!;
+      // Consume before awaiting, including empty/error/disabled opportunities.
+      cursor = (cursor + 1) % WORK_SLOTS.length;
+      const run = lanes[workClass];
+      if (!run || unavailable.has(workClass) || cooldownUntil[workClass] > now()) continue;
+      try {
+        const status = await run();
+        if (status === "processed") {
+          processed = true;
+          log({ event: "codex_runner_job_processed", work_class: workClass, policy: SCHEDULING_POLICY });
+          break;
+        }
+      } catch (error) {
+        if (error instanceof FatalCodexRunnerError) throw error;
+        log({ event: "codex_runner_poll_failed", work_class: workClass, policy: SCHEDULING_POLICY });
+        cooldownUntil[workClass] = now() + jitteredDelay(options.pollMs, random);
       }
-      if (status === "empty" && options.meshes && !options.signal.aborted) {
-        status = await runOnePortraitMeshJob(options.meshes);
+      unavailable.add(workClass);
+    }
+    if (processed || options.signal.aborted) continue;
+    let delay = jitteredDelay(options.pollMs, random);
+    const sampledAt = now();
+    for (const workClass of ["text", "portrait", "mesh"] as const) {
+      if (lanes[workClass] && cooldownUntil[workClass] > sampledAt) {
+        delay = Math.min(delay, cooldownUntil[workClass] - sampledAt);
       }
-    } catch (error) {
-      if (error instanceof FatalCodexRunnerError) throw error;
-      log({ event: "codex_runner_poll_failed" });
-      await sleep(jitteredDelay(options.pollMs, random));
-      continue;
     }
-    if (status === "processed") {
-      log({ event: "codex_runner_job_processed" });
-      continue;
-    }
-    log({ event: "codex_runner_idle" });
-    await sleep(jitteredDelay(options.pollMs, random));
+    log({ event: "codex_runner_idle", policy: SCHEDULING_POLICY });
+    await sleep(Math.max(1, delay));
   }
 }
