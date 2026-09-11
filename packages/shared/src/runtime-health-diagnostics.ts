@@ -104,7 +104,8 @@ export function diagnosePattern(input: { domain: string; authorized: boolean; sn
     || (terminal && value.schedule.status !== value.stage)
     || (!terminal && !["queued", "running"].includes(value.schedule.status))
     || ([value.schedule.lease_expires_at, value.provider?.lease_expires_at].some((lease) => lease != null && Date.parse(lease) < Date.parse(value.created_at!)))
-    || (value.provider?.completed_at && (value.provider.status !== "completed" || Date.parse(value.provider.completed_at) > observed || Date.parse(value.provider.completed_at) < Date.parse(value.created_at)))
+    || (value.provider !== null && ["completed", "failed", "cancelled"].includes(value.provider.status) !== (value.provider.completed_at !== null))
+    || (value.provider?.completed_at && (Date.parse(value.provider.completed_at) > observed || Date.parse(value.provider.completed_at) < Date.parse(value.created_at)))
     || (value.provider?.status === "leased" && !value.provider.lease_expires_at)) return unavailable("contradictory_record");
   result.reason = value.stage === "failed" ? "unknown_failure" : "observed_stage";
   result.reservation_reason = value.reservation_reason;

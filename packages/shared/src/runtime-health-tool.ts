@@ -31,11 +31,38 @@ export function parseRuntimeHealthSnapshot(input: unknown): RuntimeHealthRespons
     if (latency.successful_count === 0 && (latency.p50_ms !== null || latency.p95_ms !== null)) return null;
     if (typeof latency.successful_count === "number" && latency.successful_count > 0
       && (typeof latency.p50_ms !== "number" || typeof latency.p95_ms !== "number" || latency.p50_ms > latency.p95_ms)) return null;
+    if (Date.parse(latency.window_started_at) !== Date.parse(root.sampled_at) - 86_400_000) return null;
+    if (value.observation === "unavailable") {
+      if (value.retry_exhaustion_observation !== "not_collected" || latency.measurement_started_at !== null) return null;
+    } else {
+      const pending = value.pending_count;
+      const scheduled = value.scheduled_pending_count;
+      const dispatchable = value.dispatchable_pending_count;
+      const failed = value.failed_count;
+      if (!diagnosticInteger(pending) || !diagnosticInteger(scheduled) || !diagnosticInteger(dispatchable)
+        || !diagnosticInteger(failed) || !diagnosticInteger(value.active_lease_count) || !diagnosticInteger(value.expired_lease_count)
+        || scheduled + dispatchable > pending) return null;
+      if (value.work_class === "text") {
+        if (value.retry_exhausted_count !== null || value.retry_exhaustion_observation !== "not_collected") return null;
+      } else if (!diagnosticInteger(value.retry_exhausted_count) || value.retry_exhaustion_observation !== "known"
+        || value.retry_exhausted_count > failed) return null;
+      if ((pending === 0) !== (value.oldest_pending_age_ms === null)
+        || (dispatchable === 0) !== (value.oldest_dispatchable_pending_age_ms === null)
+        || (typeof value.oldest_pending_age_ms === "number" && typeof value.oldest_dispatchable_pending_age_ms === "number"
+          && value.oldest_dispatchable_pending_age_ms > value.oldest_pending_age_ms)) return null;
+      if (latency.coverage === "unavailable" || !diagnosticInteger(latency.successful_count)
+        || !diagnosticInteger(latency.missing_timestamp_count) || !diagnosticTimestamp(latency.measurement_started_at)
+        || Date.parse(latency.measurement_started_at) > Date.parse(root.sampled_at)) return null;
+      if (latency.coverage === "complete" && (latency.missing_timestamp_count !== 0
+        || Date.parse(latency.measurement_started_at) > Date.parse(latency.window_started_at))) return null;
+    }
     classes.push({ ...value, completion_latency: { ...latency } } as unknown as RuntimeWorkClassHealth);
   }
   const publication = diagnosticRecord(root.publication, ["observation", "reason", "publication_safety_failed_count", "retry_failures"]);
   if (!publication || !member(publication.observation, ["known", "unavailable"]) || !member(publication.reason, ["observed", "query_failed", "sample_limit_exceeded"])
     || !count(publication.publication_safety_failed_count) || (publication.observation === "unavailable" && publication.publication_safety_failed_count !== null)) return null;
+  if ((publication.observation === "known") !== (publication.reason === "observed")
+    || (publication.observation === "known" && !diagnosticInteger(publication.publication_safety_failed_count))) return null;
   const retries = diagnosticRecord(publication.retry_failures, ["observation", "reason", "count"]);
   if (!retries || retries.observation !== "unavailable" || retries.reason !== "not_collected" || retries.count !== null) return null;
   return { schema_version: "runtime-health/v1", sampled_at: root.sampled_at, work_classes: classes as RuntimeHealthResponse["work_classes"],

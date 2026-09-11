@@ -74,3 +74,17 @@ test("contradictory schedule or lease evidence never exposes a recovery clock", 
     assert.equal(result.blocking_stage, null);
   }
 });
+
+test("failed and cancelled provider completion timestamps are valid terminal evidence, never accepted output", () => {
+  for (const status of ["failed", "cancelled"] as const) {
+    const active = { ...snapshot, stage: "writing", failure_class: null, public_failure_stage: null, finished_at: null,
+      schedule: { ...snapshot.schedule, status: "queued", available_at: time },
+      provider: { ...snapshot.provider!, pass: "writer", status } };
+    const report = diagnosePattern({ domain: "pattern", authorized: true, snapshot: active }, time);
+    assert.equal(report.reason, "observed_stage");
+    assert.equal(report.provider_output, "not_collected");
+    assert.equal(report.blocking_stage, null);
+    assert.equal(report.stages.find(v => v.stage === "runner_execution")?.observation, "known");
+    assert.equal(diagnosePattern({domain:"pattern",authorized:true,snapshot:{...active,provider:{...active.provider,completed_at:null}}},time).reason,"contradictory_record");
+  }
+});

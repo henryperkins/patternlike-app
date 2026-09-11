@@ -77,3 +77,34 @@ test("unavailable or contradictory aggregate observations cannot render healthy-
   assert.equal(parseRuntimeHealthSnapshot({ ...health, work_classes: health.work_classes.map((v) => ({ ...v,
     completion_latency: { ...v.completion_latency, successful_count: 2, p50_ms: 100, p95_ms: 10 } })) }), null);
 });
+
+test("aggregate parser enforces measurement, coverage, queue and publication relationships", () => {
+  const clone = () => structuredClone(health);
+  const mutations: Array<(v: RuntimeHealthResponse) => void> = [
+    v => { v.work_classes[0].pending_count = null; },
+    v => { Object.assign(v.work_classes[0].completion_latency,{coverage:"complete",successful_count:null,p50_ms:null,p95_ms:null,missing_timestamp_count:null,measurement_started_at:null}); },
+    v => { v.work_classes[0].completion_latency.coverage = "unavailable"; },
+    v => { v.work_classes[0].completion_latency.coverage = "complete"; },
+    v => { Object.assign(v.work_classes[0].completion_latency,{coverage:"complete",measurement_started_at:"2026-09-09T00:00:00.000Z",missing_timestamp_count:1}); },
+    v => { v.work_classes[0].completion_latency.measurement_started_at = "2026-09-12T00:00:00.000Z"; },
+    v => { v.work_classes[0].completion_latency.window_started_at = time; },
+    v => { v.work_classes[0].retry_exhausted_count = 0; },
+    v => { v.work_classes[1].retry_exhaustion_observation = "not_collected"; },
+    v => { v.work_classes[1].retry_exhausted_count = 1; },
+    v => { v.work_classes[0].scheduled_pending_count = 1; },
+    v => { v.work_classes[0].oldest_pending_age_ms = 1; },
+    v => { Object.assign(v.publication,{observation:"known",reason:"query_failed",publication_safety_failed_count:null}); },
+  ];
+  for (const mutate of mutations) { const value = clone(); mutate(value); assert.equal(parseRuntimeHealthSnapshot(value),null); }
+});
+
+test("strict aggregate parser accepts the committed schema-valid complete and partial fixtures", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const name of ["runtime-health-empty.json", "runtime-health-partial-query.json", "runtime-health-historical-missing.json"]) {
+    const fixture = JSON.parse(readFileSync(new URL(`../../../contracts/runtime-health-v1/fixtures/valid/${name}`, import.meta.url), "utf8"));
+    assert.ok(parseRuntimeHealthSnapshot(fixture),name);
+  }
+  const complete = structuredClone(health);
+  for (const work of complete.work_classes) Object.assign(work.completion_latency,{coverage:"complete",measurement_started_at:"2026-09-09T00:00:00.000Z"});
+  assert.ok(parseRuntimeHealthSnapshot(complete));
+});
