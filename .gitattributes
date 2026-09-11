@@ -13,3 +13,6 @@
 *.woff  binary
 *.woff2 binary
 *.ico   binary
+
+# Bash cannot parse CRLF; shell scripts stay LF regardless of autocrlf.
+*.sh    text eol=lf
