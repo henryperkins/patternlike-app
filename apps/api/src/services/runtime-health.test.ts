@@ -1,10 +1,11 @@
 import { env } from "cloudflare:test";
-import { beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { sampleRuntimeHealth, expireRuntimeHealthAccess, runtimeHealthAuditExpiry, runtimeHealthQuery } from "./runtime-health.js";
 const now = new Date("2026-09-11T12:00:00.000Z");
 beforeEach(async () => {
   for (const table of ["runtime_health_capture", "runtime_health_access_events", "portrait_mesh_jobs", "pattern_portrait_jobs", "codex_provider_jobs"]) await env.DB.prepare(`DELETE FROM ${table}`).run();
 });
+afterEach(() => vi.useRealTimers());
 it("reports empty inventories and partial first-day capture with unknown installed runner", async () => {
   const result = await sampleRuntimeHealth(env, now);
   expect(result.work_classes.map(x => x.work_class)).toEqual(["text", "portrait", "mesh"]);
@@ -29,11 +30,12 @@ async function seedText(count: number, createdAt = "2026-09-09T12:00:00.000Z") {
     'synthetic','xhigh','synthetic',900000,1,'pending',?,?,? FROM numbers`)
     .bind(count,`sha256:${"1".repeat(64)}`,`sha256:${"2".repeat(64)}`,`sha256:${"3".repeat(64)}`,createdAt,createdAt,createdAt).run();
 }
-async function succeedText(completedAt: string) {
+async function succeedText(completedAt: string, ownerId: string | null = null) {
   await env.DB.prepare(`UPDATE codex_provider_jobs SET status='completed', lease_token_hash=?,lease_expires_at=?,
     response_hash=?,response_object_key=request_object_key||'/response',response_envelope_hash=?,response_ciphertext_hash=?,
-    response_key_id='response-synthetic',response_nonce=request_nonce,response_byte_length=1,provider_request_id='synthetic',input_tokens=0,output_tokens=0,completed_at=?`)
-    .bind(`sha256:${"4".repeat(64)}`,now.toISOString(),`sha256:${"5".repeat(64)}`,`sha256:${"6".repeat(64)}`,`sha256:${"7".repeat(64)}`,completedAt).run();
+    response_key_id='response-synthetic',response_nonce=request_nonce,response_byte_length=1,provider_request_id='synthetic',input_tokens=0,output_tokens=0,completed_at=?
+    WHERE (? IS NULL OR owner_id=?)`)
+    .bind(`sha256:${"4".repeat(64)}`,now.toISOString(),`sha256:${"5".repeat(64)}`,`sha256:${"6".repeat(64)}`,`sha256:${"7".repeat(64)}`,completedAt,ownerId,ownerId).run();
 }
 it("refuses partial counts beyond the materialized ceiling while preserving other classes",async()=>{
   await seedText(10_001);
@@ -96,4 +98,76 @@ it("classifies text schedules and leases without inventing a per-exchange attemp
   await env.DB.prepare("UPDATE codex_provider_jobs SET available_at=? WHERE owner_id='synthetic-1'").bind(new Date(now.getTime()+1).toISOString()).run();
   await env.DB.prepare("UPDATE codex_provider_jobs SET status='leased',lease_token_hash=?,lease_expires_at=? WHERE owner_id='synthetic-3'").bind(`sha256:${"4".repeat(64)}`,now.toISOString()).run();
   expect((await sampleRuntimeHealth(env,now)).work_classes[0]).toMatchObject({pending_count:2,scheduled_pending_count:1,dispatchable_pending_count:1,active_lease_count:0,expired_lease_count:1,oldest_pending_age_ms:172800000,retry_exhausted_count:null,retry_exhaustion_observation:"not_collected"});
+});
+
+/** Interleave a real D1 mutation immediately before the sampler's text snapshot. */
+function withTextReadInterleaving(action: () => Promise<void>): typeof env {
+  const interleaved = Object.create(env) as typeof env;
+  Object.defineProperty(interleaved, "DB", { value: new Proxy(env.DB, {
+    get(target, key) {
+      if (key === "prepare") return (sql: string) => {
+        const statement = target.prepare(sql);
+        if (!sql.startsWith("WITH bounded") || !sql.includes("FROM codex_provider_jobs")) return statement;
+        return new Proxy(statement, {
+          get(prepared, method) {
+            if (method === "bind") return (...values: unknown[]) => {
+              const bound = prepared.bind(...values);
+              return new Proxy(bound, {
+                get(query, operation) {
+                  if (operation === "all") return async () => {
+                    await action();
+                    return query.all();
+                  };
+                  const value = Reflect.get(query, operation);
+                  return typeof value === "function" ? value.bind(query) : value;
+                },
+              });
+            };
+            const value = Reflect.get(prepared, method);
+            return typeof value === "function" ? value.bind(prepared) : value;
+          },
+        });
+      };
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) });
+  return interleaved;
+}
+
+it("observes a reservation made during collection against one final clock", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
+  const collectionEnd = new Date("2026-09-11T12:00:00.020Z");
+  const interleaved = withTextReadInterleaving(async () => {
+    vi.setSystemTime(collectionEnd);
+    await seedText(1, collectionEnd.toISOString());
+  });
+  const result = await sampleRuntimeHealth(interleaved);
+  expect(result.work_classes[0]).toMatchObject({ observation: "known", pending_count: 1, oldest_pending_age_ms: 0 });
+  expect(result.sampled_at).toBe("2026-09-11T12:00:00.020Z");
+  for (const workClass of result.work_classes) {
+    expect(workClass.observation).toBe("known");
+    expect(workClass.completion_latency.window_started_at).toBe("2026-09-10T12:00:00.020Z");
+  }
+});
+
+it("includes concurrent acceptance but excludes successes outside the final window and impossible future data", async () => {
+  await seedText(2, "2026-09-10T11:59:59.000Z");
+  await succeedText("2026-09-10T12:00:00.000Z", "synthetic-1");
+  await env.DB.prepare("UPDATE codex_provider_jobs SET status='leased',lease_token_hash=?,lease_expires_at='2026-09-11T12:01:00.000Z' WHERE owner_id='synthetic-2'").bind(`sha256:${"4".repeat(64)}`).run();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
+  const collectionEnd = new Date("2026-09-11T12:00:00.020Z");
+  const interleaved = withTextReadInterleaving(async () => {
+    vi.setSystemTime(collectionEnd);
+    await succeedText(collectionEnd.toISOString(), "synthetic-2");
+  });
+  const result = await sampleRuntimeHealth(interleaved);
+  expect(result.sampled_at).toBe("2026-09-11T12:00:00.020Z");
+  expect(result.work_classes[0]).toMatchObject({ observation: "known", completion_latency: {
+    successful_count: 1, p50_ms: 86401020, p95_ms: 86401020, window_started_at: "2026-09-10T12:00:00.020Z",
+  } });
+  await env.DB.prepare("UPDATE codex_provider_jobs SET completed_at='2026-09-11T12:00:00.021Z' WHERE owner_id='synthetic-2'").run();
+  expect((await sampleRuntimeHealth(env)).work_classes[0]).toMatchObject({ observation: "unavailable", reason: "invalid_timestamp" });
 });

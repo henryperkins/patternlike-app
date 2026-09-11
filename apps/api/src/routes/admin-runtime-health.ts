@@ -14,7 +14,7 @@ adminRuntimeHealthRoutes.get("/runtime-health", async c => {
       await recordRuntimeHealthAccess(c.env,c.get("adminSubject"),"denied",now);
       return c.json(failure("invalid_admin_purpose"),400);
     }
-    const response = await sampleRuntimeHealth(c.env,now);
+    const response = await sampleRuntimeHealth(c.env);
     const partial = response.work_classes.some(value=>value.observation==="unavailable") || response.publication.observation==="unavailable";
     await recordRuntimeHealthAccess(c.env,c.get("adminSubject"),partial ? "unavailable":"granted",now);
     return c.json(response);

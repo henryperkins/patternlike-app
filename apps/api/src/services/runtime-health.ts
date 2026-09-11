@@ -46,6 +46,7 @@ function aggregate(workClass: RuntimeWorkClass, rows: MetricRow[], now: Date, wi
   if (rows.length > RUNTIME_HEALTH_SAMPLE_LIMIT) return unavailable(workClass,"sample_limit_exceeded",window);
   const result = unavailable(workClass,"observed",window);
   const time = now.getTime();
+  const windowStartedAt = timestamp(window);
   const started = timestamp(metadata?.measurement_started_at ?? null);
   if (started > time) throw new Error("invalid_timestamp");
   Object.assign(result,{observation:"known",pending_count:0,scheduled_pending_count:0,dispatchable_pending_count:0,active_lease_count:0,expired_lease_count:0,failed_count:0,retry_exhausted_count: workClass === "text" ? null : 0, retry_exhaustion_observation:workClass === "text" ? "not_collected" : "known"});
@@ -74,42 +75,62 @@ function aggregate(workClass: RuntimeWorkClass, rows: MetricRow[], now: Date, wi
     else {
       const completed = timestamp(row.completed_at);
       if (completed>time || completed<created) throw new Error("invalid_timestamp");
-      durations.push(completed-created);
+      // Collection can advance the shared clock beyond the query's lower bound.
+      if (completed >= windowStartedAt) durations.push(completed-created);
     }
   }
   durations.sort((a,b)=>a-b);
   result.completion_latency = {successful_count:durations.length,p50_ms:durations[Math.ceil(.5*durations.length)-1]??null,p95_ms:durations[Math.ceil(.95*durations.length)-1]??null,missing_timestamp_count:missing,measurement_started_at:new Date(started).toISOString(),window_started_at:window,coverage:started<=time-DAY_MS && missing===0 ? "complete":"partial"};
   return result;
 }
-async function sampleClass(env: Env, workClass: RuntimeWorkClass, now: Date, window: string): Promise<RuntimeWorkClassHealth> {
+async function collectClass(env: Env, workClass: RuntimeWorkClass, now: Date, window: string): Promise<MetricRow[] | RuntimeHealthReason> {
   try {
     // First actual instrumentation use starts coverage; migration application alone does not.
     await env.DB.prepare("INSERT OR IGNORE INTO runtime_health_capture(work_class,started_at) VALUES(?,?)").bind(workClass,now.toISOString()).run();
     const data = await env.DB.prepare(runtimeHealthQuery(workClass)).bind(window,workClass).all<MetricRow>();
-    if (!data.success) return unavailable(workClass,"query_failed",window);
-    try { return aggregate(workClass,data.results,now,window); }
-    catch { return unavailable(workClass,"invalid_timestamp",window); }
+    return data.success ? data.results : "query_failed";
   } catch {
     // Identify schema absence with a fixed metadata projection, never exception text.
     try {
       const table = workClass === "text" ? "codex_provider_jobs" : workClass === "portrait" ? "pattern_portrait_jobs" : "portrait_mesh_jobs";
       const columns = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{name:string}>();
       const capture = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='runtime_health_capture'").first();
-      if (!capture || !columns.results.some(column=>column.name==="completed_at")) return unavailable(workClass,"schema_unavailable",window);
+      if (!capture || !columns.results.some(column=>column.name==="completed_at")) return "schema_unavailable";
     } catch { /* A failed metadata probe cannot assert schema absence. */ }
-    return unavailable(workClass,"query_failed",window);
+    return "query_failed";
   }
 }
-export async function sampleRuntimeHealth(env: Env, now = new Date()): Promise<RuntimeHealthResponse> {
-  const window = new Date(now.getTime()-DAY_MS).toISOString();
-  const classes = await Promise.all(CLASSES.map(workClass=>sampleClass(env,workClass,now,window)));
+async function collectPublication(env: Env): Promise<RuntimeHealthResponse["publication"]> {
   const publication: RuntimeHealthResponse["publication"] = {observation:"unavailable",reason:"query_failed",publication_safety_failed_count:null,retry_failures:{observation:"unavailable",reason:"not_collected",count:null}};
   try {
     const rows = await env.DB.prepare(`SELECT failure_class FROM pattern_generation_jobs WHERE stage='failed' AND failure_class='publication_safety_failed' LIMIT ${RUNTIME_HEALTH_SAMPLE_LIMIT+1}`).all();
     if (rows.success && rows.results.length<=RUNTIME_HEALTH_SAMPLE_LIMIT) Object.assign(publication,{observation:"known",reason:"observed",publication_safety_failed_count:rows.results.length});
     else if (rows.success) publication.reason="sample_limit_exceeded";
   } catch { /* Fixed unavailable projection; no error content. */ }
-  return {schema_version:"runtime-health/v1",sampled_at:now.toISOString(),work_classes:[classes[0]!,classes[1]!,classes[2]!],publication};
+  return publication;
+}
+/** A supplied Date freezes the observation clock for deterministic callers. */
+export async function sampleRuntimeHealth(env: Env, now?: Date): Promise<RuntimeHealthResponse> {
+  const startedAt = new Date(now ?? Date.now());
+  const queryWindow = new Date(startedAt.getTime()-DAY_MS).toISOString();
+  const [snapshots, publication] = await Promise.all([
+    Promise.all(CLASSES.map(workClass=>collectClass(env,workClass,startedAt,queryWindow))),
+    collectPublication(env),
+  ]);
+  // A reservation/adoption may happen during D1 I/O. Use the collection end
+  // for every class, rather than treating normal concurrent work as future data.
+  // Each class still has a consistent SQL snapshot, with collection lag bounded
+  // by this request. The materialization ceiling remains conservative if old
+  // successes leave the latency window while snapshots are being collected.
+  const sampledAt = now ? startedAt : new Date(Math.max(startedAt.getTime(),Date.now()));
+  const window = new Date(sampledAt.getTime()-DAY_MS).toISOString();
+  const classes = CLASSES.map((workClass,index)=>{
+    const snapshot = snapshots[index]!;
+    if (typeof snapshot === "string") return unavailable(workClass,snapshot,window);
+    try { return aggregate(workClass,snapshot,sampledAt,window); }
+    catch { return unavailable(workClass,"invalid_timestamp",window); }
+  });
+  return {schema_version:"runtime-health/v1",sampled_at:sampledAt.toISOString(),work_classes:[classes[0]!,classes[1]!,classes[2]!],publication};
 }
 export function runtimeHealthAuditExpiry(createdAt: Date): string {
   const expiry = new Date(createdAt);
