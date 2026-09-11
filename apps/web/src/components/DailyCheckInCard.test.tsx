@@ -159,7 +159,7 @@ describe("daily check-in card", () => {
       note: "Waiting on a decision.",
       expires_in_seconds: 86400,
     });
-    expect(await screen.findByText(/kept from the publisher/i)).toBeInTheDocument();
+    expect(await screen.findByText(/kept out of later readings/i)).toBeInTheDocument();
     expect(screen.getByText(/Today's chapter stays as it is/i))
       .toBeInTheDocument();
   });

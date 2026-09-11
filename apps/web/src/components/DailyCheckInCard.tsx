@@ -202,11 +202,12 @@ export function DailyCheckInCard() {
     <section className="daily-check-in" aria-labelledby="daily-check-in-heading">
       <div className="daily-check-in__heading">
         <h2 id="daily-check-in-heading">How are you arriving?</h2>
-        <p className="daily-check-in__retention">Fresh for 24 hours</p>
+        <p className="daily-check-in__retention">Stays fresh for 24 hours</p>
       </div>
       <p>
-        Check-ins are stored for up to 13 months, separately from their freshness.
-        Turning permission off stops future use; it does not delete stored check-ins.
+        A check-in can be used for 24 hours; the stored record is kept for up to
+        13 months. Turning permission off stops future use; it does not delete
+        stored check-ins.
       </p>
 
       {availability.status === "loading" ? (
@@ -238,7 +239,7 @@ export function DailyCheckInCard() {
             {personalContextEligible === true
               ? "Saved. While fresh and permitted, this may be selected for a later reading. Selection is not guaranteed. Today's chapter stays as it is."
               : personalContextEligible === false
-                ? "Saved, and kept from the publisher until reading generation includes personal context. Today's chapter stays as it is."
+                ? "Saved, and kept out of later readings until personal context is enabled for them. Today's chapter stays as it is."
                 : "Saved. Personal-context permission could not be confirmed; this receipt does not establish use. Today's chapter stays as it is."}
           </p>
           <button className="button button--secondary" type="button" onClick={beginEdit}>

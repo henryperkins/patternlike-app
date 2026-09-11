@@ -163,8 +163,8 @@ export function ReadingFeedbackCard({
           <p className="reading-feedback__permission">
             With active feedback permission, your choice may be used for repetition
             control and theme ranking in later readings. This receipt does not
-            establish that a later reading used it. Notes are not offered as
-            generation context.
+            establish that a later reading used it. Notes are not used to write
+            readings.
           </p>
         </>
       ) : (
@@ -173,10 +173,10 @@ export function ReadingFeedbackCard({
             Optional feedback on this chapter. It never changes the published text.
           </p>
           <p className="reading-feedback__permission" id={permissionId}>
-            Sending this enables reading feedback for content quality, repetition
-            control, and theme ranking, including if you previously turned it off.
-            An optional note is stored encrypted and is not offered as generation
-            context. This does not enable model training.
+            Sending this uses feedback permission for content quality, repetition
+            control, and theme ranking, turning it back on if you had turned it off.
+            An optional note is stored encrypted and is not used to write readings.
+            This does not enable model training.
           </p>
           <fieldset
             className="reading-feedback__choices"

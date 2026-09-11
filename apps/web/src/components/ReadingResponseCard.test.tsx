@@ -50,7 +50,7 @@ describe("categorical reading response", () => {
     const view = mount();
     await user.click(await screen.findByRole("radio", { name: "Repetitive" }));
     expect(screen.getByText(/24 months/)).toBeInTheDocument();
-    expect(screen.getByText(/not offered as generation context/)).toBeInTheDocument();
+    expect(screen.getByText(/not used to write readings/)).toBeInTheDocument();
     expect(screen.getByText(/generation use is currently off/i)).toBeInTheDocument();
     expect(screen.queryByText(/seven days/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add a note" }));
@@ -143,7 +143,7 @@ describe("categorical reading response", () => {
     responses[`GET ${optionsPath}`]!.body = { ...options, grant_action: "reuse", expected_grant_state: "grant-reused", latest_event: receipt };
     await user.click(screen.getByRole("button", { name: "Give another response" }));
     await screen.findByRole("radio", { name: "Unclear" });
-    expect(screen.getByRole("heading", { name: "Respond to this chapter" })).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "Report a problem with this chapter" })).toHaveFocus();
     await user.click(await screen.findByRole("radio", { name: "Unclear" }));
     expect(screen.getByText(/Sending uses your existing feedback permission/)).toBeInTheDocument();
     expect(capturedFor(eventPath)).toHaveLength(0);

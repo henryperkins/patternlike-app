@@ -36,7 +36,7 @@ describe("Reading feedback", () => {
     expect(screen.getByRole("status", { name: "Feedback receipt" }))
       .toHaveTextContent("Recorded for this chapter");
     expect(screen.getByText(/does not establish that a later reading used it/i)).toBeInTheDocument();
-    expect(screen.getByText(/notes are not offered as generation context/i)).toBeInTheDocument();
+    expect(screen.getByText(/notes are not used to write readings/i)).toBeInTheDocument();
   });
 
   it("keeps the optional note behind a second ask", async () => {

@@ -231,7 +231,7 @@ describe("TodayView", () => {
     await user.click(await screen.findByRole("radio", { name: /Quiet/i }));
     await user.click(screen.getByRole("button", { name: /Keep this/i }));
     expect(await screen.findByText(/Fresh until/i)).toBeInTheDocument();
-    expect(within(checkIn!).getByText(/stored for up to 13 months/)).toBeInTheDocument();
+    expect(within(checkIn!).getByText(/kept for up to 13 months/)).toBeInTheDocument();
     expect(screen.getByText(firstParagraph)).toBeInTheDocument();
     expect(capturedFor(TODAY)).toHaveLength(1);
     expect(capturedFor(`/v1/readings/${READING_ID}/feedback`).filter(call => call.method === "POST"))

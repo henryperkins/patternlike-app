@@ -102,7 +102,7 @@ describe("account reading connections", () => {
     fixture.responses[targetPath]!.body = fixture.savedResponse;
     await user.click(screen.getByRole("link", { name: "Open saved Daily reading" }));
     expect(await screen.findByText("The exact earlier saved passage.")).toBeInTheDocument();
-    expect(screen.getByText(/Sending this enables reading feedback/)).toBeInTheDocument();
+    expect(screen.getByText(/Sending this uses feedback permission/)).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "Mixed" }));
     await user.click(screen.getByRole("button", { name: /Send this/ }));
     await screen.findByText(/Noted — mixed/);

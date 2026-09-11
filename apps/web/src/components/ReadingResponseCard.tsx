@@ -72,7 +72,7 @@ function validOptions(value: ReadingFeedbackOptionsResponse, props: ReadingRespo
 
 function EffectExplanation({ category, active }: { category: ReadingFeedbackCategory | ""; active: boolean }) {
   if (category === "unclear") return <p>Unclear responses are recorded for content quality and are not offered to generation.</p>;
-  if (!active) return <p>Generation use is currently off. Recording a response does not show that it influenced a reading.</p>;
+  if (!active) return <p>Generation use is currently off, so responses are stored without being offered to later readings.</p>;
   if (!category) return null;
   return <p>{category === "repetitive"
     ? "Repetition control may use this response for up to seven days while feedback permission remains active."
@@ -210,21 +210,21 @@ function ReadingResponse(props: ReadingResponseCardProps) {
   const targetLabel = paragraphId ? "passage" : "chapter";
   const effectExpired = receipt?.effect_expires_at != null && Date.parse(receipt.effect_expires_at) <= Date.now();
   return <section className="reading-feedback reading-response" aria-labelledby={`${id}-heading`}>
-    <h2 id={`${id}-heading`} ref={headingRef} tabIndex={-1}>Respond to this {targetLabel}</h2>
+    <h2 id={`${id}-heading`} ref={headingRef} tabIndex={-1}>Report a problem with this {targetLabel}</h2>
     {receipt ? <>
       <p className="reading-feedback__saved" role="status" aria-label="Categorical feedback receipt" ref={receiptRef} tabIndex={-1}>Recorded for this {targetLabel}: {LABELS[receipt.category]}. The published text stays as it is.</p>
       {document.generation_effects_active && effectExpired
         ? <p>The seven-day generation window has expired. The stored response remains available until its retention limit or deletion.</p>
         : <EffectExplanation category={receipt.category} active={document.generation_effects_active} />}
       {document.generation_effects_active && receipt.effect_expires_at && !effectExpired ? <p>Possible generation use expires {formatInstant(receipt.effect_expires_at)}.</p> : null}
-      <p>The response and any encrypted note are retained until {formatInstant(receipt.retention_expires_at)} under the 24-month storage limit. Notes are not offered as generation context.</p>
+      <p>The response and any encrypted note are retained until {formatInstant(receipt.retention_expires_at)} under the 24-month storage limit. Notes are not used to write readings.</p>
       <button type="button" className="reading-feedback__send" onClick={() => { nextFocus.current = "heading"; setCategory(""); setNoteOpen(false); setProblem(""); void loadOptions(false); }}>Give another response</button>
     </> : <form onSubmit={event => void submit(event)}>
-      <p id={`${id}-invite`}>Optional. This responds to the published {targetLabel}; it does not change its text or submit a check-in.</p>
+      <p id={`${id}-invite`}>Optional. This reports a problem with the published {targetLabel}; it does not change its text or submit a check-in.</p>
       <p id={`${id}-permission`}>{GRANT_COPY[document.grant_action]} This does not enable model training.</p>
-      <p id={`${id}-storage`}>Responses and optional encrypted notes are stored for up to 24 months. Notes are not offered as generation context. Turning permission off stops future use; it does not erase stored feedback.</p>
+      <p id={`${id}-storage`}>Responses and optional encrypted notes are stored for up to 24 months. Notes are not used to write readings. Turning permission off stops future use; it does not delete stored feedback.</p>
       <fieldset className="reading-feedback__choices" disabled={busy || attempt !== null} aria-describedby={`${id}-invite ${id}-permission ${id}-storage`}>
-        <legend>What would you like to tell us?</legend>
+        <legend>What's the problem?</legend>
         <div className="reading-feedback__options">
           {document.categories.map(value => <label key={value}><input name={`${id}-category`} type="radio" value={value} checked={category === value} onChange={() => setCategory(value)} /><span>{LABELS[value]}</span></label>)}
         </div>
@@ -239,10 +239,10 @@ function ReadingResponse(props: ReadingResponseCardProps) {
     </form>}
     <div className="reading-response__correction">
       <a href="#privacy" onClick={event => { if (correctBirth) { event.preventDefault(); correctBirth(); } }}>My birth details are wrong</a>
-      <p>Open birth correction in Privacy. Opening it changes nothing. Submitting different details supersedes your chart and may withhold Today readings tied to it until a successor is available.</p>
+      <p>Open birth correction in Privacy. Opening it changes nothing. Submitting different details supersedes your chart and may withhold Today readings tied to it until the new chart is ready.</p>
     </div>
     <details className="reading-response__overall" onToggle={event => setOverallOpen(event.currentTarget.open)}>
-      <summary>Give an overall response</summary>
+      <summary>Say how it landed overall</summary>
       {overallOpen ? <ReadingFeedbackCard readingId={readingId} onUnauthorized={onUnauthorized} /> : null}
     </details>
   </section>;
