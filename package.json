@@ -26,7 +26,10 @@
     "web:dev": "npm run dev -w @patternlike/web",
     "calc:golden": "npm run test:golden -w @patternlike/calc-stub",
     "ephe:download": "npm run ephe:download -w @patternlike/calc-stub",
-    "engine:allowlist": "npm run generate:allowlist -w @patternlike/reading-engine"
+    "engine:allowlist": "npm run generate:allowlist -w @patternlike/reading-engine",
+    "map:capture": "node scripts/source-map/cli.mjs capture",
+    "map:check": "node scripts/source-map/cli.mjs check",
+    "test:source-map": "node --test --test-concurrency=1 \"scripts/source-map/*.test.mjs\""
   },
   "engines": {
     "node": ">=22"

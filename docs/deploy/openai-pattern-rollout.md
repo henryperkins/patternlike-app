@@ -2,61 +2,71 @@
 
 **Created:** 2026-08-20
 
-**Status:** Core adapter, automated-ontology, and erasure-replay engineering are
-present. Gate 6 is open for both provider paths: the historical OpenAI approval
-does not cover current pins, and the selected Codex path is not certified. Gate
-7B most recently failed closed for Codex candidate
-`pattern-ontology-en-us-0.1.17`, which compiled, passed every evaluation, and
-reached regression cursor 95 of 30 fixtures before a planner pass ceiling ended
-it, so **no public-capable machine release has ever been active**.
+<a id="current-source-review-2026-09-09"></a>
 
-An *internal* release is. A 2026-08-27 production query found
-`pattern-ontology-en-us-internal-0.1.0` active with one accepted Pattern
-document generated 2026-08-26 — the Gate 7A internal path, executed. Earlier
-revisions of this file said no ontology was active and no Pattern existed; both
-statements were true when written and are recorded as dated rows below. Gates
-8–10 remain open on their own evidence: counting rows is not gate closure.
+**Current source review (2026-09-09):** Pattern admission is account-wide.
+`ontologyServesAccount` admits a valid loaded `synthetic_internal` release by
+origin; a `machine_pipeline` release additionally needs re-derived `public`
+scope. Account, active-chart, confirmed-locale, current-consent, generation-pause,
+and chart-fingerprint claim gates remain. Committed configuration selects Codex
+and parks machine ontology production; neither declaration proves live execution.
 
-**Superseding decision (2026-08-27):** the account-wide release serves readers
-from that active authored release, and Gate 7B is no longer a precondition for
-it. `ontologyServesAccount` now admits a `synthetic_internal` release on origin
-alone; the scope check still governs the `machine_pipeline` branch, where a
-release earns `public` only by producing its whole evidence chain. The reason is
-recorded in this file's own history: fifteen candidate versions from `0.1.0`
-through `0.1.17` are logged here, every one of them entered the regressing
-stage, and none passed. `adbbbdc` counts sixteen candidate *runs* against those
-versions and notes that two of the last three died on prompt defects rather
-than on the ontology being judged. Requiring a public machine
-release would therefore close Pattern for every reader rather than open it.
+The offline builder now defaults to the local unsigned 0.1.2 candidate: 36
+records from 35 of the 60 prepared fragments. It omits twelve §2 sign, eight §8
+cross-cutting, three unsupported §6 pattern, and two unsupported §7 uncertainty
+fragments. Concentration requires stellium; §7.1 supplies separate exact-time
+methodological guidance alongside its unknown-time record. The approved
+[applicability fix](../reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/README.md)
+preserves the earlier contrast extraction fix and the historical 40-record
+candidates. These candidates have not been activated by the local work.
+Source-verbatim extraction retains traceability, not editorial adjudication. The corpus is model-generated
+first-party material with zero certified human-reviewed fragments in
+[provenance](../../pattern-corpus/provenance.json). `licensed_excerpt` asserts
+rights; `source_supported` ties a record to prepared material. Compilation and
+signatures do not certify quality. Synthetic evaluation compatibility fields do
+not prove independent machine evaluation or a regression rehearsal.
 
-That is a trade, and it is stated here so nobody rediscovers it during an
-incident. An authored release skips the independent evaluator and the seven
-regression hard gates, and those gates run nowhere else in the product — the
-live per-generation path has structural validation and a model semantic
-verifier, not `suppressed_feature_leak` or `prohibited_claim`. What the authored
-release does carry is publication rights: every record is `source_supported`
-against a `licensed_excerpt` corpus and cites the fragment it came from, it is
-signed by the isolated signer, and it compiles. Since Pattern became
-account-wide there is no cohort to contain the consequence, so **Gates 8 and 10
-no longer describe a reachable cohort transition** and are closed as not
-applicable rather than satisfied.
+Both admitted origins pass shared deterministic document publication safety on
+the reader path, alongside the semantic verifier. The seven safety categories
+include suppressed-feature leakage and prohibited claims; whole-corpus machine
+evaluation and release regression remain distinct processes. See
+[publication proof](../../apps/api/src/services/pattern-publication-proof.ts)
+and [admission](../../apps/api/src/db/pattern-ontology.ts).
 
-The dated failed-candidate history below is preserved deliberately: it is the
-evidence for why the machine gate was not used, and it is what a later operator
-needs if the pipeline is ever re-enabled.
+**Dated state:** the [September 6 observation](../reviews/artifacts/2026-09-06-source-register-followup/production-observation.json)
+at `2026-09-06T18:49:35.205Z` records an active-pointer join to
+`pattern-ontology-en-us-internal-0.1.0`, bundle hash
+`sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84`,
+corpus hash `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`,
+and a null joined machine-evidence run. This is not a complete evidence-table
+census, current signature verification, fresh activation check, or lifecycle
+exercise. The August observations and ledger below retain their historical scope.
 
-This file is the operational source of truth; updating it does not itself
-authorize a deployment, secret change, ontology activation, or provider call.
+**Failure classification:** ledger attempts 1, 4, 5, and 6 stopped at candidate
+validation; 2 at coverage; 3 at record policy; 8 and 9 at configuration; 7 at a
+regression gate; 10 at prohibited claims; 11 and fixcheck-04 at suppressed-feature
+leakage; 12 at a bounded planner/deadline failure; 13 at planner failure with a
+subsequent quota probe; and `0.1.17` at a pass ceiling. The August 25 `0.1.17`
+execution stopped at cursor 95 after 96 regression calls across a thirty-fixture
+corpus, not 95 completed fixtures. Current source already contains
+`PLAN_CLOSURE_RULES` and the named `ontology_regression_failed` event. Its
+historical diagnosis is a lead for Slice 13, not a reproduced current defect.
+
+**Operational use:** older gate procedures and historical interpretations below
+require current-source reconciliation before use. Gates 8/10 no longer describe
+reachable cohort transitions; their acceptance, lifecycle, restore, and sustained
+observation evidence is still relevant and is not supplied by removing cohorts.
+Gate 6's dated spend approvals do not cover new pins; Gate 7B's machine evidence
+is separate from internal-origin admission; Gate 9's recorded engineering and
+Access cutover do not establish a completed restore drill. No blanket gate
+closure is claimed. [Correction evidence](../architecture/source-map/source-corrections.md)
+records this review. This document authorizes no deployment, activation, signing,
+provider call, or change to saved readings.
 
 **Pattern has no rollout variable.** `PATTERN_AI_ROLLOUT` and
-`PATTERN_INTERNAL_ACCOUNT_IDS` were removed from source and from both Wrangler
-blocks: every authenticated account with an active chart, a confirmed locale,
-its own current consent, a public-capable active ontology, and an unused
-chart-fingerprint claim is in the generated flow. The gate that remains under an
-operator's control is **which ontology is active**, and activating a
-public-capable one opens generation for every eligible account at once. Dated
-observations of the old variables are kept below as evidence; none of them is a
-step.
+`PATTERN_INTERNAL_ACCOUNT_IDS` are absent. An admitted ontology permits the
+remaining eligibility checks; the operational pause independently stops new
+generation while preserving accepted reads and erasure behavior.
 
 **Companion artifacts:**
 
@@ -105,12 +115,48 @@ This table describes repository evidence, not unqueried live state.
 | Later recorded migration evidence (reviewed 2026-09-08) | `MIGRATIONS.json` records **0028 applied** on 2026-09-06; the separate [0029 receipt](../reviews/artifacts/2026-09-07-release-attestation/production-migration-0029.json) records **0029 applied** on 2026-09-07 at 10:15:26 UTC | The prospective 0029 source note does not mean the later apply remains pending. See the [release review](../reviews/2026-09-07-release-attestation-merge.md#completed-deployment-prerequisites). 0021, 0022 and 0024 lack dedicated APPLIED notes in `MIGRATIONS.json`; consult dated receipts and the live ledger before any new migration action. This table is not a fresh live D1 query. |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | Executed on production 2026-08-26 | `pattern-ontology-en-us-internal-0.1.0` active; one failed generation (`semantic_verification_failed`) then one succeeded and accepted. It reached a provider through the internal-account bypass this repository has since removed. This records that it happened; it does not record Gate 8's acceptance evidence. |
-| Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active. See the evidence ledger for individual runs. |
+| Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; the dated ledger records no active machine release. See the evidence ledger for individual runs. |
 | Pattern admission declared in committed `wrangler.toml` | none — `PATTERN_AI_ROLLOUT` and `PATTERN_INTERNAL_ACCOUNT_IDS` are absent from both blocks | Admission is the reader's eligibility ladder. The operator-controlled gate is which ontology is active. |
 | Committed publisher declaration | `codex` in both blocks | The dedicated runner path is the only one configuration accepts; OpenAI gateway ids and key alias remain empty |
 | Gate 6 spend certification | Open for OpenAI and Codex | `100` Pattern and `500` ontology calls/day remain enforcement ceilings. The 2026-08-22 OpenAI approval used old 4k/8k/4k output pins and is historical evidence, not authorization for the current mixed ontology/Pattern envelope or Codex. |
-| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-27 — see the observation below | API `287bce63-dece-4911-96db-dd212c2cec33` (deployed `2026-08-27T06:36:15Z`); active ontology `pattern-ontology-en-us-internal-0.1.0` with zero pipeline-evidence rows, so its activation scope derives `internal`; one accepted Pattern document. |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Historical query 2026-08-27 — see the observation below | API `287bce63-dece-4911-96db-dd212c2cec33` (deployed `2026-08-27T06:36:15Z`); active ontology `pattern-ontology-en-us-internal-0.1.0` with zero pipeline-evidence rows, so its activation scope derives `internal`; one accepted Pattern document. |
 | Production DB, secrets, active ontology pointer, deployed Worker version | Superseded — queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; observed Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner was polling `/codex-provider/v1/jobs/claim` and answering `ok`. This observed state differs from current committed rollout declarations and must be re-queried before another operation. |
+
+<a id="superseded-historical-decision-2026-08-27"></a>
+
+## Superseded historical decision — 2026-08-27
+
+The following dated decision is preserved verbatim from the pre-correction
+runbook. Its claims that every candidate entered regression, that the safety
+gates run nowhere on the reader path, and that Gates 8/10 are wholly closed as
+inapplicable are **superseded historical interpretations**. Use the
+[September 9 current-source explanation](#current-source-review-2026-09-09)
+and the current admission table for present guidance. This retained record
+is not an operational instruction or a fresh observation.
+
+**Superseding decision (2026-08-27):** the account-wide release serves readers
+from that active authored release, and Gate 7B is no longer a precondition for
+it. `ontologyServesAccount` now admits a `synthetic_internal` release on origin
+alone; the scope check still governs the `machine_pipeline` branch, where a
+release earns `public` only by producing its whole evidence chain. The reason is
+recorded in this file's own history: fifteen candidate versions from `0.1.0`
+through `0.1.17` are logged here, every one of them entered the regressing
+stage, and none passed. `adbbbdc` counts sixteen candidate *runs* against those
+versions and notes that two of the last three died on prompt defects rather
+than on the ontology being judged. Requiring a public machine
+release would therefore close Pattern for every reader rather than open it.
+
+That is a trade, and it is stated here so nobody rediscovers it during an
+incident. An authored release skips the independent evaluator and the seven
+regression hard gates, and those gates run nowhere else in the product — the
+live per-generation path has structural validation and a model semantic
+verifier, not `suppressed_feature_leak` or `prohibited_claim`. What the authored
+release does carry is publication rights: every record is `source_supported`
+against a `licensed_excerpt` corpus and cites the fragment it came from, it is
+signed by the isolated signer, and it compiles. Since Pattern became
+account-wide there is no cohort to contain the consequence, so **Gates 8 and 10
+no longer describe a reachable cohort transition** and are closed as not
+applicable rather than satisfied.
 
 ## Production observation — 2026-08-27
 
@@ -149,6 +195,10 @@ unerased `pattern_generation_artifact_keys` 2, and **zero** jobs carrying
 
 ### What this means for the account-wide deploy
 
+**Superseded historical interpretation (2026-08-27):** the narrative below
+described a machine-only predicate. Current admission instead admits internal
+origin as stated above; preserve this text as history, not deployment guidance.
+
 The active release has no pipeline evidence, so
 `ONTOLOGY_ACTIVATION_SCOPE_SQL` derives `internal` for it. It served a Pattern on
 2026-08-26 only because the two-argument `ontologyServesAccount` admitted an
@@ -173,6 +223,11 @@ actually executed, or that word-count and semantic validation passed under the
 current pins. Only row counts and identities were read.
 
 ## What remains before the first generated Pattern
+
+**Historical procedure/interpretation:** this section retains the August 22–28
+operational record. Reconcile it with the September 9 current-source review
+above before use; its cohort, first-generation, and defect claims are not fresh
+state or a new execution receipt.
 
 The shortest supported route is the internal path. Follow the common gates
 first, then choose exactly one ontology branch:
@@ -207,16 +262,18 @@ already public.
 
 ## Paths after the common engineering gates
 
-There is one path, and its only operator-controlled step is ontology activation.
+The ontology admission boundary is defined below; the generation pause remains
+a separate operational control.
 
-| Step | Ontology accepted | Who can generate | Additional blockers |
-| --- | --- | --- | --- |
-| No active ontology | — | nobody; every account reads `ontology_unavailable` | — |
-| Internal activation | signed `synthetic_internal`, or a machine release whose evidence does not re-derive `public` | still nobody | An internal release serves no reader: `ontologyServesAccount` requires machine-pipeline provenance AND a `public` activation scope. It remains useful only for control-plane work. |
-| Public activation | signed `machine_pipeline`, backed by an authorized `licensed_excerpt` corpus, with committed evaluation and regression evidence | every eligible account | Automated ontology Task 11 evidence, Gate 9 certification, admin role boundary, replay runtime/drill, sustained metrics, and the privacy/legal review of consent policy `1.1.0` |
+| Available release | Ontology admission result | Remaining boundaries |
+| --- | --- | --- |
+| None, invalid, or unavailable through release loading | No usable ontology; other eligibility states may also apply | Eligibility ladder may return an earlier account/chart/locale state |
+| Valid admitted `synthetic_internal` | Admitted by origin | Account, chart, locale, consent, pause, and claim gates |
+| Valid `machine_pipeline` without re-derived `public` scope | Not admitted for reader generation | Machine evidence must satisfy release loading/admission |
+| Valid `machine_pipeline` with re-derived `public` scope | Admitted | Account, chart, locale, consent, pause, and claim gates |
 
-The internal release is never promoted into a public release. The first machine
-release recalls it and triggers withdrawal for documents based on it.
+Activation, recall, and reader eligibility are separate checks; signing alone
+neither ingests nor activates a release.
 
 Because activation is account-independent, there is no "canary cohort" to
 configure. The first generation after activation is a canary by observation:
@@ -794,7 +851,9 @@ unreachable from Workers.
 Historical direct-OpenAI-path probe evidence recorded HTTP `429`
 `insufficient_quota` / `credit_balance_exhausted`. That evidence blocks the
 historical direct OpenAI path; it does not describe the selected Codex runner
-path. The current operational blockers are the failed Codex regression candidate
+path. The following historical blocker interpretation predates internal-origin
+admission and is superseded by the current-source review above: the blockers
+were the failed Codex regression candidate
 and resulting absence of an active signed ontology release, plus the open
 selected-provider Gate 6. A new Codex candidate must pass every existing hard
 gate before activation; there is no manual or credit-free shortcut to a signed
@@ -811,18 +870,18 @@ does not establish which upstream component introduced the condition.
 
 ### Gate 7A — shortest internal path
 
-Execute `docs/superpowers/plans/2026-08-20-internal-ontology-activation.md`.
-Required evidence: signed `synthetic_internal` bundle hash, compiler pass,
-signature/key id, and active pointer — followed by proof that the release serves
-**nobody**. An internal activation scope is a content-integrity refusal, not a
-cohort: every authenticated account, including the operator's own, must receive
-`409 ontology_unavailable` on reservation and `ontology_unavailable` from
-`GET /v1/pattern-state`. Each denied request must leave zero claim, consent,
-generation-job, provider-budget, or artifact side effects. `evaluator_passed`
-and `regression_passed` remain honestly false.
+Reconcile `docs/superpowers/plans/2026-08-20-internal-ontology-activation.md`
+with current source before any operation. Record the compiled internal candidate,
+canonical bundle hash, signature/key id, ingestion, and active pointer separately.
+The signing route signs and returns; ingestion and activation belong to the
+existing guarded release route. A valid admitted internal-origin release can
+serve eligible readers; it is not a serves-nobody activation scope.
 
-This path can therefore no longer produce a generated Pattern. It remains the
-shortest way to exercise signing, ingestion, activation, and recall.
+The offline builder writes `compiler_passed=true`, checks compilation before
+output, and retains `evaluator_passed=true`, `regression_passed=false`, and
+`unevaluated_fixture_count=0`. The latter compatibility fields do not establish
+independent evaluation or fixture coverage. Reader publication safety remains
+mandatory. No provider operation is authorized by this correction.
 
 ### Gate 7B — public-capable path
 
@@ -840,6 +899,11 @@ An `internal_synthetic` corpus can prove engineering but cannot satisfy 7B. No
 operator can relabel it or waive a failed record.
 
 #### The recurring `suppressed_feature_leak` failure, and what was changed
+
+**Historical procedure/interpretation:** this section retains the August 22–28
+operational record. Reconcile it with the September 9 current-source review
+above before use; its cohort, first-generation, and defect claims are not fresh
+state or a new execution receipt.
 
 Two of the fourteen failed candidates died on the same gate rather than on
 their own content: attempt 11 (`0.1.10`, 46 regression results) and
@@ -871,6 +935,11 @@ have never been reached by any candidate, and a candidate can still fail closed
 on this or any other hard gate.
 
 #### What `0.1.17` showed, and the planner defect it exposed
+
+**Historical procedure/interpretation:** this section retains the August 22–28
+operational record. Reconcile it with the September 9 current-source review
+above before use; its cohort, first-generation, and defect claims are not fresh
+state or a new execution receipt.
 
 Candidate `pattern-ontology-en-us-0.1.17`
 (`oprun_4d24bc8b-83c8-465d-8877-05c6daffcb34`, config
@@ -913,6 +982,11 @@ regression failure, missing source authorization, wrong provenance, or an
 attempt to make Slice A public.
 
 ## Gate 8 — enable and certify the first internal Pattern
+
+**Historical procedure/interpretation:** this section retains the August 22–28
+operational record. Reconcile it with the September 9 current-source review
+above before use; its cohort, first-generation, and defect claims are not fresh
+state or a new execution receipt.
 
 **Current state:** blocked before reservation. Production has four active
 accounts, four active charts, and four confirmed `en-US` locales. Canary
@@ -967,6 +1041,11 @@ internal account. Gates 9–10 govern external readers.
 
 ## Gate 9 — public-readiness certification
 
+**Historical procedure/interpretation:** this section retains the August 22–28
+operational record. Reconcile it with the September 9 current-source review
+above before use; its cohort, first-generation, and defect claims are not fresh
+state or a new execution receipt.
+
 **Current state:** replay engineering and production signing configuration are
 complete, while operational certification remains open. Migration `0008`, the
 signed create-only R2-first writer, atomic D1 receipts, lifecycle integrations,
@@ -1002,6 +1081,11 @@ writer, replayer, replica receipt, and drill must exist and be exercised.
 restore resurrection, plaintext exposure, or exception waived by a person.
 
 ## Gate 10 — advance to `first_open`
+
+**Historical procedure/interpretation:** this section retains the August 22–28
+operational record. Reconcile it with the September 9 current-source review
+above before use; its cohort, first-generation, and defect claims are not fresh
+state or a new execution receipt.
 
 **Current state:** not attempted. Gate 6 is open for the selected provider;
 Gate 7B failed closed and Gates 8 and 9 remain open. There is no active machine

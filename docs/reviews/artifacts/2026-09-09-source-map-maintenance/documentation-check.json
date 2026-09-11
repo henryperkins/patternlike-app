@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "counts": {
+    "documents": 22,
+    "local_links": 1241,
+    "fragments": 967,
+    "source_line_anchors": 201
+  },
+  "original_checkout_inputs_checked": 17,
+  "archives_checked": 5,
+  "errors": []
+}

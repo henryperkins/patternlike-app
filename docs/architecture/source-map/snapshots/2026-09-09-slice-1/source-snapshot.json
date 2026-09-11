@@ -1,0 +1,1890 @@
+{
+  "schema_version": "patternlike-source-map-snapshot.v1",
+  "capture_id": "2026-09-09-slice-1",
+  "captured_at": "2026-09-09T04:24:22.744Z",
+  "scope": "referenced_files_and_map_inputs_only",
+  "repository": {
+    "base_commit": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+    "branch": "codex/source-map-maintenance",
+    "worktree_has_changes": true,
+    "dirty_paths": [
+      "apps/api/scripts/build-internal-ontology.ts",
+      "apps/api/src/services/ontology-signing-client.ts",
+      "docs/architecture/source-map/map.json",
+      "package.json",
+      "scripts/source-map/cli.mjs",
+      "scripts/source-map/model.mjs",
+      "scripts/source-map/snapshot.mjs"
+    ]
+  },
+  "identity": {
+    "definition": {
+      "path": "docs/architecture/source-map/map.json",
+      "sha256": "79a894097c333d1b6fad2cd20526c68a553c92769af5f2f76fb9ff72a5947847",
+      "bytes": 117343,
+      "executable": false
+    },
+    "tooling_files": {
+      ".nvmrc": {
+        "sha256": "f14b4987904bcb5814e4459a057ed4d20f58a633152288a761214dcd28780b56",
+        "bytes": 3,
+        "executable": false
+      },
+      "package.json": {
+        "sha256": "248c8722330d77aa4bb14903f0f7921059a78ee55f85aed52c26079c4c8df18b",
+        "bytes": 3187,
+        "executable": false
+      },
+      "scripts/pattern-release/candidates.mjs": {
+        "sha256": "482c5333633ab10dab4737235b4df325ccfa759643bb0b386158ef3c183670a4",
+        "bytes": 12561,
+        "executable": false
+      },
+      "scripts/source-map/cli.mjs": {
+        "sha256": "c1b5d35f4e645df8ea053895123076cdf9388b861f7ab9e2cd722af49ae206d2",
+        "bytes": 238,
+        "executable": false
+      },
+      "scripts/source-map/model.mjs": {
+        "sha256": "1e9671e5c9a4cba7460bcd600dd8deda7c0e7054929fb59677511b16db7568c8",
+        "bytes": 6199,
+        "executable": false
+      },
+      "scripts/source-map/snapshot.mjs": {
+        "sha256": "be89c2c7a707baa3c06eb79e1ffcdf4ace6ed22dd42a7860f886483c11bee9d2",
+        "bytes": 18630,
+        "executable": false
+      }
+    },
+    "referenced_files": {
+      "AGENTS.md": {
+        "sha256": "d7ffd61a89da3c185973daf812eeda7717b66a0437cf9593cfd72b326befe57b",
+        "bytes": 5549,
+        "executable": false
+      },
+      "LICENSING.md": {
+        "sha256": "03b2c433d17acf182131bd4a9a784164d6610c7eed411389b11630be55a08ec1",
+        "bytes": 3399,
+        "executable": false
+      },
+      "apps/api/scripts/build-internal-ontology.ts": {
+        "sha256": "533386a4489ec3fdf493687a9256ad97d53b65614fab3447e366d089ce82d622",
+        "bytes": 7408,
+        "executable": false
+      },
+      "apps/api/src/crypto.ts": {
+        "sha256": "6eccb19eb8cbd4f34d008f346b723117b329dc72c28985ea1c897c5bc45dad39",
+        "bytes": 8165,
+        "executable": false
+      },
+      "apps/api/src/db/codex-provider-jobs.ts": {
+        "sha256": "5ac1761d67800a9ef54498b9659290ee8bb941cf4c3a5a6f3b5ca0012f36e84b",
+        "bytes": 23367,
+        "executable": false
+      },
+      "apps/api/src/db/crypto-write-fence.ts": {
+        "sha256": "ec7df260a33bbdaa9983eaefcb18ced3dc6a5d0f8fcf95e6ab71cd189a8d572d",
+        "bytes": 1669,
+        "executable": false
+      },
+      "apps/api/src/db/pattern-ontology.ts": {
+        "sha256": "5e15be35cdd4a59ae4309ad3bae7ece4a39fc60c850b84126ee1b97035b9ddaa",
+        "bytes": 30802,
+        "executable": false
+      },
+      "apps/api/src/index.ts": {
+        "sha256": "592cd93158b00c4937d5ac9add472da9733f46a3bee038278c515c768bb60586",
+        "bytes": 7611,
+        "executable": false
+      },
+      "apps/api/src/middleware/admin-auth.ts": {
+        "sha256": "cf5ef3b6f2e7b629f317875e688b206c633d90bed35feadb30a754239c7f034c",
+        "bytes": 4287,
+        "executable": false
+      },
+      "apps/api/src/middleware/auth.ts": {
+        "sha256": "dbb0d7589cb93d6708b6ad29e06eca04ec10d4250e53a69284ab712206641803",
+        "bytes": 5978,
+        "executable": false
+      },
+      "apps/api/src/queue.ts": {
+        "sha256": "318ccd3f8f6347d4bbbc67f726157540a29d723e28406b05fabca45b801e056e",
+        "bytes": 16050,
+        "executable": false
+      },
+      "apps/api/src/routes/account-processing-consents.ts": {
+        "sha256": "7444fa35defbc89b406424114975f3a01fbf95352c893821335fedbbb296a082",
+        "bytes": 4439,
+        "executable": false
+      },
+      "apps/api/src/routes/admin-pattern.ts": {
+        "sha256": "12f0cb9499601f5513dd6b264d0555941003fcc3f02de7ac439884db341435cd",
+        "bytes": 10026,
+        "executable": false
+      },
+      "apps/api/src/routes/birth.ts": {
+        "sha256": "2192df66f68e3de0d6a450202f048c458e763878a015b1e254ae1da388f98254",
+        "bytes": 53816,
+        "executable": false
+      },
+      "apps/api/src/routes/codex-provider.ts": {
+        "sha256": "e379e8917bf548bd7d2239ebaacf913c60b772ce50a412381a11a5ed598074b8",
+        "bytes": 16938,
+        "executable": false
+      },
+      "apps/api/src/routes/consents.ts": {
+        "sha256": "91f4d5706c4a6934de9720e088b594d9cf15010c4f3fb78ccf378908f7021b46",
+        "bytes": 9090,
+        "executable": false
+      },
+      "apps/api/src/routes/content-releases.ts": {
+        "sha256": "ad45279f96b9fbb8ca0707dfb9cd28148fe59a0d65edb959689fbb0d7e23da47",
+        "bytes": 15770,
+        "executable": false
+      },
+      "apps/api/src/routes/health.ts": {
+        "sha256": "583dcfe44a187488297489e0ecc49d18ba47c4c314b8bde63972ac8f43a0daeb",
+        "bytes": 1269,
+        "executable": false
+      },
+      "apps/api/src/routes/internal-crypto.ts": {
+        "sha256": "96c4a76726ba841e6661baa3a821adb4c95c5eb7d76796e592c7663033743f23",
+        "bytes": 6999,
+        "executable": false
+      },
+      "apps/api/src/routes/internal-generation.ts": {
+        "sha256": "8a10d92c3fcc470fe56ca5db86d077e5a104079dcc5bc03483583d00c2d8643c",
+        "bytes": 9873,
+        "executable": false
+      },
+      "apps/api/src/routes/pattern-ai.ts": {
+        "sha256": "2c7d8522dc55ddd0899b6722fdc15c06b534fba051706a82bd6929dec1b91484",
+        "bytes": 11677,
+        "executable": false
+      },
+      "apps/api/src/routes/pattern.ts": {
+        "sha256": "c1d66af3cfcbb2b41b02cede934500d82bfbb90f53d8852694afecb3956df944",
+        "bytes": 977,
+        "executable": false
+      },
+      "apps/api/src/routes/places.ts": {
+        "sha256": "b2d1799df856bbe1e2c37fce38b36f38dce9e8705d3a3e401e2bee8ad46413b8",
+        "bytes": 5602,
+        "executable": false
+      },
+      "apps/api/src/routes/privacy.ts": {
+        "sha256": "26d10b1deaf86ac8a7d7fce249eb4cb352882795ddb6535982750728f2ff5078",
+        "bytes": 17752,
+        "executable": false
+      },
+      "apps/api/src/routes/readings.ts": {
+        "sha256": "2feec6d2a9908d928a0cbba5ee794cc66ed94d4c8d3c4bc6736dd0c8b272ce9f",
+        "bytes": 23203,
+        "executable": false
+      },
+      "apps/api/src/routes/sessions.ts": {
+        "sha256": "c8e68111c3fe6302ea2eefc40e59081073873c4bd63246d76c3b45ca315650ff",
+        "bytes": 2905,
+        "executable": false
+      },
+      "apps/api/src/routes/stubs.ts": {
+        "sha256": "56cadccdf6dbdb77d899052715bc932af6b393f22d10ab1fd7554964770b13b4",
+        "bytes": 2364,
+        "executable": false
+      },
+      "apps/api/src/routes/timing.ts": {
+        "sha256": "e6de1b453b4b2dfd3c96b478f45489f63c3574a5129ab05802346bcae52b6885",
+        "bytes": 7886,
+        "executable": false
+      },
+      "apps/api/src/scheduled.ts": {
+        "sha256": "500a845e7c7418d26fe89fb4eb3f8ecf2c4b8edeb41cfffbe737a2185ceedd53",
+        "bytes": 3912,
+        "executable": false
+      },
+      "apps/api/src/services/account-deletion.ts": {
+        "sha256": "f1ca0214991ec280f4711bd26093deeae832a4230795ba4652c72a2feb857d0b",
+        "bytes": 12265,
+        "executable": false
+      },
+      "apps/api/src/services/birth-operational-config.ts": {
+        "sha256": "68b88a039f0261ede39e41b9491d7c3e5dc9902a7960dd363fafac372a003b1e",
+        "bytes": 1936,
+        "executable": false
+      },
+      "apps/api/src/services/calc-client.ts": {
+        "sha256": "f1e608234528308c8387ea8a0edf71eee9334c69081c7703fbfc78883f765b10",
+        "bytes": 3524,
+        "executable": false
+      },
+      "apps/api/src/services/codex-pattern-publisher.ts": {
+        "sha256": "6b0fa068f3f0a0b8de474ff4c92b2878b906983db5933be9816605fafe32f124",
+        "bytes": 5870,
+        "executable": false
+      },
+      "apps/api/src/services/codex-provider-artifacts.ts": {
+        "sha256": "a19a661619553b5f3cdd4748fdab7b4c270f27790cc6b1afac554947c272cd60",
+        "bytes": 14124,
+        "executable": false
+      },
+      "apps/api/src/services/codex-reading-publisher.ts": {
+        "sha256": "54b3029dc9eb8371dab3192d906c3bd5e3f8794f105463d35540ac7db8e1c560",
+        "bytes": 10305,
+        "executable": false
+      },
+      "apps/api/src/services/content-release.ts": {
+        "sha256": "36b11249ae7833c7ac893e52fc284b1edaccea5d99bd3c16d7ff9e4b6553552a",
+        "bytes": 37087,
+        "executable": false
+      },
+      "apps/api/src/services/context-compiler.ts": {
+        "sha256": "d4cb7774539cbb708b305a806ccab3930f3901de75f0039a4b0b49945481263d",
+        "bytes": 8810,
+        "executable": false
+      },
+      "apps/api/src/services/daily-sky-client.ts": {
+        "sha256": "8c0f639e43a3d534fb761557743f566c01d5438dc2f1db74f1c78d458f61441d",
+        "bytes": 9090,
+        "executable": false
+      },
+      "apps/api/src/services/enqueue.ts": {
+        "sha256": "a6b28a3e0c411175bcf439978c6c59247199eea627cabd1d349e20aab66bfd34",
+        "bytes": 18734,
+        "executable": false
+      },
+      "apps/api/src/services/ensure-today-reading.ts": {
+        "sha256": "b81f18f25e74dcdfce021314a324a6fcfe4a264895a7fae5cf7b2eb19016cc94",
+        "bytes": 13239,
+        "executable": false
+      },
+      "apps/api/src/services/generate-daily-reading-v5.ts": {
+        "sha256": "79237cc140276b0d37b60ebcf2d4b5bfa0e8193321a009103a1499ec627efd71",
+        "bytes": 33105,
+        "executable": false
+      },
+      "apps/api/src/services/generate-daily-reading.ts": {
+        "sha256": "aac27a016fad70865e1c63722cad144d5b0a113d2a884d7fbe0f1f3ca522c366",
+        "bytes": 17184,
+        "executable": false
+      },
+      "apps/api/src/services/generation-command-v2.ts": {
+        "sha256": "a9b78237444868da44f660636fba8ad7654c150e0ee4376c363ebda6587695e8",
+        "bytes": 28097,
+        "executable": false
+      },
+      "apps/api/src/services/geocoder/index.ts": {
+        "sha256": "e8af215741d3ec2a0e0b8ecbda4a89275e8826c6ccc01101b4eb3c9c3fcb87a0",
+        "bytes": 540,
+        "executable": false
+      },
+      "apps/api/src/services/natal-features.ts": {
+        "sha256": "3ed3575ffd36b73ad7ffead2805b4d759481323b985a45b9887ab15de92b0a81",
+        "bytes": 7833,
+        "executable": false
+      },
+      "apps/api/src/services/ontology-pipeline-execute.ts": {
+        "sha256": "6398a4e103e7523a5b0541233f45ad03b0eb5f8c7af81bd48d58a5d0f8c7d165",
+        "bytes": 105703,
+        "executable": false
+      },
+      "apps/api/src/services/ontology-signing-client.ts": {
+        "sha256": "456b59e9eda1bd57036eb8cc81f026515dd19795ddcea3890ce72b52f2a4a85b",
+        "bytes": 6471,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-command.ts": {
+        "sha256": "1f8f93cf3ea5d31fd80989829a24690fa8aaf51430c157cf89535076f3504a7c",
+        "bytes": 3970,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-crypto.ts": {
+        "sha256": "b6e9d4e8c96f59dbc42a89c69f0eee9a64d2cdd1872decc7c59683568007fc03",
+        "bytes": 2490,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-execute.ts": {
+        "sha256": "3992b26d16e831445b74b6750eeeaf678f0502310e8849e5fff6c708d20c34cf",
+        "bytes": 73806,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-portrait-mesh.ts": {
+        "sha256": "496a72734cbeb87dbfcf67c4efb15725e5b4708bde713925643b0d3f828f221b",
+        "bytes": 37375,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-portrait.ts": {
+        "sha256": "a17a5b2e0c1def763b79663814d136a93f910ad541181f4abeb1946aa703d4e4",
+        "bytes": 34960,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-publication-proof.ts": {
+        "sha256": "b49197e0b398cfdb0e31c9365a949e455aa0ca234f0ccbf2f8a67c467ad25775",
+        "bytes": 13263,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-publication-safety.ts": {
+        "sha256": "892b6ad37a3e99ff2c0e1b5b44e056eec55c739e9ee65741decfcdf904645cd2",
+        "bytes": 17674,
+        "executable": false
+      },
+      "apps/api/src/services/pattern-state.ts": {
+        "sha256": "763ae8d6f87bfe2eb0c225261157fdf6b03fe2ec9a2ff38489f159e163b0c85e",
+        "bytes": 13916,
+        "executable": false
+      },
+      "apps/api/src/services/reading-invalidation.ts": {
+        "sha256": "a8a0ebf3882d9de1bcc89be2c2a82379c9d058b61be852d00b7548b88843c7e8",
+        "bytes": 17526,
+        "executable": false
+      },
+      "apps/api/src/services/reading-publisher.ts": {
+        "sha256": "f1073e69468eca194fab6482465d21ff108390cb4f22ca234845abceafd4fba2",
+        "bytes": 27591,
+        "executable": false
+      },
+      "apps/api/src/services/run-reading-scheduler.ts": {
+        "sha256": "2d53b6d9231840c128d4cc3cc5b1179f78adf9412faab736b5e7319743551fef",
+        "bytes": 12732,
+        "executable": false
+      },
+      "apps/api/src/services/safe-log.ts": {
+        "sha256": "6d761c42b81f7ef23bb3921c62452369b153329abe5c1159257ff4b48bb2df45",
+        "bytes": 20635,
+        "executable": false
+      },
+      "apps/api/src/services/time-travel.ts": {
+        "sha256": "d1dcf67030db8b692fb10e9ef8441184f9a077ead01fd4b25775f2eb4f4c2fab",
+        "bytes": 12897,
+        "executable": false
+      },
+      "apps/api/src/services/timezone.ts": {
+        "sha256": "dbd7d11f146950b1185bc40428ebecc96931bc4fbd4588ffbdef042f360cf692",
+        "bytes": 8343,
+        "executable": false
+      },
+      "apps/api/wrangler.toml": {
+        "sha256": "e744fdcea2605ab668cd044c1161fd067d20e11ccbe3e583c1a9378ac983fe13",
+        "bytes": 35377,
+        "executable": false
+      },
+      "apps/calc-stub/package.json": {
+        "sha256": "454e077e21b904db7cf7fe65a3e8c8a290ded35aabf74c316d72e547e1045bc0",
+        "bytes": 1159,
+        "executable": false
+      },
+      "apps/calc-stub/src/engine.ts": {
+        "sha256": "b18f99b25714c0501c3953a5e831054a6c98b805d424c286e828082b2dcf0653",
+        "bytes": 34389,
+        "executable": false
+      },
+      "apps/calc-stub/src/server.ts": {
+        "sha256": "2e62dd9524b49fa80e5d139249700a19493796e121261eed239e2c2b07fae680",
+        "bytes": 7868,
+        "executable": false
+      },
+      "apps/codex-runner/src/codex-cli.ts": {
+        "sha256": "dd9e96498f0854712159e7e6d81bbf6cc442d7770a5a17206a49b873e0c7cc70",
+        "bytes": 4043,
+        "executable": false
+      },
+      "apps/codex-runner/src/index.ts": {
+        "sha256": "10483fb3bbd28b3a3741e312a53cd6167ed35fe568f521cbb039a59746865ff5",
+        "bytes": 2938,
+        "executable": false
+      },
+      "apps/codex-runner/src/isolated-codex-json.ts": {
+        "sha256": "8df0b523bf3e936f4fff6057b278284181ba6b60d3b7cfb07efb0c88333713ef",
+        "bytes": 14208,
+        "executable": false
+      },
+      "apps/codex-runner/src/portrait-invocation.ts": {
+        "sha256": "377e306d4bfe90362a66069e828fbd2318a57435771f231abbafe460d0ba02ba",
+        "bytes": 21329,
+        "executable": false
+      },
+      "apps/codex-runner/src/portrait-mesh-invocation.ts": {
+        "sha256": "dfd1612a160c7c4504f53ea93cc002a8219c335cbf2ee1facc4c4c936eed533b",
+        "bytes": 12840,
+        "executable": false
+      },
+      "apps/codex-runner/src/runner.ts": {
+        "sha256": "382463ac88325150a2c52668de3d75cd5570b890568c63c15b555a29efebadaf",
+        "bytes": 9270,
+        "executable": false
+      },
+      "apps/ontology-signer/src/index.ts": {
+        "sha256": "25c96ce00080a505cf61550ebbea3a04797b37f1d394844722e33382411adb9b",
+        "bytes": 8687,
+        "executable": false
+      },
+      "apps/web/public/sw.js": {
+        "sha256": "f76238cd81bb37e340719d159a5286b3ade84a9a80cffd008d65e36967203d87",
+        "bytes": 1289,
+        "executable": false
+      },
+      "apps/web/src/App.tsx": {
+        "sha256": "205d372fde306411c3442690438d8a5c466b782a439a7e774f04e95f4e338006",
+        "bytes": 17893,
+        "executable": false
+      },
+      "apps/web/src/components/AccountPortraitExplorer.tsx": {
+        "sha256": "e543dcdc1a33cdc13ecc714edd3ffcd3b8d6bb261188efe104c99f8ef9282afa",
+        "bytes": 14466,
+        "executable": false
+      },
+      "apps/web/src/components/AppShell.tsx": {
+        "sha256": "32f68f4bd4cd4d3790512b03be571990e89be5f642419ab03a2c9083d500cb83",
+        "bytes": 3248,
+        "executable": false
+      },
+      "apps/web/src/components/ChartView.tsx": {
+        "sha256": "7fe626126443730828057ee2f8d017f6a3b43268f91105b6126dea72bc470073",
+        "bytes": 8652,
+        "executable": false
+      },
+      "apps/web/src/components/HistoryView.tsx": {
+        "sha256": "91936e98bf7acaaffa538b193101406f5d1ffbefa4b2861b2baa176f3d3ed775",
+        "bytes": 15556,
+        "executable": false
+      },
+      "apps/web/src/components/Onboarding.tsx": {
+        "sha256": "b76335d09e09100b85e02228d9a4d26ceef0813de83499cfc6efb1af03f0e44d",
+        "bytes": 25933,
+        "executable": false
+      },
+      "apps/web/src/components/PatternExperience.tsx": {
+        "sha256": "0f0ec87b1e233a43f7a27d3366c2abd10aff29b51b256966bf4ba342b4b0fb38",
+        "bytes": 23747,
+        "executable": false
+      },
+      "apps/web/src/components/PrivacyView.tsx": {
+        "sha256": "c330d1a84efac9e286de4c1e44d57ebf2d3345ab8c3df434d6e051dd47bd70a6",
+        "bytes": 28932,
+        "executable": false
+      },
+      "apps/web/src/components/ReadingArticle.tsx": {
+        "sha256": "2fd578f1e03185ba4b22dee92017cb9a2328aa381f6d41272cac6597cea199a6",
+        "bytes": 5866,
+        "executable": false
+      },
+      "apps/web/src/components/TimeTravelView.tsx": {
+        "sha256": "3fd19dbb8b8ea5e8cff964a60a7cfc7f97d2ae89a7a3ccad548d6a9a1b7eaac0",
+        "bytes": 25558,
+        "executable": false
+      },
+      "apps/web/src/components/TodayView.tsx": {
+        "sha256": "39a59a14ce6e774d0a2ef97ebc6eb54692060cd3dd3d3162bd9aed6fc80ae487",
+        "bytes": 12301,
+        "executable": false
+      },
+      "apps/web/src/components/portrait-explorer/ExplorerReader.tsx": {
+        "sha256": "79bc589ded575df548bc6bccb480ae07f5203d49318533fb4407f9276657bf86",
+        "bytes": 8073,
+        "executable": false
+      },
+      "apps/web/src/components/portrait-explorer/ObservatoryControls.tsx": {
+        "sha256": "3897d8fc15b23f5c04108130c9bacbbeb82603bd1089356bf73c712806982047",
+        "bytes": 2845,
+        "executable": false
+      },
+      "apps/web/src/components/portrait-explorer/PortraitExplorer.tsx": {
+        "sha256": "342cc17bd4cd8fd9d315caed596662ee0120bcd3a375dadea37422d98ba3d78c",
+        "bytes": 42886,
+        "executable": false
+      },
+      "apps/web/src/components/portrait-explorer/PortraitScene.tsx": {
+        "sha256": "780652bc82c40f659bc94b24ff78e935ae14b4f846666979ac8ec683caee67ea",
+        "bytes": 46122,
+        "executable": false
+      },
+      "apps/web/src/components/portrait-explorer/observatory-world.ts": {
+        "sha256": "39a55a2b719864dbc7762fc3379b4d40b0ea9037c44828c8ca3578a5b8f5237d",
+        "bytes": 16826,
+        "executable": false
+      },
+      "apps/web/src/components/portrait-explorer/use-explorer-navigation.ts": {
+        "sha256": "734ebb43c8c830e4ab6ffc74d81de86413167c689c45e3ddfb294d16d722245c",
+        "bytes": 10298,
+        "executable": false
+      },
+      "apps/web/src/lib/pattern-portrait.ts": {
+        "sha256": "3b3f3e2a58e45667181e2e3436cbd6961e6dde526ae6b1e0a08122dfd0b151f5",
+        "bytes": 4038,
+        "executable": false
+      },
+      "contracts/validate_schemas.py": {
+        "sha256": "715037c5a25a5a09bf8e22420d08dcfee884f94e103283073470345596651f91",
+        "bytes": 175320,
+        "executable": false
+      },
+      "db/d1/0027_portrait_mesh_automation.sql": {
+        "sha256": "eb1e09412c117db6dcf631f4b4912ad9c53c1c703f80020d8752cb44a8032e0b",
+        "bytes": 6549,
+        "executable": false
+      },
+      "db/d1/MIGRATIONS.json": {
+        "sha256": "57991f1fff5fe52df4c10f6211040cd61df1d97a9dcfde61015922dd0f4a09b6",
+        "bytes": 49219,
+        "executable": false
+      },
+      "docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md": {
+        "sha256": "adfaca8a0cf4fb8a89457c32919fc7eebfe2c94c935776ec038768df35822e23",
+        "bytes": 7758,
+        "executable": false
+      },
+      "docs/reviews/artifacts/2026-09-06-source-register-followup/production-observation.json": {
+        "sha256": "c2a579abe19ef330f3db76df0d5fb5741767ad29d3fc53930b9b18e677bae604",
+        "bytes": 6609,
+        "executable": false
+      },
+      "package.json": {
+        "sha256": "248c8722330d77aa4bb14903f0f7921059a78ee55f85aed52c26079c4c8df18b",
+        "bytes": 3187,
+        "executable": false
+      },
+      "packages/pattern-engine/src/candidate-validate.ts": {
+        "sha256": "d32b8955fa3ad8be0912862fc994194e57957cc6a54a979d6d183e7e752b68a6",
+        "bytes": 8591,
+        "executable": false
+      },
+      "packages/pattern-engine/src/index.ts": {
+        "sha256": "f1111bd7b042b70739c11fa4ddcbe3f65502db534d186cac28dab55b200e63a4",
+        "bytes": 1798,
+        "executable": false
+      },
+      "packages/pattern-engine/src/plan-validate.ts": {
+        "sha256": "b086114d76a71e5fe92345f751b29301e0cc55665b5be6b2742d51a32c558014",
+        "bytes": 8328,
+        "executable": false
+      },
+      "packages/pattern-engine/src/selection.ts": {
+        "sha256": "ade154e0cf4b9c9e8f447dba7f1f7356c42c40599365b204b5f00422b0aefdb8",
+        "bytes": 12520,
+        "executable": false
+      },
+      "packages/reading-engine/src/candidate-validation.ts": {
+        "sha256": "c5e1c3cf8befa3961d2e6a58d5ad720dbb12f19a5e8b1f7632fa1e0e09503bf3",
+        "bytes": 17254,
+        "executable": false
+      },
+      "packages/reading-engine/src/claim-support.ts": {
+        "sha256": "6f9bba95c99296e10bbcf932ec79854030cc9609f0e181e16df8e91eb127c399",
+        "bytes": 20671,
+        "executable": false
+      },
+      "packages/reading-engine/src/constrained-input.ts": {
+        "sha256": "57717d707edeefa33ba3c8bdeeda7055f26b6832e4bf206957817d123c6afd18",
+        "bytes": 36280,
+        "executable": false
+      },
+      "packages/reading-engine/src/index.ts": {
+        "sha256": "198c43429ce97f3b120ccd86f8b354086e8cffbc38bff11e40227b170e0ed4a3",
+        "bytes": 3218,
+        "executable": false
+      },
+      "packages/shared/package.json": {
+        "sha256": "d631838fade01d67e30cbb5c0172a6e24a0b982283e0bd30649445c6b11b57ab",
+        "bytes": 1029,
+        "executable": false
+      },
+      "packages/shared/src/index.ts": {
+        "sha256": "9e6a28178f85b9a7dff51cf3bc686bbaeea4d1cc7ad5fccafe456f33ab70cd5c",
+        "bytes": 9670,
+        "executable": false
+      },
+      "pattern-corpus/README.md": {
+        "sha256": "bcb07a4b01e8b2ad7162d19ddfe4fe8e5f7ebb12a5e3fe6dbdb5c78ceb3689b8",
+        "bytes": 7876,
+        "executable": false
+      },
+      "pattern-corpus/fragments.json": {
+        "sha256": "a19f5e35d2595fb6da76f5cacfc0c0f6fd21330c1df5706fd2961f830b1aed7e",
+        "bytes": 94148,
+        "executable": false
+      },
+      "pattern-corpus/provenance.json": {
+        "sha256": "359bd50ab93ed2d08f0a48b594c2bed2d2ed7e3e5e7bdb8e1ef475f11bfd8687",
+        "bytes": 10617,
+        "executable": false
+      },
+      "pattern-corpus/reviewers.json": {
+        "sha256": "8a6a715f14cb3c897fac9c08066b603aed3f2afc83b238be6f6e420fc7558f87",
+        "bytes": 73,
+        "executable": false
+      },
+      "pattern-corpus/validate-fragments.mjs": {
+        "sha256": "389fad70165ed2d1b499afc4af163c0d67cf0c912d027a9f6b85af24b129589b",
+        "bytes": 6747,
+        "executable": false
+      },
+      "scripts/ci-local.sh": {
+        "sha256": "ce68a6169445a2212187d8d4701e4739ba706aba52076d2a505a23a07e2341e0",
+        "bytes": 6673,
+        "executable": true
+      },
+      "scripts/pattern-release/fresh-pattern-evaluation.mjs": {
+        "sha256": "b59953f4b966b41f3ab822576881f8bdd0caaac8027d01e3381ae878e1063089",
+        "bytes": 11901,
+        "executable": false
+      },
+      "scripts/pattern-release/fresh-pattern-verifier-evaluation.mjs": {
+        "sha256": "8b4573541f6951ac727ced215dd7eee402aa658df9cfb5292f566a1b0de2beef",
+        "bytes": 22827,
+        "executable": false
+      },
+      "scripts/pattern-release/fresh-reading-evaluation.mjs": {
+        "sha256": "a2adb614d4a4a4e35cd86b9d608ff8149b4f4a3a85d32956133b4a64ed8bc7f0",
+        "bytes": 9710,
+        "executable": false
+      },
+      "scripts/pattern-release/operational-canary.mjs": {
+        "sha256": "1b7a18ee091fce2af9a1425cf80c5c37f118d515fb33ba860391f3ca7ea3d507",
+        "bytes": 8326,
+        "executable": false
+      },
+      "scripts/pattern-release/release-evidence.mjs": {
+        "sha256": "5ad62278ba912554b8ff2f0f59cfb7403606fd7f48735a7bb6082e6257a2890c",
+        "bytes": 14793,
+        "executable": false
+      },
+      "scripts/pattern-release/release-reconciliation.mjs": {
+        "sha256": "34df26efb6f3b0a566ff6e466609a0c9537e70d70538cb140fcf850e0f919eac",
+        "bytes": 22393,
+        "executable": false
+      }
+    },
+    "anchors": {
+      "evidence-apps-web-app-tsx": {
+        "path": "apps/web/src/App.tsx",
+        "start_line": 60,
+        "end_line": 60,
+        "selector_sha256": "edde0061e836bcb9651e0a8b5aab6e301e9b306761395ba3175519047a054a6b"
+      },
+      "evidence-apps-web-components-appshell-tsx": {
+        "path": "apps/web/src/components/AppShell.tsx",
+        "start_line": 6,
+        "end_line": 6,
+        "selector_sha256": "d6b8dcc361d37d485afe90905f369c0b5fb05029102532b3b9d31001518f20c6"
+      },
+      "evidence-apps-web-components-readingarticle-tsx": {
+        "path": "apps/web/src/components/ReadingArticle.tsx",
+        "start_line": 77,
+        "end_line": 77,
+        "selector_sha256": "b59965a6b558fe9759eab662e25e438a07c78a9cfadaaad1c49e1b0365c05972"
+      },
+      "evidence-apps-web-components-readingarticle-tsx-2": {
+        "path": "apps/web/src/components/ReadingArticle.tsx",
+        "start_line": 171,
+        "end_line": 172,
+        "selector_sha256": "7c5e1634842c526bf55f792c170d024b1258255a7c4643aebe03c923630acb4b"
+      },
+      "evidence-apps-web-components-historyview-tsx": {
+        "path": "apps/web/src/components/HistoryView.tsx",
+        "start_line": 43,
+        "end_line": 43,
+        "selector_sha256": "2775fc1a021422704d82ca6e42358b6d052e5455f4003511dadd653c67a7950f"
+      },
+      "evidence-apps-web-components-chartview-tsx": {
+        "path": "apps/web/src/components/ChartView.tsx",
+        "start_line": 54,
+        "end_line": 54,
+        "selector_sha256": "90a92d6ffc213a3b2a7c94d467c2f4241f931fdc330a37201c0ba93ce1d29a85"
+      },
+      "evidence-apps-web-components-chartview-tsx-2": {
+        "path": "apps/web/src/components/ChartView.tsx",
+        "start_line": 68,
+        "end_line": 68,
+        "selector_sha256": "a79fec9ed91937bf5da62cdaa8031ea10a78fd8b46a803b54539bc48ac8ca1f9"
+      },
+      "evidence-apps-web-components-patternexperience-tsx": {
+        "path": "apps/web/src/components/PatternExperience.tsx",
+        "start_line": 248,
+        "end_line": 248,
+        "selector_sha256": "4d744293ca8b31157c16f8151431c30c82d5f3e49df4955a3cd65f43223b6eee"
+      },
+      "evidence-apps-api-routes-timing-ts": {
+        "path": "apps/api/src/routes/timing.ts",
+        "start_line": 127,
+        "end_line": 127,
+        "selector_sha256": "c5c42b6e07d65977b9f0cf854032c480ed88a52fab55fc77d5bf378729c3f8d6"
+      },
+      "evidence-apps-api-services-time-travel-ts": {
+        "path": "apps/api/src/services/time-travel.ts",
+        "start_line": 189,
+        "end_line": 189,
+        "selector_sha256": "6c5e586ccdd3176cf5d2120725ff4a1d5310729901f13e47df17ff46730b031c"
+      },
+      "evidence-apps-web-components-timetravelview-tsx": {
+        "path": "apps/web/src/components/TimeTravelView.tsx",
+        "start_line": 681,
+        "end_line": 681,
+        "selector_sha256": "f629dbd761686861496bda0a53b9fe4416c7c11db7331673ca147b30dd820ef4"
+      },
+      "evidence-apps-api-routes-birth-ts": {
+        "path": "apps/api/src/routes/birth.ts",
+        "start_line": 355,
+        "end_line": 355,
+        "selector_sha256": "917be3b119b84e1410bfb4649fd70dd4058cf59a61c2f7b223c9ed22cd2799c2"
+      },
+      "evidence-apps-api-services-geocoder-index-ts": {
+        "path": "apps/api/src/services/geocoder/index.ts",
+        "start_line": 9,
+        "end_line": 9,
+        "selector_sha256": "fed4eabad7d355db806b005a6f3541e28fff50f387004215dac5813714625283"
+      },
+      "evidence-apps-web-components-onboarding-tsx": {
+        "path": "apps/web/src/components/Onboarding.tsx",
+        "start_line": 69,
+        "end_line": 69,
+        "selector_sha256": "33d0a6d3b49f55152f298ff8505e2aa5e55698a01b945d1d4be980d98b48bc21"
+      },
+      "evidence-apps-api-services-timezone-ts": {
+        "path": "apps/api/src/services/timezone.ts",
+        "start_line": 155,
+        "end_line": 155,
+        "selector_sha256": "3f9999342a86f71654fc7e0a471eadc71bb1f68ea18b4519faa63839ab535134"
+      },
+      "evidence-apps-calc-stub-engine-ts": {
+        "path": "apps/calc-stub/src/engine.ts",
+        "start_line": 476,
+        "end_line": 476,
+        "selector_sha256": "c0d77be14d5f6954d6632b52b7acefc902b0b2c145ae2b602d61e87ae684fdac"
+      },
+      "evidence-apps-calc-stub-server-ts": {
+        "path": "apps/calc-stub/src/server.ts",
+        "start_line": 95,
+        "end_line": 95,
+        "selector_sha256": "0d0318b609e1f9c3807f327bb0151e6368ff83a17663b2d2eed3296a465d6c30"
+      },
+      "evidence-apps-calc-stub-engine-ts-2": {
+        "path": "apps/calc-stub/src/engine.ts",
+        "start_line": 689,
+        "end_line": 689,
+        "selector_sha256": "dd97cee4eb5710d7120512201afafe7f029fc79d2cc7ec2e8105a6a011414165"
+      },
+      "evidence-apps-api-services-natal-features-ts": {
+        "path": "apps/api/src/services/natal-features.ts",
+        "start_line": 112,
+        "end_line": 112,
+        "selector_sha256": "35b16dc7183b8bfd9ef0be2adb51621bb8b42eb665eb75e878bc25c7c232cff8"
+      },
+      "evidence-apps-api-services-daily-sky-client-ts": {
+        "path": "apps/api/src/services/daily-sky-client.ts",
+        "start_line": 146,
+        "end_line": 146,
+        "selector_sha256": "f74b76de5bdc7ee8fcb2734d32be7ab132553835f518e680f5b511d0dbf757e3"
+      },
+      "evidence-apps-api-services-birth-operational-config-ts": {
+        "path": "apps/api/src/services/birth-operational-config.ts",
+        "start_line": 42,
+        "end_line": 42,
+        "selector_sha256": "b5e1124ccfc0345c357eb8487baaa663b48ec6ede7c997b238c5653cdc2b25fa"
+      },
+      "evidence-apps-api-routes-readings-ts": {
+        "path": "apps/api/src/routes/readings.ts",
+        "start_line": 269,
+        "end_line": 269,
+        "selector_sha256": "bff63bd7e271117d8402b8abb0a1821a3755784f2326243bfe2f36adae69376e"
+      },
+      "evidence-apps-api-services-ensure-today-reading-ts": {
+        "path": "apps/api/src/services/ensure-today-reading.ts",
+        "start_line": 107,
+        "end_line": 107,
+        "selector_sha256": "707f52138abebc9eb8e164fea179cd7a12366e2b2610ad94c76ce8af56a1faf0"
+      },
+      "evidence-apps-api-services-run-reading-scheduler-ts": {
+        "path": "apps/api/src/services/run-reading-scheduler.ts",
+        "start_line": 116,
+        "end_line": 116,
+        "selector_sha256": "3a3c72c91b550e8cf5496e12c3f9eb134dbcdb870758a5cafaf53179121eb3d7"
+      },
+      "evidence-apps-api-services-context-compiler-ts": {
+        "path": "apps/api/src/services/context-compiler.ts",
+        "start_line": 82,
+        "end_line": 82,
+        "selector_sha256": "ecfa834af99acab16be03c1697b3e016559dbe9a54a3d33f57025416f693cb04"
+      },
+      "evidence-packages-reading-engine-constrained-input-ts": {
+        "path": "packages/reading-engine/src/constrained-input.ts",
+        "start_line": 750,
+        "end_line": 750,
+        "selector_sha256": "f07f17929b918a07c76e3d3fbe1f1b71b9c67510b1808829ad4c3ee45045824e"
+      },
+      "evidence-apps-api-routes-stubs-ts": {
+        "path": "apps/api/src/routes/stubs.ts",
+        "start_line": 40,
+        "end_line": 40,
+        "selector_sha256": "cfaac4017653ac019289f00a2823022033dbdd49d671e063460828fddf1e5ced"
+      },
+      "evidence-apps-api-services-generate-daily-reading-v5-ts": {
+        "path": "apps/api/src/services/generate-daily-reading-v5.ts",
+        "start_line": 723,
+        "end_line": 723,
+        "selector_sha256": "695eadccb8bd8640bb07d96c9868703545436260cf438e74144dfd6a5f5b35a4"
+      },
+      "evidence-packages-reading-engine-candidate-validation-ts": {
+        "path": "packages/reading-engine/src/candidate-validation.ts",
+        "start_line": 291,
+        "end_line": 291,
+        "selector_sha256": "22900ec26d8771c49f04c27663935e05b67d20e3554def1bb7073d079a904423"
+      },
+      "evidence-packages-reading-engine-claim-support-ts": {
+        "path": "packages/reading-engine/src/claim-support.ts",
+        "start_line": 362,
+        "end_line": 362,
+        "selector_sha256": "6ba0ed2bfa907b36b752230f36ac3555b468d9717efc251be50ce26d1ebcbb3e"
+      },
+      "evidence-apps-api-services-generate-daily-reading-v5-ts-2": {
+        "path": "apps/api/src/services/generate-daily-reading-v5.ts",
+        "start_line": 845,
+        "end_line": 845,
+        "selector_sha256": "025d8db510a5dcd431bfaa00bdad441bc095e5d03bdafde346847508213ddc28"
+      },
+      "evidence-apps-api-routes-readings-ts-2": {
+        "path": "apps/api/src/routes/readings.ts",
+        "start_line": 521,
+        "end_line": 521,
+        "selector_sha256": "dbc870a24581f1a7168c73450ebf9930f122d8557721e64908bf316dbd907e6c"
+      },
+      "evidence-apps-api-services-pattern-execute-ts": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 1107,
+        "end_line": 1107,
+        "selector_sha256": "114f87b0b029b2378be8f4437ef2fcc4e9814527471b1132d8ef5be74dab2f76"
+      },
+      "evidence-apps-api-services-pattern-execute-ts-2": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 1265,
+        "end_line": 1265,
+        "selector_sha256": "71db5e74e6e87e16c1c25a3a59a1e135b523d0d78d8fb3af24953bc6b7bf4013"
+      },
+      "evidence-apps-api-routes-pattern-ts": {
+        "path": "apps/api/src/routes/pattern.ts",
+        "start_line": 19,
+        "end_line": 19,
+        "selector_sha256": "288d9c6302d3eb6560edb98650addb45ddc751eb0f15ee540104ecd0f7257a8c"
+      },
+      "evidence-apps-api-routes-pattern-ai-ts": {
+        "path": "apps/api/src/routes/pattern-ai.ts",
+        "start_line": 82,
+        "end_line": 82,
+        "selector_sha256": "1e669b97f14ecade1ac138b42747d50e4bcd8fb85de377fd20e575c28cc4c080"
+      },
+      "evidence-apps-api-services-pattern-state-ts": {
+        "path": "apps/api/src/services/pattern-state.ts",
+        "start_line": 141,
+        "end_line": 141,
+        "selector_sha256": "2dae711bff95e28b676b8e8e39265529eec76ad80765a60e52fcf3f72885ba90"
+      },
+      "evidence-apps-api-services-ontology-pipeline-execute-ts": {
+        "path": "apps/api/src/services/ontology-pipeline-execute.ts",
+        "start_line": 3154,
+        "end_line": 3154,
+        "selector_sha256": "054c1121d9c6c4ce288dfd94cf31a94e597d9c0f412a8cf967534f4bdab91a1e"
+      },
+      "evidence-apps-api-db-pattern-ontology-ts": {
+        "path": "apps/api/src/db/pattern-ontology.ts",
+        "start_line": 250,
+        "end_line": 250,
+        "selector_sha256": "2d946387b58dabc6ae3b3a56e7e50b6a2141c0354ce96c6edd4ab41df700c1b5"
+      },
+      "evidence-apps-api-wrangler-toml": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 481,
+        "end_line": 482,
+        "selector_sha256": "a01b0d1176a008977ede58e94fd44b2e0916bbb1eb1ede825a9b60f096cf6606"
+      },
+      "evidence-pattern-corpus-readme-md": {
+        "path": "pattern-corpus/README.md",
+        "start_line": 3,
+        "end_line": 3,
+        "selector_sha256": "5c3f7c3c71948285380b988dd4a63d5147de08b15dc18d13bb070a2ee17ff556"
+      },
+      "evidence-pattern-corpus-provenance-json": {
+        "path": "pattern-corpus/provenance.json",
+        "start_line": 49,
+        "end_line": 49,
+        "selector_sha256": "e48b9d37b2de774c2e29a7fc3c4fd7a7d495e6ccdeffa5aa11ea999ac11f7f6a"
+      },
+      "evidence-pattern-corpus-reviewers-json": {
+        "path": "pattern-corpus/reviewers.json",
+        "start_line": 3,
+        "end_line": 3,
+        "selector_sha256": "bb3af7f92079b282b10db430d2a757727b6a1f01a57f1d549f49aea57357f444"
+      },
+      "evidence-pattern-corpus-validate-fragments-mjs": {
+        "path": "pattern-corpus/validate-fragments.mjs",
+        "start_line": 64,
+        "end_line": 64,
+        "selector_sha256": "858e3b7967d88a4f76a8f6886a379a584d1db1ccc7308610447df1109fb336e3"
+      },
+      "evidence-apps-api-services-pattern-publication-safety-ts-2": {
+        "path": "apps/api/src/services/pattern-publication-safety.ts",
+        "start_line": 189,
+        "end_line": 189,
+        "selector_sha256": "09b7e2099c91ac45465566eeb830f5351c23f9373ca15ef0f9c3ddae1c423dd6"
+      },
+      "evidence-apps-api-services-pattern-portrait-ts": {
+        "path": "apps/api/src/services/pattern-portrait.ts",
+        "start_line": 53,
+        "end_line": 53,
+        "selector_sha256": "837cba842854c8c64ae2330695bdf77f790068cd10bebb58a49aa523b4827041"
+      },
+      "evidence-apps-api-services-pattern-portrait-ts-2": {
+        "path": "apps/api/src/services/pattern-portrait.ts",
+        "start_line": 171,
+        "end_line": 171,
+        "selector_sha256": "01950269aaba03b51b4f56df8e29b6d5e06ddb2ca307d8fd1be8b4c9bf5913d5"
+      },
+      "evidence-apps-codex-runner-portrait-invocation-ts": {
+        "path": "apps/codex-runner/src/portrait-invocation.ts",
+        "start_line": 24,
+        "end_line": 24,
+        "selector_sha256": "7e134766b0697ab1ffcdf85a03f76ae5fce98709308f6fdc4f01f40f951ec133"
+      },
+      "evidence-apps-codex-runner-portrait-mesh-invocation-ts": {
+        "path": "apps/codex-runner/src/portrait-mesh-invocation.ts",
+        "start_line": 71,
+        "end_line": 71,
+        "selector_sha256": "4608514361b82ae4ee44c61906933b2444b2e232018c897fc6e07d14a7296f72"
+      },
+      "evidence-apps-api-services-pattern-portrait-mesh-ts": {
+        "path": "apps/api/src/services/pattern-portrait-mesh.ts",
+        "start_line": 609,
+        "end_line": 609,
+        "selector_sha256": "8777e27cb0477a99631b62f0210bf58fd9c269d91aca94f4d57b10264e79da58"
+      },
+      "evidence-apps-web-components-accountportraitexplorer-tsx": {
+        "path": "apps/web/src/components/AccountPortraitExplorer.tsx",
+        "start_line": 134,
+        "end_line": 134,
+        "selector_sha256": "9e4b1e36dca2b99ad864a72f91a108cb1e70767c5458acd92a75cd6051d35142"
+      },
+      "evidence-apps-web-components-portrait-explorer-portraitexplorer-tsx": {
+        "path": "apps/web/src/components/portrait-explorer/PortraitExplorer.tsx",
+        "start_line": 148,
+        "end_line": 148,
+        "selector_sha256": "b44043414f51080b0f7db86702c721afde5ff9feb1f0a807d51fab0c137386e1"
+      },
+      "evidence-apps-web-components-portrait-explorer-observatory-world-ts": {
+        "path": "apps/web/src/components/portrait-explorer/observatory-world.ts",
+        "start_line": 113,
+        "end_line": 113,
+        "selector_sha256": "8c143ba4a56b44c51d95049ce444ffe32446389cc310c5058d24aed6570f1a20"
+      },
+      "evidence-apps-web-components-portrait-explorer-portraitscene-tsx": {
+        "path": "apps/web/src/components/portrait-explorer/PortraitScene.tsx",
+        "start_line": 745,
+        "end_line": 745,
+        "selector_sha256": "9120cea012f5d81a69f6044b11f63c567884d2f491fe95f0cebfe62070902af3"
+      },
+      "evidence-apps-web-components-accountportraitexplorer-tsx-2": {
+        "path": "apps/web/src/components/AccountPortraitExplorer.tsx",
+        "start_line": 53,
+        "end_line": 53,
+        "selector_sha256": "d2fd8ac744ae4e8dfdc530272679dc49146ab8d9850f2fab78f08f38b0a4f5d2"
+      },
+      "evidence-apps-web-components-portrait-explorer-observatorycontrols-tsx": {
+        "path": "apps/web/src/components/portrait-explorer/ObservatoryControls.tsx",
+        "start_line": 7,
+        "end_line": 7,
+        "selector_sha256": "466c82840b05cd7313aafd42abd2227edc50dafb1dab7f1e3a2d0d60cc99a0a2"
+      },
+      "evidence-apps-web-lib-pattern-portrait-ts": {
+        "path": "apps/web/src/lib/pattern-portrait.ts",
+        "start_line": 76,
+        "end_line": 76,
+        "selector_sha256": "998749bb313adfbda3ac985e18b5789f252e99698f7a31368e8f5307e49f5ef4"
+      },
+      "evidence-apps-web-components-portrait-explorer-explorerreader-tsx": {
+        "path": "apps/web/src/components/portrait-explorer/ExplorerReader.tsx",
+        "start_line": 101,
+        "end_line": 101,
+        "selector_sha256": "215b6a8c20f00793ac83869731a911d5e8bedba5ae4c206c7665aab591966a6b"
+      },
+      "evidence-apps-web-components-accountportraitexplorer-tsx-3": {
+        "path": "apps/web/src/components/AccountPortraitExplorer.tsx",
+        "start_line": 70,
+        "end_line": 70,
+        "selector_sha256": "cc8e48006b8311951bb4fda67519b22038621845a7a10f393e0b928cc1c4ac96"
+      },
+      "evidence-apps-web-components-portrait-explorer-portraitscene-tsx-2": {
+        "path": "apps/web/src/components/portrait-explorer/PortraitScene.tsx",
+        "start_line": 685,
+        "end_line": 685,
+        "selector_sha256": "62571fa644a8fcc7cf1f8fc1387d81be31ed3640ec0a4514fe473095b649655c"
+      },
+      "evidence-apps-web-components-portrait-explorer-use-explorer-navigation-ts": {
+        "path": "apps/web/src/components/portrait-explorer/use-explorer-navigation.ts",
+        "start_line": 65,
+        "end_line": 65,
+        "selector_sha256": "235db794cd7a6f0f79d7e16acae818095da0186a6f91babf6feeb800dea84316"
+      },
+      "evidence-apps-api-index-ts": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 187,
+        "end_line": 187,
+        "selector_sha256": "8a41e13e680d639dbf639ed05feb3e3b74baa85ebce00bbf663e1a475358d67e"
+      },
+      "evidence-apps-api-wrangler-toml-2": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 559,
+        "end_line": 559,
+        "selector_sha256": "20e5b47ef2499477edb1a57183ee852b7cb103b27aed7326861ad47eb945c176"
+      },
+      "evidence-apps-web-public-sw-js": {
+        "path": "apps/web/public/sw.js",
+        "start_line": 25,
+        "end_line": 25,
+        "selector_sha256": "72320a9cc40fc35a45e0f52e37d1b11adb2a22e5a4556d862f6219b46b8ff17f"
+      },
+      "evidence-apps-api-queue-ts": {
+        "path": "apps/api/src/queue.ts",
+        "start_line": 161,
+        "end_line": 161,
+        "selector_sha256": "04050d613605657415286ce0d388b06e038973b7c41d42b41d26a9375d654587"
+      },
+      "evidence-apps-api-scheduled-ts": {
+        "path": "apps/api/src/scheduled.ts",
+        "start_line": 21,
+        "end_line": 21,
+        "selector_sha256": "eaaa54a13cfce3bc4f60d0d98c108f8bf1e85e8843b9d6f8268aeabcae98c532"
+      },
+      "evidence-apps-api-wrangler-toml-3": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 75,
+        "end_line": 76,
+        "selector_sha256": "f8e1f9e5b20ea6097f34e02969c729409359db17eba56439c5534481403ef4b9"
+      },
+      "evidence-apps-codex-runner-index-ts": {
+        "path": "apps/codex-runner/src/index.ts",
+        "start_line": 21,
+        "end_line": 21,
+        "selector_sha256": "29b7c0e7f975931f55d47a8b527d39e9b963904bb075961dd13a1130bef993bc"
+      },
+      "evidence-apps-codex-runner-runner-ts": {
+        "path": "apps/codex-runner/src/runner.ts",
+        "start_line": 235,
+        "end_line": 235,
+        "selector_sha256": "2e2340c25c9f2d6ae0deb2eccbf3195f60b2335fc0337d38bc225da602700f2d"
+      },
+      "evidence-apps-codex-runner-codex-cli-ts": {
+        "path": "apps/codex-runner/src/codex-cli.ts",
+        "start_line": 42,
+        "end_line": 42,
+        "selector_sha256": "241bf0820ed6ddadb64bcef972122fb0d2de7d431c91177941186b5da976c05b"
+      },
+      "evidence-apps-codex-runner-isolated-codex-json-ts": {
+        "path": "apps/codex-runner/src/isolated-codex-json.ts",
+        "start_line": 52,
+        "end_line": 52,
+        "selector_sha256": "5d1bfa78f671a0845f9d46f474bd4b9a7ed21d9df9597e446405c7a7e399c073"
+      },
+      "evidence-apps-api-routes-codex-provider-ts": {
+        "path": "apps/api/src/routes/codex-provider.ts",
+        "start_line": 266,
+        "end_line": 266,
+        "selector_sha256": "043d2dd1fb6aa014e91222870252620df87f5d18caae27d99aa50828e7348441"
+      },
+      "evidence-apps-api-routes-internal-generation-ts": {
+        "path": "apps/api/src/routes/internal-generation.ts",
+        "start_line": 138,
+        "end_line": 138,
+        "selector_sha256": "edd24b8f59e68897c247fd1b64a0186a5fcf47020fd16a742fa6413dfbf09352"
+      },
+      "evidence-apps-api-wrangler-toml-4": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 563,
+        "end_line": 564,
+        "selector_sha256": "efb62894a50e603e70c17aa17d3ca29076771c03f8d6a83721ded91606ae39ce"
+      },
+      "evidence-apps-api-wrangler-toml-5": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 582,
+        "end_line": 583,
+        "selector_sha256": "73ab91ce4371170bd480679a3ef5f261cf01e1214389690706d7501bda8c8886"
+      },
+      "evidence-apps-ontology-signer-index-ts": {
+        "path": "apps/ontology-signer/src/index.ts",
+        "start_line": 68,
+        "end_line": 68,
+        "selector_sha256": "4774cb3a97da0f91d10450b7af31b5f1b9a30f56b6f6d5d87c344d8ee702d8f1"
+      },
+      "evidence-apps-api-wrangler-toml-6": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 312,
+        "end_line": 313,
+        "selector_sha256": "5711214eaf7c9d682b0040664a64f7ff6ec6fbcc15d6fad87a81d8682613a613"
+      },
+      "evidence-apps-api-services-reading-publisher-ts": {
+        "path": "apps/api/src/services/reading-publisher.ts",
+        "start_line": 50,
+        "end_line": 50,
+        "selector_sha256": "e12c3946458f79c45a92cb6e71d75309e8ede109e252d0a2c7298e2a68386ad4"
+      },
+      "evidence-apps-api-services-pattern-execute-ts-3": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 123,
+        "end_line": 123,
+        "selector_sha256": "dfc18b5d3899dec317e36ebdb2e56fe07e6b56dfaf6db88b7310f1e1c1a5ff88"
+      },
+      "evidence-apps-api-index-ts-2": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 68,
+        "end_line": 68,
+        "selector_sha256": "46e38f8ad7a96525b87a16df0f0b968baaa87f17d540992a026abc1f3c1005ee"
+      },
+      "evidence-apps-api-index-ts-3": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 105,
+        "end_line": 105,
+        "selector_sha256": "bafc663ea1aac3c593f571fbca973041b6e1f69371ecb01078f3770a209a436b"
+      },
+      "evidence-apps-api-index-ts-4": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 133,
+        "end_line": 133,
+        "selector_sha256": "6e91cc1c16b03f5656bcaecbf206c736629529779c9024179ed02f3ee993b6b5"
+      },
+      "evidence-apps-api-index-ts-5": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 137,
+        "end_line": 137,
+        "selector_sha256": "d3c8076ca5bb87d542694a5ec53c9c743588f0e283eefdd327d63689c6ed90f6"
+      },
+      "evidence-apps-api-middleware-admin-auth-ts": {
+        "path": "apps/api/src/middleware/admin-auth.ts",
+        "start_line": 111,
+        "end_line": 111,
+        "selector_sha256": "00781ad1a1dab7ff40f8fb5cd5a4e7395761dc2b3e643203c6f0202e40930498"
+      },
+      "evidence-apps-api-routes-admin-pattern-ts": {
+        "path": "apps/api/src/routes/admin-pattern.ts",
+        "start_line": 79,
+        "end_line": 79,
+        "selector_sha256": "8c2d4d737b7ba552f7d6413faaada9405e308e71cddaeddf38b5cdbac845b8c5"
+      },
+      "evidence-apps-api-routes-admin-pattern-ts-2": {
+        "path": "apps/api/src/routes/admin-pattern.ts",
+        "start_line": 54,
+        "end_line": 54,
+        "selector_sha256": "78fd1571f67c12b234ffc9536d67000a90efdcccf9fcbd696f1fe442207afc4a"
+      },
+      "evidence-apps-api-routes-sessions-ts": {
+        "path": "apps/api/src/routes/sessions.ts",
+        "start_line": 84,
+        "end_line": 88,
+        "selector_sha256": "002bd009dfa4b30ab6a1161a1764a8b01b9b6f90c75f79057d93fa75d14d2179"
+      },
+      "evidence-apps-api-middleware-auth-ts": {
+        "path": "apps/api/src/middleware/auth.ts",
+        "start_line": 106,
+        "end_line": 106,
+        "selector_sha256": "9d9a13a9075b83a5ce5adee9c87e21e0c856a3cc07e2ceeaf2d05051be4b3a88"
+      },
+      "evidence-apps-api-routes-account-processing-consents-ts": {
+        "path": "apps/api/src/routes/account-processing-consents.ts",
+        "start_line": 49,
+        "end_line": 49,
+        "selector_sha256": "c1845e6d8c44c6845360223c370b749f93214c7fe32ee90f4d2030a11c0635d9"
+      },
+      "evidence-apps-api-routes-consents-ts": {
+        "path": "apps/api/src/routes/consents.ts",
+        "start_line": 95,
+        "end_line": 95,
+        "selector_sha256": "0b76b70c8a6f7beef951c8867d35803e9542f363b47cafe51010558e88a58d3a"
+      },
+      "evidence-apps-web-components-privacyview-tsx": {
+        "path": "apps/web/src/components/PrivacyView.tsx",
+        "start_line": 724,
+        "end_line": 724,
+        "selector_sha256": "10ad9af501a59e5e9325c914f6dc40926fd6810a1837ff7407a0f172e1c3bf11"
+      },
+      "evidence-apps-api-crypto-ts": {
+        "path": "apps/api/src/crypto.ts",
+        "start_line": 223,
+        "end_line": 223,
+        "selector_sha256": "6826e37a484837a22e514740b89aaa2d4f2b881edbc8f03f8f4d94cab7d6edef"
+      },
+      "evidence-apps-api-services-pattern-crypto-ts": {
+        "path": "apps/api/src/services/pattern-crypto.ts",
+        "start_line": 13,
+        "end_line": 13,
+        "selector_sha256": "d50f827bd0806a34af20049063a6a7f69b4ca524fcdc02fbde61ffba7a0b4fb9"
+      },
+      "evidence-apps-api-services-safe-log-ts": {
+        "path": "apps/api/src/services/safe-log.ts",
+        "start_line": 341,
+        "end_line": 341,
+        "selector_sha256": "c49c9ad65e660d40ffa0c35578ce37dcaa4e027b48a313c644912dfa1c4e2ea7"
+      },
+      "evidence-apps-api-routes-readings-ts-3": {
+        "path": "apps/api/src/routes/readings.ts",
+        "start_line": 46,
+        "end_line": 46,
+        "selector_sha256": "66804f9e6a4e9922f7c2e1f81314091edf245da31102910820e743ce4f658f6e"
+      },
+      "evidence-apps-api-routes-privacy-ts": {
+        "path": "apps/api/src/routes/privacy.ts",
+        "start_line": 87,
+        "end_line": 87,
+        "selector_sha256": "f591cf5310f51b365c74bc2d1d51828409cc0f4cc6363eb93bd6166334acf599"
+      },
+      "evidence-apps-api-services-account-deletion-ts": {
+        "path": "apps/api/src/services/account-deletion.ts",
+        "start_line": 259,
+        "end_line": 259,
+        "selector_sha256": "c494bc193721032f56fbef8d50cf8f587e055d3c74c3cea26dd39361fb0d9c33"
+      },
+      "evidence-apps-api-routes-internal-crypto-ts": {
+        "path": "apps/api/src/routes/internal-crypto.ts",
+        "start_line": 28,
+        "end_line": 28,
+        "selector_sha256": "7c7f0a0693b47f94a146edd46d2ceee1e29659231a9feff8f40a27389bee22bb"
+      },
+      "evidence-apps-api-db-crypto-write-fence-ts": {
+        "path": "apps/api/src/db/crypto-write-fence.ts",
+        "start_line": 11,
+        "end_line": 11,
+        "selector_sha256": "64a620e47b1a6f7f5c79cab904c2cbc10b99d0f79c522f0e60d3a0d417fc9d8b"
+      },
+      "evidence-contracts-validate-schemas-py": {
+        "path": "contracts/validate_schemas.py",
+        "start_line": 3939,
+        "end_line": 3939,
+        "selector_sha256": "56f3e2348bd44657fa2e55b6d83ae5d21470e7efc3e74aacd7dfcbda90c509ee"
+      },
+      "evidence-db-d1-migrations-json": {
+        "path": "db/d1/MIGRATIONS.json",
+        "start_line": 2,
+        "end_line": 2,
+        "selector_sha256": "ab047f1d91ac9edff008e79b5ce829a49f33dfed3890b267484524fcedea3773"
+      },
+      "evidence-packages-shared-index-ts": {
+        "path": "packages/shared/src/index.ts",
+        "start_line": 3,
+        "end_line": 3,
+        "selector_sha256": "6c0fa3e013c1ffead750bfbe47cafc5db9182f6a5a84cd5cc35813bbdac30ac1"
+      },
+      "evidence-apps-api-routes-content-releases-ts": {
+        "path": "apps/api/src/routes/content-releases.ts",
+        "start_line": 273,
+        "end_line": 273,
+        "selector_sha256": "0db1ca170911c6fd56104e48083a34059f70468b6772e9d318c0aac533235087"
+      },
+      "evidence-apps-api-services-content-release-ts": {
+        "path": "apps/api/src/services/content-release.ts",
+        "start_line": 998,
+        "end_line": 998,
+        "selector_sha256": "7599d1f7154c254d5198177db9035210e984dd1da4ea16ecf7ef0ab3562b0a81"
+      },
+      "evidence-apps-api-routes-pattern-ts-2": {
+        "path": "apps/api/src/routes/pattern.ts",
+        "start_line": 12,
+        "end_line": 12,
+        "selector_sha256": "9af260ea3454e181bb2a6844511f0dbf48dce9acbc15acbeee2fc1f3ed3384c2"
+      },
+      "evidence-apps-api-routes-stubs-ts-2": {
+        "path": "apps/api/src/routes/stubs.ts",
+        "start_line": 6,
+        "end_line": 6,
+        "selector_sha256": "37a6d60f3cf18a9aac5d5025cbd4cbd281122563b1804a035cb47d43fe1e24b6"
+      },
+      "evidence-packages-reading-engine-index-ts": {
+        "path": "packages/reading-engine/src/index.ts",
+        "start_line": 13,
+        "end_line": 13,
+        "selector_sha256": "90074ccda2d05260ee5d8b8e0500cdf886f051f4cc802f1df8afce67a43397b0"
+      },
+      "evidence-packages-pattern-engine-index-ts": {
+        "path": "packages/pattern-engine/src/index.ts",
+        "start_line": 9,
+        "end_line": 9,
+        "selector_sha256": "077c0292a0e1b81dadb4c90e3c69bd311586dc683e85e2286d45122f66850db7"
+      },
+      "evidence-apps-calc-stub-package-json": {
+        "path": "apps/calc-stub/package.json",
+        "start_line": 5,
+        "end_line": 5,
+        "selector_sha256": "5b2f3fabd86a4bc35b50fc1c64831162d267fc76bee64935fe15327947409c88"
+      },
+      "evidence-packages-shared-package-json": {
+        "path": "packages/shared/package.json",
+        "start_line": 6,
+        "end_line": 6,
+        "selector_sha256": "143f1ec00ae6ca349be22b72468661a120f2f1883dfb67628c723f79a2a32b89"
+      },
+      "evidence-scripts-pattern-release-release-reconciliation-mjs": {
+        "path": "scripts/pattern-release/release-reconciliation.mjs",
+        "start_line": 2,
+        "end_line": 2,
+        "selector_sha256": "bf02946716cb29fb3c5171f43c105f3968521aaf32f9ac3e0bcfd3e5d7ffd655"
+      },
+      "evidence-package-json": {
+        "path": "package.json",
+        "start_line": 20,
+        "end_line": 20,
+        "selector_sha256": "57da274d074855379782f726daac8bc8a47362369fe9888b2436be18c0e370bf"
+      },
+      "evidence-scripts-ci-local-sh": {
+        "path": "scripts/ci-local.sh",
+        "start_line": 113,
+        "end_line": 113,
+        "selector_sha256": "06d9d7580839704388480f207fdf04db0b9d54a8ce30cebba2f8d9d8fb38b69e"
+      },
+      "evidence-agents-md": {
+        "path": "AGENTS.md",
+        "start_line": 31,
+        "end_line": 31,
+        "selector_sha256": "db50ce79ac89f4f564d6f9f2f5f42d8a713db65891193fa2d36b73abd79ee972"
+      },
+      "evidence-packages-pattern-engine-selection-ts-2": {
+        "path": "packages/pattern-engine/src/selection.ts",
+        "start_line": 201,
+        "end_line": 201,
+        "selector_sha256": "1ccdf107bcf65b0c5dcd0f955cf901fd8e3734990960091bf61b34d062ab9a56"
+      },
+      "evidence-apps-api-services-pattern-command-ts-2": {
+        "path": "apps/api/src/services/pattern-command.ts",
+        "start_line": 75,
+        "end_line": 75,
+        "selector_sha256": "6129945b02dfe48afe71e0f13163d560004142b49238de50ab5ac3c942cec095"
+      },
+      "evidence-apps-api-services-pattern-execute-ts-4": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 807,
+        "end_line": 807,
+        "selector_sha256": "5bade0b8c63c2974b8b84f1dd0243c62bbc5f5cc4a883f5bbd996525006c916b"
+      },
+      "evidence-apps-api-services-pattern-execute-ts-5": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 1016,
+        "end_line": 1016,
+        "selector_sha256": "860f1c832d39fbce418e19a70f597d00166537ccccca5b0023d917569f48ed09"
+      },
+      "evidence-apps-api-services-pattern-execute-ts-6": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 139,
+        "end_line": 139,
+        "selector_sha256": "c1608f9f999658f63f0652a94c65fc2030d9a46062dff5e1a9a15ea188e9284d"
+      },
+      "evidence-packages-pattern-engine-plan-validate-ts": {
+        "path": "packages/pattern-engine/src/plan-validate.ts",
+        "start_line": 50,
+        "end_line": 50,
+        "selector_sha256": "00279b64e1da7611bbf8881d50145f7a0be0e41c5a3f88d74c4c353f0d7c4edd"
+      },
+      "evidence-packages-pattern-engine-candidate-validate-ts": {
+        "path": "packages/pattern-engine/src/candidate-validate.ts",
+        "start_line": 56,
+        "end_line": 56,
+        "selector_sha256": "d75b8841e1ca790164ac7a777f227138914842fbca38d1155412c6e453191ba4"
+      },
+      "evidence-apps-api-services-pattern-execute-ts-7": {
+        "path": "apps/api/src/services/pattern-execute.ts",
+        "start_line": 1416,
+        "end_line": 1416,
+        "selector_sha256": "8473529100a281f1ebfca4607cbf3b77cba6cfabd35be27090e56d7fc3316954"
+      },
+      "evidence-apps-api-services-pattern-publication-proof-ts-2": {
+        "path": "apps/api/src/services/pattern-publication-proof.ts",
+        "start_line": 104,
+        "end_line": 104,
+        "selector_sha256": "bb311cd0acf35919843787a0497f34070361b240cf1683bb3a6fd06a022d59eb"
+      },
+      "evidence-apps-api-services-pattern-publication-safety-ts-3": {
+        "path": "apps/api/src/services/pattern-publication-safety.ts",
+        "start_line": 258,
+        "end_line": 258,
+        "selector_sha256": "ecac9b4a086b217209078c5ee46987eb3f4144c437e8d4224705e48419c25a67"
+      },
+      "evidence-apps-api-scripts-build-internal-ontology-ts": {
+        "path": "apps/api/scripts/build-internal-ontology.ts",
+        "start_line": 114,
+        "end_line": 114,
+        "selector_sha256": "cba69cbaf7275ed99676e5e1dbd088cf6e239582291ad3a38ade161a37fdcb14"
+      },
+      "evidence-apps-api-scripts-build-internal-ontology-ts-2": {
+        "path": "apps/api/scripts/build-internal-ontology.ts",
+        "start_line": 60,
+        "end_line": 60,
+        "selector_sha256": "5dc777b7c1f18893e1d6e7e33404cc5b82f9bd9bae5a78e3b83661b9499ec9ed"
+      },
+      "evidence-apps-api-scripts-build-internal-ontology-ts-3": {
+        "path": "apps/api/scripts/build-internal-ontology.ts",
+        "start_line": 84,
+        "end_line": 84,
+        "selector_sha256": "e15b04d84e7da2da817be808394c88436578c8d0f98a5b02dcbc872babae7a51"
+      },
+      "evidence-apps-api-scripts-build-internal-ontology-ts-4": {
+        "path": "apps/api/scripts/build-internal-ontology.ts",
+        "start_line": 90,
+        "end_line": 90,
+        "selector_sha256": "69c712e613536ab80ace33cbbde52149ddb7894f47f075db4ac1c30360225be2"
+      },
+      "evidence-apps-api-scripts-build-internal-ontology-ts-5": {
+        "path": "apps/api/scripts/build-internal-ontology.ts",
+        "start_line": 166,
+        "end_line": 166,
+        "selector_sha256": "df28de56dee5aa9dc896c900f6109b1e5aef329b96abf804c69d7de7735b753c"
+      },
+      "evidence-apps-api-services-ontology-signing-client-ts": {
+        "path": "apps/api/src/services/ontology-signing-client.ts",
+        "start_line": 131,
+        "end_line": 131,
+        "selector_sha256": "c218b0c0845d464fe65e320ff0a7c45464372be69d23b02dfa647c458811b523"
+      },
+      "evidence-recorded-ontology-pointer": {
+        "path": "docs/reviews/artifacts/2026-09-06-source-register-followup/production-observation.json",
+        "start_line": 148,
+        "end_line": 148,
+        "selector_sha256": "f7a5d5a1002cb23f833a36b6be632162f9bb7dfaba674994468b69d374c48759"
+      },
+      "evidence-apps-api-services-generate-daily-reading-ts": {
+        "path": "apps/api/src/services/generate-daily-reading.ts",
+        "start_line": 249,
+        "end_line": 249,
+        "selector_sha256": "bbd92786ee83ed56b5252f40ab9af2d26c375e509b23acf0d8682f1ecb196c38"
+      },
+      "evidence-apps-api-index-ts-6": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 46,
+        "end_line": 46,
+        "selector_sha256": "8de8ce812ae57149b38a2b959e5404c4547c6c7d35c77e24ee2f27398615844a"
+      },
+      "evidence-apps-api-index-ts-7": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 55,
+        "end_line": 55,
+        "selector_sha256": "568da54019f2b7a57ceff512019ffab97a3788f6f87fbade8edda7c262c78d45"
+      },
+      "evidence-apps-api-routes-sessions-ts-2": {
+        "path": "apps/api/src/routes/sessions.ts",
+        "start_line": 34,
+        "end_line": 34,
+        "selector_sha256": "99cd6e95f561a08f09c1ea562ca22b45b8f43b8782a8f13d4d5cf49eaaa6f0ae"
+      },
+      "evidence-apps-api-index-ts-8": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 62,
+        "end_line": 62,
+        "selector_sha256": "3285b874225c9f850e69c996369110f83b31c03b1f206e66b33d33fc98e7d778"
+      },
+      "evidence-apps-api-routes-privacy-ts-2": {
+        "path": "apps/api/src/routes/privacy.ts",
+        "start_line": 368,
+        "end_line": 368,
+        "selector_sha256": "81611a3d2e662bfef2a8024214566b739b28683e9d6d93d5f083c8d4535db928"
+      },
+      "evidence-apps-api-index-ts-9": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 96,
+        "end_line": 96,
+        "selector_sha256": "aded4c296a2cf45948b26b502a17f8bb71cfebc52ffe1e1c49804858452abec3"
+      },
+      "evidence-apps-api-index-ts-10": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 120,
+        "end_line": 120,
+        "selector_sha256": "cdcf30ae28becfd09d52ed25a919801157b06783c94b935bfb1d3e65a46b3082"
+      },
+      "evidence-apps-api-services-generation-command-v2-ts-2": {
+        "path": "apps/api/src/services/generation-command-v2.ts",
+        "start_line": 83,
+        "end_line": 83,
+        "selector_sha256": "d2dede041e4d03b6b17883024fea15c8c324b3618043c71ae5c6a896959a70da"
+      },
+      "evidence-apps-api-services-reading-invalidation-ts-2": {
+        "path": "apps/api/src/services/reading-invalidation.ts",
+        "start_line": 244,
+        "end_line": 244,
+        "selector_sha256": "12dbaee17c1d0e26150b6592bc7c9f9b8efc1a0dce4b2c00eab89eb5e55a5b81"
+      },
+      "evidence-apps-api-services-run-reading-scheduler-ts-2": {
+        "path": "apps/api/src/services/run-reading-scheduler.ts",
+        "start_line": 290,
+        "end_line": 290,
+        "selector_sha256": "f4edade13e923a3a4adc7a16c326f5e030b8cbd0da2dff13d6ad74851e6e4842"
+      },
+      "evidence-apps-api-services-enqueue-ts": {
+        "path": "apps/api/src/services/enqueue.ts",
+        "start_line": 366,
+        "end_line": 366,
+        "selector_sha256": "a5e2e159ce895fbf9f2f2f32afe4b76d7552b474dcf4581101d8a963f18128ca"
+      },
+      "evidence-apps-web-components-privacyview-tsx-2": {
+        "path": "apps/web/src/components/PrivacyView.tsx",
+        "start_line": 663,
+        "end_line": 663,
+        "selector_sha256": "a46e0f641b996a6d9076aa0718b60a0fcfa3e7e6cb2deccb808fc13bedfb869d"
+      },
+      "evidence-apps-api-services-pattern-portrait-mesh-ts-2": {
+        "path": "apps/api/src/services/pattern-portrait-mesh.ts",
+        "start_line": 143,
+        "end_line": 143,
+        "selector_sha256": "2541e974f8ae75cb060a9cdb8cf63e460eb4a2c35cf346025e9222c0d256da5e"
+      },
+      "evidence-db-d1-0027-portrait-mesh-automation-sql": {
+        "path": "db/d1/0027_portrait_mesh_automation.sql",
+        "start_line": 39,
+        "end_line": 39,
+        "selector_sha256": "9a56d551dbf645d8b4b0de67b115dc9dd9b50e8b83c0c5abff28f04a5d3bd79d"
+      },
+      "evidence-apps-api-services-pattern-portrait-mesh-ts-3": {
+        "path": "apps/api/src/services/pattern-portrait-mesh.ts",
+        "start_line": 971,
+        "end_line": 971,
+        "selector_sha256": "80e7cf532731a095bb7b2dee7fcf5b89dde7d94ee8049abeba30b1534b28c026"
+      },
+      "evidence-apps-codex-runner-runner-ts-2": {
+        "path": "apps/codex-runner/src/runner.ts",
+        "start_line": 235,
+        "end_line": 235,
+        "selector_sha256": "e709956a5eb03381ab5aad135bf50c69e36bf8c11bfe5c2f9386bc1cdfa8bf07"
+      },
+      "evidence-db-d1-0027-portrait-mesh-automation-sql-2": {
+        "path": "db/d1/0027_portrait_mesh_automation.sql",
+        "start_line": 59,
+        "end_line": 59,
+        "selector_sha256": "635be070a822d4b0f1465a0fb2a9760776ead9899ea595ba5748e0b8602e241a"
+      },
+      "evidence-apps-api-services-codex-reading-publisher-ts": {
+        "path": "apps/api/src/services/codex-reading-publisher.ts",
+        "start_line": 89,
+        "end_line": 89,
+        "selector_sha256": "4407cbf80190223477db5a946b3971d6f0a58a5bf97f7e3371956a25155e00c7"
+      },
+      "evidence-apps-api-services-codex-pattern-publisher-ts": {
+        "path": "apps/api/src/services/codex-pattern-publisher.ts",
+        "start_line": 42,
+        "end_line": 42,
+        "selector_sha256": "d03cb57d512625b4984ecb4ecadfcdd8fb1581deba6827f740a791a96e8e0258"
+      },
+      "evidence-apps-api-db-codex-provider-jobs-ts": {
+        "path": "apps/api/src/db/codex-provider-jobs.ts",
+        "start_line": 356,
+        "end_line": 356,
+        "selector_sha256": "7c405d74c315a9edfa01b1605a53dd102e59d17f87ca42ef64667432872043a1"
+      },
+      "evidence-apps-api-services-codex-provider-artifacts-ts": {
+        "path": "apps/api/src/services/codex-provider-artifacts.ts",
+        "start_line": 389,
+        "end_line": 389,
+        "selector_sha256": "b818257a514378ab672211c63295022ef64fbc0e5d5e541cd027a32f1274e31d"
+      },
+      "evidence-apps-api-services-generate-daily-reading-v5-ts-3": {
+        "path": "apps/api/src/services/generate-daily-reading-v5.ts",
+        "start_line": 388,
+        "end_line": 388,
+        "selector_sha256": "237519e2efb0e411f70061f8cbd5822110d1e5cdc83bc5b988fb6bec6b52cd23"
+      },
+      "evidence-apps-api-wrangler-toml-7": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 658,
+        "end_line": 659,
+        "selector_sha256": "f43e980fe07f682925a2ae87c770238350681c134fd60ff414f5afd6cb621122"
+      },
+      "evidence-apps-api-wrangler-toml-8": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 662,
+        "end_line": 663,
+        "selector_sha256": "563ce0274113bfe9d31f64665ced8236f114cd8da965e338168763e0e413475b"
+      },
+      "evidence-apps-api-wrangler-toml-9": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 674,
+        "end_line": 675,
+        "selector_sha256": "835d91b0ecba9cb6df454370a2c18d4a4dfb8db2db6ce3fdf34bebf35eee9eb8"
+      },
+      "evidence-apps-api-routes-health-ts": {
+        "path": "apps/api/src/routes/health.ts",
+        "start_line": 11,
+        "end_line": 11,
+        "selector_sha256": "35c0d1d55a2d2461c9f5a9e8356881205eb413da56edf2696d43d627a0c50b4d"
+      },
+      "evidence-apps-api-routes-health-ts-2": {
+        "path": "apps/api/src/routes/health.ts",
+        "start_line": 29,
+        "end_line": 29,
+        "selector_sha256": "749db84c0854c35dfd893fac4a4f45fb382caa20de9630492e77b7cd096e8438"
+      },
+      "evidence-scripts-pattern-release-operational-canary-mjs-2": {
+        "path": "scripts/pattern-release/operational-canary.mjs",
+        "start_line": 73,
+        "end_line": 73,
+        "selector_sha256": "b4af70847de3f12c0001627eb2a8db73995bdac1f8b6809527f03098de586737"
+      },
+      "evidence-scripts-pattern-release-fresh-reading-evaluation-mjs-2": {
+        "path": "scripts/pattern-release/fresh-reading-evaluation.mjs",
+        "start_line": 67,
+        "end_line": 67,
+        "selector_sha256": "3bce6f3cd3109cdd82a24a0c34a6d2b2125d410786965ee1e9f2a3f75d5b886f"
+      },
+      "evidence-scripts-pattern-release-fresh-pattern-evaluation-mjs": {
+        "path": "scripts/pattern-release/fresh-pattern-evaluation.mjs",
+        "start_line": 51,
+        "end_line": 51,
+        "selector_sha256": "3bce6f3cd3109cdd82a24a0c34a6d2b2125d410786965ee1e9f2a3f75d5b886f"
+      },
+      "evidence-scripts-pattern-release-fresh-pattern-verifier-evaluation-mjs-2": {
+        "path": "scripts/pattern-release/fresh-pattern-verifier-evaluation.mjs",
+        "start_line": 187,
+        "end_line": 187,
+        "selector_sha256": "3bce6f3cd3109cdd82a24a0c34a6d2b2125d410786965ee1e9f2a3f75d5b886f"
+      },
+      "evidence-scripts-pattern-release-fresh-reading-evaluation-mjs-3": {
+        "path": "scripts/pattern-release/fresh-reading-evaluation.mjs",
+        "start_line": 123,
+        "end_line": 123,
+        "selector_sha256": "f2452add9a1899a8e7ac784b27e07427a41be4796ae37efc6bce26f7e7c87c89"
+      },
+      "evidence-scripts-pattern-release-fresh-pattern-verifier-evaluation-mjs-3": {
+        "path": "scripts/pattern-release/fresh-pattern-verifier-evaluation.mjs",
+        "start_line": 265,
+        "end_line": 265,
+        "selector_sha256": "f2452add9a1899a8e7ac784b27e07427a41be4796ae37efc6bce26f7e7c87c89"
+      },
+      "evidence-scripts-pattern-release-release-evidence-mjs-2": {
+        "path": "scripts/pattern-release/release-evidence.mjs",
+        "start_line": 180,
+        "end_line": 180,
+        "selector_sha256": "6c78bf1c898f4e1199fdce85ec4b7406ee438ce29e3994875faf8580c7e64993"
+      },
+      "evidence-scripts-pattern-release-release-evidence-mjs-3": {
+        "path": "scripts/pattern-release/release-evidence.mjs",
+        "start_line": 169,
+        "end_line": 169,
+        "selector_sha256": "003754ef0404a75d28230b42f9cfc525eaf863284789b28bc0b8af231929a64a"
+      },
+      "evidence-agents-md-2": {
+        "path": "AGENTS.md",
+        "start_line": 33,
+        "end_line": 33,
+        "selector_sha256": "8e79451d5a1dd4c1733b6dceca80f49f0802523c42fd6787d270aea0db51cc5f"
+      },
+      "evidence-agents-md-3": {
+        "path": "AGENTS.md",
+        "start_line": 51,
+        "end_line": 51,
+        "selector_sha256": "1408e085a1781141f06cd6ed4e4063e1b2291d501f5f20997d4d6994cec31f0d"
+      },
+      "evidence-onboarding-form": {
+        "path": "apps/web/src/components/Onboarding.tsx",
+        "start_line": 69,
+        "end_line": 69,
+        "selector_sha256": "5583ba2e458c1d891eb89cb1d6a7c680adace17a4abbac8224bc1b25718df0a0"
+      },
+      "evidence-deletion-status-view": {
+        "path": "apps/web/src/App.tsx",
+        "start_line": 373,
+        "end_line": 373,
+        "selector_sha256": "8677af6389c58d71e13b853a791d7eac362efcc1436314dcb8ec0e1c596a4109"
+      },
+      "evidence-app-sign-out": {
+        "path": "apps/web/src/App.tsx",
+        "start_line": 307,
+        "end_line": 307,
+        "selector_sha256": "f55abc45b2d1e8a364dd46e27c1fff4fbb6fa3c39dad4e645559b291cd3f0663"
+      },
+      "evidence-today-view": {
+        "path": "apps/web/src/components/TodayView.tsx",
+        "start_line": 155,
+        "end_line": 155,
+        "selector_sha256": "9b94f9eab1e4a339eaf83d19a50fd7f3478ef9faef9345afa350f59b473943af"
+      },
+      "evidence-history-feedback-switch": {
+        "path": "apps/web/src/components/HistoryView.tsx",
+        "start_line": 265,
+        "end_line": 265,
+        "selector_sha256": "0b06a3b1da3d37223b1d712ed208855db592b8617517ee17e0e115e110a13d60"
+      },
+      "evidence-today-check-in-switch": {
+        "path": "apps/web/src/components/TodayView.tsx",
+        "start_line": 267,
+        "end_line": 268,
+        "selector_sha256": "410aff5c3fe7a2a497a52dcb17540ea8b9853ec493ead451a0c883737452d7c4"
+      },
+      "evidence-place-search-route": {
+        "path": "apps/api/src/routes/places.ts",
+        "start_line": 112,
+        "end_line": 112,
+        "selector_sha256": "846418efabdcab6327f86b45cd6897f84e4ceaaf53668cb695145b2ab5aacf08"
+      },
+      "evidence-bounded-calc-client": {
+        "path": "apps/api/src/services/calc-client.ts",
+        "start_line": 79,
+        "end_line": 79,
+        "selector_sha256": "079e7d3fa1a11b237217abf41b7daa8210e0c727f7e46cb69601d353d7c729f9"
+      },
+      "evidence-birth-budget-exhaustion": {
+        "path": "apps/api/src/routes/birth.ts",
+        "start_line": 788,
+        "end_line": 788,
+        "selector_sha256": "2395c8f6e2dbc97f8b08fe992cf5bc63783bf53c6517b7d201fdcfcd2c3458f0"
+      },
+      "evidence-context-expansion": {
+        "path": "packages/reading-engine/src/constrained-input.ts",
+        "start_line": 478,
+        "end_line": 478,
+        "selector_sha256": "01e83bec3172df1a7a9011762becefd4411acd6ebc4ba47e0eaa798c134e5ef8"
+      },
+      "evidence-reading-feedback-write": {
+        "path": "apps/api/src/routes/readings.ts",
+        "start_line": 606,
+        "end_line": 606,
+        "selector_sha256": "8af7074eb4befc54f41dd2482e00c18325a09054b0bfe4c78328916c1a0d5e46"
+      },
+      "evidence-offline-compile": {
+        "path": "apps/api/scripts/build-internal-ontology.ts",
+        "start_line": 179,
+        "end_line": 179,
+        "selector_sha256": "4a55c2da351791c08f1d8655a2a6b28f02abc651a14493f87783728182f1d057"
+      },
+      "evidence-corpus-fragments": {
+        "path": "pattern-corpus/fragments.json",
+        "start_line": 3,
+        "end_line": 3,
+        "selector_sha256": "2f923f1f79443b0e14be52972940db19002afef60d9cea4c9f60133788d5195a"
+      },
+      "evidence-corpus-hash-format": {
+        "path": "pattern-corpus/provenance.json",
+        "start_line": 14,
+        "end_line": 14,
+        "selector_sha256": "10a418aa37f6b68e096c8a6b092d6b70fda090ba14825a2c9658d1212b8977a4"
+      },
+      "evidence-corpus-generation-status": {
+        "path": "pattern-corpus/provenance.json",
+        "start_line": 16,
+        "end_line": 16,
+        "selector_sha256": "e0cb82915838e215a9f105ccbce2a2b11fe21386b68bd0ed08d0c9ed75f2084f"
+      },
+      "evidence-corpus-public-activation": {
+        "path": "pattern-corpus/provenance.json",
+        "start_line": 54,
+        "end_line": 54,
+        "selector_sha256": "4c952ffd21b3449ff71824efc3593a0ff057272bcc0d59d3617bae73a9725dbe"
+      },
+      "evidence-portrait-four-chapters": {
+        "path": "apps/api/src/services/pattern-portrait.ts",
+        "start_line": 66,
+        "end_line": 66,
+        "selector_sha256": "229fde7c3afa305fcd3c6ab58d7b56c227e818f261f518d93a3ae9145cff0cce"
+      },
+      "evidence-portrait-completion": {
+        "path": "apps/api/src/services/pattern-portrait.ts",
+        "start_line": 248,
+        "end_line": 248,
+        "selector_sha256": "867e39f00f6542a5c35f6a42579f12e42c68518999c83e74595e7c55e1bbc5ac"
+      },
+      "evidence-production-web-assets": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 556,
+        "end_line": 557,
+        "selector_sha256": "82e94f1fb764e0e1f62dca8c8640ecf30b16766b022a03971ac397a70fc82a82"
+      },
+      "evidence-production-artifacts": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 578,
+        "end_line": 579,
+        "selector_sha256": "0b174a321443c83fdd451c870792711488c572aece145d39187bbce5b69174fa"
+      },
+      "evidence-production-daily-rollout": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 395,
+        "end_line": 395,
+        "selector_sha256": "fc618425f1b17a004c7565d34966887bb27f84c3fcd3258e358b613c0f125e14"
+      },
+      "evidence-production-geocoder": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 324,
+        "end_line": 324,
+        "selector_sha256": "47a814a89e2bc83c84faaf51cc0895295dec1707d0c484bdddcfa03b51c2c036"
+      },
+      "evidence-pattern-generation-switch": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 450,
+        "end_line": 452,
+        "selector_sha256": "5f6138c713d75fb40ff10bc1701671f5487f563d84361ea19723cf7c2ec58d3b"
+      },
+      "evidence-daily-model-pins": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 509,
+        "end_line": 510,
+        "selector_sha256": "c7526261365b414e24ec31876265c67def19227e809517e22542f094cc243091"
+      },
+      "evidence-production-pattern-model-pins": {
+        "path": "apps/api/wrangler.toml",
+        "start_line": 458,
+        "end_line": 465,
+        "selector_sha256": "9c1854cd92bdf10d73912e697d9cf34fa7f1294be3f2cc5904fdb18585164ad4"
+      },
+      "evidence-wrap-user-dek": {
+        "path": "apps/api/src/crypto.ts",
+        "start_line": 182,
+        "end_line": 182,
+        "selector_sha256": "90b744ff667c369cc3b7dda9d8aed2620a3053000a76cda5c9cc2a2f5ff12f47"
+      },
+      "evidence-editorial-signature": {
+        "path": "apps/api/src/services/content-release.ts",
+        "start_line": 382,
+        "end_line": 382,
+        "selector_sha256": "92de63ee32ce1b627f2221bd2e38a302c6a579540f985780ffdc1e4fa59bd4ed"
+      },
+      "evidence-editorial-object-hashes": {
+        "path": "apps/api/src/services/content-release.ts",
+        "start_line": 772,
+        "end_line": 772,
+        "selector_sha256": "af734b8e47983d0b169c127481f9f6f9504db783024d5444b5216d889958733f"
+      },
+      "evidence-editorial-content-graph": {
+        "path": "apps/api/src/services/content-release.ts",
+        "start_line": 804,
+        "end_line": 804,
+        "selector_sha256": "8dbb74435b664539cf3cbdc1acdbd75c14d1ba0c737e30e6b426482fece95291"
+      },
+      "evidence-legacy-stub-order": {
+        "path": "apps/api/src/index.ts",
+        "start_line": 89,
+        "end_line": 89,
+        "selector_sha256": "6e398a428ad68da43f405ff8eef4fee1d872ed1894644e5cf846d2d9fbd09180"
+      },
+      "evidence-shared-license-decision": {
+        "path": "docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md",
+        "start_line": 126,
+        "end_line": 126,
+        "selector_sha256": "f51ed262a1a3a746f7f9bec17dab5008195e54942974f21bbcda814f91a91aa7"
+      },
+      "evidence-unresolved-license-boundary": {
+        "path": "LICENSING.md",
+        "start_line": 35,
+        "end_line": 35,
+        "selector_sha256": "f1b72029c87a1b48bee4f5a127cea0291654467461ebdd475bff73a3cb19559d"
+      }
+    },
+    "outputs": {
+      "map-input.json": {
+        "sha256": "79a894097c333d1b6fad2cd20526c68a553c92769af5f2f76fb9ff72a5947847",
+        "bytes": 117343,
+        "executable": false
+      },
+      "patternlike-source-mindmap.md": {
+        "sha256": "6428b1886738b532fe2deb9251b404d7f52a5e9c00828a0fc00a9d4d0aaf31bc",
+        "bytes": 63401,
+        "executable": false
+      },
+      "source-evidence.md": {
+        "sha256": "c3d6195c5654f6824860feddd5cf8be1217ed361325e8a82a2aa3e933d69abe6",
+        "bytes": 113020,
+        "executable": false
+      }
+    },
+    "counts": {
+      "branches": 8,
+      "topics": 42,
+      "leaves": 97,
+      "evidence_entries": 201,
+      "referenced_files": 119
+    }
+  },
+  "content_sha256": "53588fcb54226eadb520770b88187d1cf6112d32189a1f79872ca5aa8aa3f9a0"
+}

@@ -1,0 +1,20 @@
+{
+  "status": "verified",
+  "scope": "referenced_files_and_map_inputs_only",
+  "snapshot_path": "docs/architecture/source-map/snapshots/2026-09-09-slice-1",
+  "content_sha256": "53588fcb54226eadb520770b88187d1cf6112d32189a1f79872ca5aa8aa3f9a0",
+  "base_commit": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+  "current_head": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+  "base_commit_matches": true,
+  "node_version": "v22.23.2",
+  "counts": {
+    "branches": 8,
+    "topics": 42,
+    "leaves": 97,
+    "evidence_entries": 201,
+    "referenced_files": 119
+  },
+  "problem_count": 0,
+  "problems_truncated": false,
+  "problems": []
+}
