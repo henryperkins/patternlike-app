@@ -419,6 +419,45 @@ describe("PatternExperience", () => {
       .toEqual([]);
   });
 
+  it.each([false, undefined, null] as const)(
+    "keeps a failed attempt read-only when retry eligibility is %s",
+    async (retryable) => {
+      mockApiResponses({
+        [`GET ${STATE}`]: {
+          status: 200,
+          body: {
+            ...stateDoc({
+              state: "failed",
+              consent: { ...consent, status: "granted", granted_at: "2026-08-27T12:00:00.000Z" },
+            }),
+            // Missing eligibility must never grant permission to retry.
+            generation: retryable === null ? null : {
+              generation_id: "pgen_failed_0001",
+              stage: "writing",
+              status_updated_at: "2026-08-27T12:00:00.000Z",
+              started_at: "2026-08-27T11:59:00.000Z",
+              retryable,
+              request_id: null,
+            },
+          },
+        },
+      });
+
+      render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+
+      expect(await screen.findByRole("heading", { name: "This Pattern could not be finished." })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Generate my Pattern/i })).toBeNull();
+      expect(screen.queryByText(/You can try again/i)).toBeNull();
+      expect(capturedFor(GENERATIONS)).toEqual([]);
+
+      await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+      await waitFor(() => expect(capturedFor(STATE)).toHaveLength(2));
+      expect(capturedFor(STATE).every((request) => request.method === "GET")).toBe(true);
+      expect(capturedFor(GENERATIONS)).toEqual([]);
+      expect(screen.queryByRole("button", { name: /Generate my Pattern/i })).toBeNull();
+    },
+  );
+
   it("offers a retry on a failed attempt and keeps the request shape exact", async () => {
     mockApiResponses({
       [`GET ${STATE}`]: {
