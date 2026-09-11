@@ -1,4 +1,4 @@
-import { canonicalJson, contentHash, sha256Hex, ZODIAC_SIGNS, PATTERN_GENERATION_CONSENT_POLICY_VERSION, PORTRAIT_SCHEMA_VERSION, PORTRAIT_CONSENT_POLICY_VERSION, createPortraitGraph, isPortraitGraph, portraitImageModelProvenance, type CodexPortraitClaim, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest, type PatternPortraitResponse, type PatternPortraitDownload, type PatternResponseV7, type ZodiacSignName } from "@patternlike/shared";
+import { canonicalJson, contentHash, sha256Hex, ZODIAC_SIGNS, PATTERN_GENERATION_CONSENT_POLICY_VERSION, PORTRAIT_SCHEMA_VERSION, PORTRAIT_V2_SCHEMA_VERSION, PORTRAIT_CONSENT_POLICY_VERSION, PORTRAIT_V2_CONSENT_POLICY_VERSION, createPortraitGraph, createAdaptiveImageConstellation, isPortraitGraph, isPortraitChapterCount, portraitImageModelProvenance, type PortraitChapterCount, type CodexPortraitClaim, type CodexPortraitClaimV1, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest, type PatternPortraitResponse, type PatternPortraitResponseV1, type PatternPortraitDownload, type PatternResponseV7, type ZodiacSignName } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { b64, fromB64 } from "../crypto.js";
 import { loadUserIdentity, type UserIdentity } from "../db/users.js";
@@ -10,6 +10,7 @@ import { loadPreferences } from "../db/preferences.js";
 import { buildCryptoWriteFence } from "../db/crypto-write-fence.js";
 import { loadActiveChart, loadActivePatternDocument, projectPatternResponse } from "./pattern-state.js";
 import { randomNonce, unwrapContentKey } from "./pattern-crypto.js";
+import { portraitTerminalMatches, type PortraitProtocol } from "./portrait-protocol.js";
 
 export const PORTRAIT_LEASE_MS = 20 * 60_000;
 export const PORTRAIT_TIMEOUT_MS = 15 * 60_000;
@@ -23,6 +24,7 @@ export interface PortraitRow {
   ontology_version: string; processing_consent_id: string; pattern_consent_id: string;
   sun_sign: ZodiacSignName | null; status: "generating" | "failed" | "ready" | "cancelled";
   graph_asset_id: string | null;
+  chapter_count: PortraitChapterCount; protocol_version: PortraitProtocol;
 }
 interface JobRow {
   id: string; portrait_id: string; user_id: string; chapter_index: number; source_sha256: string;
@@ -44,8 +46,11 @@ async function bytesHash(bytes: Uint8Array): Promise<string> {
 }
 const opaque = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 export const portraitEnabled = (env: Env) => env.PATTERN_PORTRAIT_ENABLED === "1" && !!env.ARTIFACTS;
-export function portraitEmpty(status: "unavailable" | "not_started" = "unavailable"): PatternPortraitResponse {
-  return { schema_version: PORTRAIT_SCHEMA_VERSION, status, portrait_id: null, pattern_id: null, generated_at: null, chart_id: null, document_revision: null, sun_sign: null, completed_chapters: 0, retryable: false, chapters: [], graph: null };
+// Strict and local to admission: invalid values cannot interrupt accepted work.
+export const adaptivePortraitsEnabled = (env: Env) => env.PATTERN_ADAPTIVE_PORTRAITS_ENABLED === "1";
+export function portraitEmpty(status: "unavailable" | "not_started" = "unavailable", protocol: PortraitProtocol = "v1"): PatternPortraitResponse {
+  const base: PatternPortraitResponseV1 = { schema_version: PORTRAIT_SCHEMA_VERSION, status, portrait_id: null, pattern_id: null, generated_at: null, chart_id: null, document_revision: null, sun_sign: null, completed_chapters: 0, retryable: false, chapters: [], graph: null };
+  return protocol === "v2" ? { ...base, schema_version: PORTRAIT_V2_SCHEMA_VERSION, chapter_count: null, graph: null } : base;
 }
 function chapterText(chapter: PatternResponseV7["core_chapters"][number]): string {
   return JSON.stringify({ title: chapter.title, summary: chapter.summary, sections: chapter.sections.map((unit) => unit.text), tensions: chapter.tensions.map((unit) => unit.text), resources: chapter.resources.map((unit) => unit.text), counterExpression: chapter.counter_expression.text });
@@ -63,20 +68,21 @@ export async function currentPattern(env: Env, userId: string) {
   const preferences = await loadPreferences(env, userId);
   if (!document || claim?.status !== "accepted" || !preferences || preferences.localeSource !== "user_confirmed" || await isOntologyRecalled(env, document.ontology_version)) return null;
   const published = await projectPatternResponse(env, identity, document);
-  if (published.core_chapters.length !== 4) return null;
+  const chapterCount = published.core_chapters.length;
+  if (!isPortraitChapterCount(chapterCount)) return null;
   const metadata = await env.DB.prepare("SELECT p.content_hash, c.snapshot_json FROM pattern_documents p JOIN chart_snapshots c ON c.id = ? WHERE p.id = ?").bind(chart.id, document.id).first<{ content_hash: string; snapshot_json: string }>();
   if (!metadata) return null;
   const positions = (JSON.parse(metadata.snapshot_json) as { positions?: Array<{ body: string; longitude_deg: number }> }).positions;
   const longitude = positions?.find((position) => position.body === "sun")?.longitude_deg;
   const sunSign = typeof longitude === "number" && Number.isFinite(longitude) ? ZODIAC_SIGNS[Math.floor(((longitude % 360 + 360) % 360) / 30)]! : null;
-  return { identity, chart, document, published, fingerprint, documentHash: metadata.content_hash, sunSign, revision: `${published.schema_version}:${published.pattern_id}:${published.generated_at}`, sources: published.core_chapters.map(chapterText) };
+  return { identity, chart, document, published, fingerprint, chapterCount, documentHash: metadata.content_hash, sunSign, revision: `${published.schema_version}:${published.pattern_id}:${published.generated_at}`, sources: published.core_chapters.map(chapterText) };
 }
 export async function patternKey(env: Env, current: Current) {
   const d = current.document;
   return unwrapContentKey(env, current.identity, d.id, "pattern_documents.wrapped_document_key_enc", { key_version: d.wrapped_document_key_version, nonce: d.wrapped_document_key_nonce, ciphertext: b64(d.wrapped_document_key_enc) });
 }
 function matches(row: PortraitRow, current: Current) {
-  return row.pattern_id === current.document.id && row.chart_id === current.chart.id && row.document_hash === current.documentHash && row.document_revision === current.revision && row.status !== "cancelled";
+  return row.pattern_id === current.document.id && row.chart_id === current.chart.id && row.document_hash === current.documentHash && row.document_revision === current.revision && row.chapter_count === current.chapterCount && (row.protocol_version === "v2" || (row.protocol_version === "v1" && row.chapter_count === 4)) && row.status !== "cancelled";
 }
 export async function authorizedCurrent(env: Env, row: PortraitRow, now: Date) {
   const current = await currentPattern(env, row.user_id);
@@ -121,49 +127,54 @@ async function cancel(env: Env, id: string) {
 
 export async function startPortrait(env: Env, identity: UserIdentity, input: PatternPortraitGenerationRequest, automationGrantId?: string): Promise<PatternPortraitResponse> {
   if (!portraitEnabled(env)) throw new PortraitError(503, "portrait_unavailable");
+  if (input.consent_policy_version !== PORTRAIT_CONSENT_POLICY_VERSION && input.consent_policy_version !== PORTRAIT_V2_CONSENT_POLICY_VERSION) throw new PortraitError(400, "invalid_request");
   const current = await currentPattern(env, identity.userId);
   if (!current || input.chart_id !== current.chart.id || input.pattern_id !== current.document.id || input.generated_at !== current.document.generated_at) throw new PortraitError(409, "portrait_revision_conflict");
+  const protocol: PortraitProtocol = input.consent_policy_version === PORTRAIT_V2_CONSENT_POLICY_VERSION ? "v2" : "v1";
+  if (protocol === "v1" ? current.chapterCount !== 4 : !("chapter_count" in input) || input.chapter_count !== current.chapterCount) throw new PortraitError(409, "portrait_revision_conflict");
   const now = new Date();
   const processing = await loadLiveAccountProcessingGrant(env, identity.userId, now);
   const pattern = await loadPatternGenerationGrant(env, identity.userId, now);
   if (!processing || !pattern) throw new PortraitError(409, "portrait_consent_required");
-  const automationFence = automationGrantId ? [env.DB.prepare("INSERT INTO assertion_probe(id,reason) SELECT 1, 'portrait automation withdrawn' WHERE NOT EXISTS(SELECT 1 FROM portrait_automation_grants WHERE id=? AND user_id=? AND chart_id=? AND enabled=1)").bind(automationGrantId,identity.userId,current.chart.id)] : [];
+  const automationFence = automationGrantId ? [env.DB.prepare("INSERT INTO assertion_probe(id,reason) SELECT 1, 'portrait automation withdrawn' WHERE NOT EXISTS(SELECT 1 FROM portrait_automation_grants WHERE id=? AND user_id=? AND chart_id=? AND enabled=1 AND policy_version=?)").bind(automationGrantId,identity.userId,current.chart.id,protocol === "v2" ? "2.0.0" : "1.1.0")] : [];
   const existing = await env.DB.prepare("SELECT * FROM pattern_portraits WHERE pattern_id = ? AND user_id = ?").bind(current.document.id, identity.userId).first<PortraitRow>();
   if (existing) {
-    if (!matches(existing, current)) throw new PortraitError(409, "portrait_revision_conflict");
+    if (!matches(existing, current) || (protocol === "v1" && existing.protocol_version === "v2")) throw new PortraitError(409, "portrait_revision_conflict");
     // The same Pattern has one bounded budget; explicit retry never resets attempts.
     if (existing.status === "failed") {
       await env.DB.batch([...automationFence,...guards(env, existing, current, now), env.DB.prepare("UPDATE pattern_portrait_jobs SET status = 'pending', retry_at = ?, failure_code = NULL WHERE portrait_id = ? AND (status = 'failed' OR (? = 1 AND status = 'cancelled')) AND attempts < ?").bind(now.toISOString(), existing.id, automationGrantId ? 1 : 0, PORTRAIT_MAX_ATTEMPTS), env.DB.prepare("UPDATE pattern_portraits SET status = 'generating' WHERE id = ? AND EXISTS (SELECT 1 FROM pattern_portrait_jobs WHERE portrait_id = ? AND status IN ('pending','running'))").bind(existing.id, existing.id)]);
     }
-    return readPortrait(env, identity.userId);
+    return readPortrait(env, identity.userId, protocol);
   }
-  const row: PortraitRow = { id: opaque("ppor"), user_id: identity.userId, pattern_id: current.document.id, generation_id: current.document.generation_id, chart_id: current.chart.id, chart_fingerprint_hash: current.fingerprint, document_revision: current.revision, document_hash: current.documentHash, generated_at: current.document.generated_at, ontology_version: current.document.ontology_version, processing_consent_id: processing.consentId, pattern_consent_id: pattern.consentId, sun_sign: current.sunSign, status: "generating", graph_asset_id: null };
-  const statements = [...automationFence,...guards(env, row, current, now), env.DB.prepare(`INSERT INTO pattern_portraits (id,user_id,pattern_id,generation_id,chart_id,chart_fingerprint_hash,document_revision,document_hash,generated_at,ontology_version,processing_consent_id,pattern_consent_id,consent_policy_version,sun_sign,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'generating',?,?)`).bind(row.id,row.user_id,row.pattern_id,row.generation_id,row.chart_id,row.chart_fingerprint_hash,row.document_revision,row.document_hash,row.generated_at,row.ontology_version,row.processing_consent_id,row.pattern_consent_id,PORTRAIT_CONSENT_POLICY_VERSION,row.sun_sign,now.toISOString(),now.toISOString())];
-  for (let index = 0; index < 4; index++) statements.push(env.DB.prepare(`INSERT INTO pattern_portrait_jobs (id,portrait_id,user_id,chapter_index,source_sha256,status,retry_at,created_at,updated_at) VALUES (?,?,?,?,?,'pending',?,?,?)`).bind(opaque("ppjob"), row.id, row.user_id, index, await sha256Hex(current.sources[index]!), now.toISOString(), now.toISOString(), now.toISOString()));
+  if (protocol === "v2" && !adaptivePortraitsEnabled(env)) throw new PortraitError(503, "adaptive_portrait_unavailable");
+  const row: PortraitRow = { id: opaque("ppor"), user_id: identity.userId, pattern_id: current.document.id, generation_id: current.document.generation_id, chart_id: current.chart.id, chart_fingerprint_hash: current.fingerprint, document_revision: current.revision, document_hash: current.documentHash, generated_at: current.document.generated_at, ontology_version: current.document.ontology_version, processing_consent_id: processing.consentId, pattern_consent_id: pattern.consentId, sun_sign: current.sunSign, status: "generating", graph_asset_id: null, chapter_count: current.chapterCount, protocol_version: protocol };
+  const statements = [...automationFence,...guards(env, row, current, now), env.DB.prepare(`INSERT INTO pattern_portraits (id,user_id,pattern_id,generation_id,chart_id,chart_fingerprint_hash,document_revision,document_hash,generated_at,ontology_version,processing_consent_id,pattern_consent_id,consent_policy_version,sun_sign,chapter_count,protocol_version,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'generating',?,?)`).bind(row.id,row.user_id,row.pattern_id,row.generation_id,row.chart_id,row.chart_fingerprint_hash,row.document_revision,row.document_hash,row.generated_at,row.ontology_version,row.processing_consent_id,row.pattern_consent_id,input.consent_policy_version,row.sun_sign,row.chapter_count,row.protocol_version,now.toISOString(),now.toISOString())];
+  for (let index = 0; index < row.chapter_count; index++) statements.push(env.DB.prepare(`INSERT INTO pattern_portrait_jobs (id,portrait_id,user_id,chapter_index,source_sha256,status,retry_at,created_at,updated_at) VALUES (?,?,?,?,?,'pending',?,?,?)`).bind(opaque("ppjob"), row.id, row.user_id, index, await sha256Hex(current.sources[index]!), now.toISOString(), now.toISOString(), now.toISOString()));
   try { await env.DB.batch(statements); } catch {
     const winner = await env.DB.prepare("SELECT id FROM pattern_portraits WHERE pattern_id = ? AND user_id = ?").bind(row.pattern_id,row.user_id).first();
     if (!winner) throw new PortraitError(409, "portrait_revision_conflict");
   }
-  return readPortrait(env, identity.userId);
+  return readPortrait(env, identity.userId, protocol);
 }
 
-export async function claimPortrait(env: Env, now = new Date()): Promise<CodexPortraitClaim | null> {
+export async function claimPortrait(env: Env, now = new Date(), protocol: PortraitProtocol = "v1"): Promise<CodexPortraitClaim | null> {
   if (!portraitEnabled(env)) throw new PortraitError(503, "portrait_unavailable");
   await recoverPortraitLeases(env, now);
-  const candidates = (await env.DB.prepare(`SELECT j.* FROM pattern_portrait_jobs j JOIN pattern_portraits p ON p.id = j.portrait_id JOIN users owner ON owner.id = j.user_id AND owner.status = 'active' WHERE j.status = 'pending' AND j.attempts < ? AND j.retry_at <= ? AND p.status = 'generating' ORDER BY j.created_at, j.portrait_id, j.chapter_index LIMIT 8`).bind(PORTRAIT_MAX_ATTEMPTS, now.toISOString()).all<JobRow>()).results;
+  const candidates = (await env.DB.prepare(`SELECT j.* FROM pattern_portrait_jobs j JOIN pattern_portraits p ON p.id = j.portrait_id JOIN users owner ON owner.id = j.user_id AND owner.status = 'active' WHERE j.status = 'pending' AND j.attempts < ? AND j.retry_at <= ? AND p.status = 'generating' AND (p.protocol_version='v1' OR ?='v2') ORDER BY j.created_at, j.portrait_id, j.chapter_index LIMIT 8`).bind(PORTRAIT_MAX_ATTEMPTS, now.toISOString(), protocol).all<JobRow>()).results;
   for (const job of candidates) {
     const row = await portraitById(env, job.portrait_id);
     const current = row ? await authorizedCurrent(env, row, now) : null;
     if (!row || !current) { if (row) await cancel(env, row.id); continue; }
     const source = current.sources[job.chapter_index]!;
-    if (await sha256Hex(source) !== job.source_sha256) { await cancel(env, row.id); continue; }
+    if (!source || job.chapter_index < 0 || job.chapter_index >= row.chapter_count || await sha256Hex(source) !== job.source_sha256) { await cancel(env, row.id); continue; }
     const token = crypto.randomUUID();
     try {
       const result = await env.DB.batch([...guards(env, row, current, now), env.DB.prepare(`UPDATE pattern_portrait_jobs SET status = 'running', attempts = attempts + 1, lease_hash = ?, lease_expires_at = ?, updated_at = ? WHERE id = ? AND status = 'pending' AND attempts < ? AND EXISTS (SELECT 1 FROM pattern_portraits WHERE id = ? AND status = 'generating')`).bind(await contentHash(token), new Date(now.getTime() + PORTRAIT_LEASE_MS).toISOString(), now.toISOString(), job.id, PORTRAIT_MAX_ATTEMPTS, row.id)]);
       if (!result[result.length - 1]!.meta.changes) continue;
     } catch { continue; }
-    return { schema_version: "codex-portrait-claim/v1", job_id: job.id, portrait_id: row.id, chapter_index: job.chapter_index, lease_token: token, model: "gpt-5.6-sol", reasoning_effort: "xhigh", image_model: "gpt-image-2", prompt_version: "portrait-object-v1", timeout_ms: PORTRAIT_TIMEOUT_MS, source_sha256: job.source_sha256,
+    const claim: CodexPortraitClaimV1 = { schema_version: "codex-portrait-claim/v1", job_id: job.id, portrait_id: row.id, chapter_index: job.chapter_index, lease_token: token, model: "gpt-5.6-sol", reasoning_effort: "xhigh", image_model: "gpt-image-2", prompt_version: "portrait-object-v1", timeout_ms: PORTRAIT_TIMEOUT_MS, source_sha256: job.source_sha256,
       prompt: buildPortraitPrompt(source) };
+    return row.protocol_version === "v2" ? { ...claim, schema_version: "codex-portrait-claim/v2", chapter_count: row.chapter_count, chapter_id: `chapter-${job.chapter_index + 1}`, document_revision: row.document_revision } : claim;
   }
   return null;
 }
@@ -179,16 +190,19 @@ async function recoverPortraitLeases(env: Env, now: Date) {
   ]);
 }
 
-export async function readPortrait(env: Env, userId: string): Promise<PatternPortraitResponse> {
-  if (!portraitEnabled(env)) return portraitEmpty();
+export async function readPortrait(env: Env, userId: string, protocol: PortraitProtocol = "v1"): Promise<PatternPortraitResponse> {
+  if (!portraitEnabled(env)) return portraitEmpty("unavailable", protocol);
   const current = await currentPattern(env, userId);
-  if (!current) return portraitEmpty();
+  if (!current) return portraitEmpty("unavailable", protocol);
   let row = await env.DB.prepare("SELECT * FROM pattern_portraits WHERE pattern_id = ? AND user_id = ?").bind(current.document.id,userId).first<PortraitRow>();
-  const base: PatternPortraitResponse = { ...portraitEmpty("not_started"), pattern_id: current.document.id, generated_at: current.document.generated_at, chart_id: current.chart.id, document_revision: current.revision, sun_sign: current.sunSign };
+  if (protocol === "v1" && (current.chapterCount !== 4 || row?.protocol_version === "v2")) return portraitEmpty();
+  const base: PatternPortraitResponse = { ...portraitEmpty("not_started", row?.protocol_version ?? protocol), pattern_id: current.document.id, generated_at: current.document.generated_at, chart_id: current.chart.id, document_revision: current.revision, sun_sign: current.sunSign };
+  if (base.schema_version === PORTRAIT_V2_SCHEMA_VERSION) base.chapter_count = current.chapterCount;
   if (!row) return base;
   if (!matches(row,current)) return { ...base, status: "unavailable" };
   const jobs = await jobsFor(env,row.id);
-  if (jobs.length === 4 && jobs.every((job) => job.status === "complete") && row.status !== "ready") {
+  if (!orderedJobs(jobs, row.chapter_count)) return { ...base, portrait_id: row.id, status: "failed" };
+  if (jobs.every((job) => job.status === "complete") && row.status !== "ready") {
     await assemblePortrait(env,row,new Date());
     row = (await portraitById(env,row.id))!;
   }
@@ -208,8 +222,10 @@ export async function readPortrait(env: Env, userId: string): Promise<PatternPor
       const metadata = JSON.parse(decoder.decode(await readAsset(env,sample,key))) as Sample;
       response.chapters.push({ chapter_id: `chapter-${job.chapter_index + 1}`, reference_id: image.id, label: metadata.label, rationale: metadata.rationale, reference_sha256: image.plaintext_sha256, source_text: current.sources[job.chapter_index]!, image_model_provenance: portraitImageModelProvenance(metadata) });
     }
-    if (response.chapters.length !== 4) throw new Error("portrait incomplete");
-    response.graph = graph;
+    if (response.chapters.length !== row.chapter_count) throw new Error("portrait incomplete");
+    if (response.schema_version === PORTRAIT_SCHEMA_VERSION && graph.engine_version === "constellation-v1") response.graph = graph;
+    else if (response.schema_version === PORTRAIT_V2_SCHEMA_VERSION && graph.engine_version === "constellation-v2" && graph.chapter_count === row.chapter_count) response.graph = graph;
+    else throw new Error("portrait graph protocol mismatch");
   } catch { return { ...response, status: "failed", retryable: false, graph: null, chapters: [] }; }
   return response;
 }
@@ -252,7 +268,7 @@ export async function completePortrait(env: Env,jobId: string,completion: CodexP
   const current = row ? await authorizedCurrent(env,row,now) : null;
   const hash = await contentHash(canonicalJson(completion));
   const tokenHash = await contentHash(completion.lease_token);
-  if (!job || !row || !current || job.lease_hash !== tokenHash || job.source_sha256 !== completion.source_sha256) throw new PortraitError(409,"portrait_result_conflict");
+  if (!job || !row || !current || !portraitTerminalMatches(row, job.chapter_index, completion, "codex-portrait-completion/v2") || job.lease_hash !== tokenHash || job.source_sha256 !== completion.source_sha256) throw new PortraitError(409,"portrait_result_conflict");
   if (job.status === "complete") {
     if (job.completion_hash !== hash) throw new PortraitError(409,"portrait_result_conflict");
     await assemblePortrait(env,row,now); return;
@@ -278,10 +294,13 @@ export async function completePortrait(env: Env,jobId: string,completion: CodexP
   }
   await assemblePortrait(env,row,now);
 }
+function orderedJobs(jobs: JobRow[], count: PortraitChapterCount): boolean {
+  return jobs.length === count && jobs.every((job, index) => job.chapter_index === index);
+}
 async function assemblePortrait(env: Env,row: PortraitRow,now: Date) {
   if (row.status === "ready" || row.status === "cancelled") return;
   const jobs = await jobsFor(env,row.id);
-  if (jobs.length !== 4 || jobs.some((job) => job.status !== "complete")) return;
+  if (!orderedJobs(jobs, row.chapter_count) || jobs.some((job) => job.status !== "complete")) return;
   const current = await authorizedCurrent(env,row,now);
   if (!current) { await cancel(env,row.id); return; }
   const key = await patternKey(env,current);
@@ -293,18 +312,19 @@ async function assemblePortrait(env: Env,row: PortraitRow,now: Date) {
     const metadata = JSON.parse(decoder.decode(await readAsset(env,sample,key))) as Sample;
     images.push({ width:metadata.pixels.width,height:metadata.pixels.height,data:new Uint8ClampedArray(fromB64(metadata.pixels.rgba_base64)) });
   }
-  const graph = createPortraitGraph(images,row.sun_sign);
+  const graph = row.protocol_version === "v2" ? createAdaptiveImageConstellation(images, row.sun_sign) : createPortraitGraph(images,row.sun_sign);
   if (!isPortraitGraph(graph)) throw new PortraitError(503,"portrait_graph_invalid");
-  const graphAsset = await saveAsset(env,row,current,null,"graph",encoder.encode(JSON.stringify(graph)),"constellation-v1",now);
-  await env.DB.batch([...guards(env,row,current,new Date(Math.max(now.getTime(),Date.now()))),env.DB.prepare(`UPDATE pattern_portraits SET status = 'ready', graph_asset_id = ?, updated_at = ? WHERE id = ? AND status != 'cancelled' AND (SELECT COUNT(*) FROM pattern_portrait_jobs WHERE portrait_id = ? AND status = 'complete') = 4`).bind(graphAsset.id,now.toISOString(),row.id,row.id)]);
+  const graphAsset = await saveAsset(env,row,current,null,"graph",encoder.encode(JSON.stringify(graph)),graph.engine_version,now);
+  await env.DB.batch([...guards(env,row,current,new Date(Math.max(now.getTime(),Date.now()))),env.DB.prepare(`UPDATE pattern_portraits SET status = 'ready', graph_asset_id = ?, updated_at = ? WHERE id = ? AND status != 'cancelled' AND (SELECT COUNT(*) FROM pattern_portrait_jobs WHERE portrait_id = ? AND status = 'complete' AND chapter_index >= 0 AND chapter_index < pattern_portraits.chapter_count) = pattern_portraits.chapter_count`).bind(graphAsset.id,now.toISOString(),row.id,row.id)]);
 }
 export async function failPortrait(env: Env,jobId: string,failure: CodexPortraitFailure,now = new Date()) {
   if (!portraitEnabled(env)) throw new PortraitError(503,"portrait_unavailable");
   const job = await env.DB.prepare("SELECT * FROM pattern_portrait_jobs WHERE id = ?").bind(jobId).first<JobRow>();
   if (!job || job.lease_hash !== await contentHash(failure.lease_token)) throw new PortraitError(409,"portrait_result_conflict");
+  const row = await portraitById(env,job.portrait_id);
+  if (!row || !portraitTerminalMatches(row, job.chapter_index, failure, "codex-portrait-failure/v2") || ("source_sha256" in failure && failure.source_sha256 !== job.source_sha256)) throw new PortraitError(409,"portrait_result_conflict");
   if ((job.status === "failed" || job.status === "pending") && job.failure_code === failure.code) return;
   if (job.status !== "running" || !job.lease_expires_at || job.lease_expires_at <= now.toISOString()) throw new PortraitError(409,"portrait_result_conflict");
-  const row = await portraitById(env,job.portrait_id);
   const current = row ? await authorizedCurrent(env,row,now) : null;
   if (!row || !current) { if(row) await cancel(env,row.id);throw new PortraitError(409,"portrait_result_conflict"); }
   const automatic = failure.code === "generation_failed" && job.attempts < PORTRAIT_MAX_ATTEMPTS;
@@ -318,13 +338,13 @@ export async function portraitImage(env: Env,userId: string,referenceId: string)
   if (!asset) throw new PortraitError(404,"portrait_image_not_found");
   try { return await readAsset(env,asset,await patternKey(env,current)); } catch { throw new PortraitError(404,"portrait_image_not_found"); }
 }
-export async function portraitDownload(env: Env,userId: string,expected: URLSearchParams): Promise<PatternPortraitDownload> {
-  const portrait = await readPortrait(env,userId);
+export async function portraitDownload(env: Env,userId: string,expected: URLSearchParams, protocol: PortraitProtocol = "v1"): Promise<PatternPortraitDownload> {
+  const portrait = await readPortrait(env,userId,protocol);
   for (const key of ["chart_id","pattern_id","generated_at"] as const) if (!expected.has(key) || expected.get(key) !== portrait[key]) throw new PortraitError(409,"portrait_revision_conflict");
   if (portrait.status !== "ready") throw new PortraitError(409,"portrait_not_ready");
   const images: PatternPortraitDownload["images"] = [];
   for (const chapter of portrait.chapters) images.push({ reference_id: chapter.reference_id, content_type: "image/png", sha256: chapter.reference_sha256, data_base64: b64(await portraitImage(env,userId,chapter.reference_id)), image_model_provenance: chapter.image_model_provenance });
-  return { schema_version: "pattern-portrait-download/v1", portrait, images };
+  return portrait.schema_version === PORTRAIT_V2_SCHEMA_VERSION ? { schema_version: "pattern-portrait-download/v2", portrait, images } : { schema_version: "pattern-portrait-download/v1", portrait, images };
 }
 /** Claim a fair bounded scan without changing the user-visible completion time. */
 export async function nextPortraitMaintenanceBatch(env: Env, now: Date): Promise<PortraitRow[]> {

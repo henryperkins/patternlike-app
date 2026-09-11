@@ -1,0 +1,9 @@
+{
+  "lease_token": "12345678-1234-1234-1234-123456789abc",
+  "code": "visual_check_failed",
+  "schema_version": "codex-portrait-mesh-failure/v2",
+  "chapter_count": 5,
+  "chapter_index": 4,
+  "chapter_id": "chapter-5",
+  "document_revision": "revision-fictional"
+}

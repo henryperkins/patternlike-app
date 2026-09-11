@@ -402,6 +402,6 @@ export default function PatternSculpture(props: SculptureProps) {
     return () => { controller.abort(); owned?.geometry.dispose(); owned?.lineGeometry.dispose(); };
   }, [sculptureKey]);
   useEffect(() => { if (failed) props.onUnavailable(); }, [failed, props.onUnavailable]);
-  if (failed) return <p className="portrait-graphics-message" role="status">The constellation could not be drawn from the four images. You can still read every chapter.</p>;
-  return model ? <SculptureCanvas {...props} model={model} /> : <p className="portrait-graphics-message" role="status">Tracing the four chapter images…</p>;
+  if (failed) return <p className="portrait-graphics-message" role="status">The constellation could not be drawn from the chapter images. You can still read every chapter.</p>;
+  return model ? <SculptureCanvas {...props} model={model} /> : <p className="portrait-graphics-message" role="status">Tracing the chapter images…</p>;
 }

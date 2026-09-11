@@ -1,0 +1,8 @@
+{
+  "schema_version": "portrait-automation/v2",
+  "available": false,
+  "chart_id": "chart-fictional",
+  "enabled": true,
+  "legacy_enabled": true,
+  "consent_policy_version": "2.0.0"
+}

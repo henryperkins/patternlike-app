@@ -5,7 +5,7 @@ import { chmod, lstat, mkdir, mkdtemp, open, realpath, rm, writeFile } from "nod
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
-import type { CodexPortraitClaim, CodexPortraitCompletion, CodexPortraitFailure } from "@patternlike/shared";
+import type { CodexPortraitClaim, CodexPortraitCompletion, CodexPortraitCompletionV1, CodexPortraitFailure } from "@patternlike/shared";
 import { buildCodexChildEnvironment } from "./codex-environment.js";
 import { decodePortraitBase64, parsePortraitClaim } from "./portrait-client.js";
 
@@ -278,7 +278,7 @@ export async function runPortraitInvocation(options: PortraitInvocationOptions):
     await verifiedNativeFile(native, home, bytes);
     let prepared; try { prepared = await preparePortraitImage(bytes); } catch { throw new PortraitError("image_invalid"); }
     await options.onVerifiedImage?.(bytes);
-    outcome = { ok: true, completion: { lease_token: options.claim.lease_token, source_sha256: options.claim.source_sha256,
+    const base: CodexPortraitCompletionV1 = { lease_token: options.claim.lease_token, source_sha256: options.claim.source_sha256,
       label: native.label, rationale: native.rationale, ...prepared, provider_request_id: `${native.threadId}:${native.turnId}`,
       image_request_id: native.imageId, image_model: options.claim.image_model,
       image_model_provenance: {
@@ -287,7 +287,16 @@ export async function runPortraitInvocation(options: PortraitInvocationOptions):
         observed_image_model: null,
         observation_status: "not_exposed",
         codex_cli_version: PORTRAIT_CODEX_CLI_VERSION,
-      } } };
+      },
+    };
+    const completion: CodexPortraitCompletion = options.claim.schema_version === "codex-portrait-claim/v2" ? {
+        ...base, schema_version: "codex-portrait-completion/v2",
+        chapter_count: options.claim.chapter_count,
+        chapter_index: options.claim.chapter_index,
+        chapter_id: options.claim.chapter_id,
+        document_revision: options.claim.document_revision,
+      } : base;
+    outcome = { ok: true, completion };
   } catch (error) {
     outcome = { ok: false, code: error instanceof PortraitError ? error.code : "generation_failed", fatal: error instanceof PortraitError && error.fatal };
   }

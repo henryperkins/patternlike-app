@@ -64,3 +64,15 @@ test("limits serialized programs to 64 KiB even when declaration counts are vali
   assert.equal(parsePortraitMeshProgram(dense), null);
   assert.ok(parsePortraitMeshProgram({ ...dense, parts: dense.parts.slice(0, 1) }));
 });
+
+test("adaptive programs bind every supported chapter count and retain geometry limits", () => {
+  for (const chapterCount of [3, 4, 5, 6]) {
+    const value = { ...program(), version: "portrait-mesh-program/v2", chapter_count: chapterCount, chapter_id: `chapter-${chapterCount}` };
+    assert.deepEqual(parsePortraitMeshProgram(value), value);
+    for (const patch of [{ chapter_count: 2 }, { chapter_count: 7 }, { chapter_count: 3.5 },
+      { chapter_count: chapterCount - 1 }, { chapter_id: "chapter-0" }, { chapter_id: "chapter-7" },
+      { version: "portrait-mesh-program/v1" }, { version: "portrait-mesh-program/v3" }, { injected: true },
+      { parts: [{ ...value.parts[0], position: [NaN, 0, 0] }] },
+    ]) assert.equal(parsePortraitMeshProgram({ ...value, ...patch }), null);
+  }
+});

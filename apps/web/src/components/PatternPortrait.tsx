@@ -63,7 +63,7 @@ function CompleteChapter({ chapter }: { chapter: PortraitChapter }) {
 
 function ReadyPortrait({ manifest, savedGraph }: { manifest: PortraitManifest; savedGraph?: PortraitGraph }) {
   const imageUrls = useMemo(() => portraitImageUrls(manifest), [manifest]);
-  const graph = useMemo(() => savedGraph && isPortraitGraph(savedGraph) && manifest.chapters.length === 4
+  const graph = useMemo(() => savedGraph && isPortraitGraph(savedGraph) && manifest.chapters.length === (savedGraph.engine_version === "constellation-v2" ? savedGraph.chapter_count : 4)
     && manifest.chapters.every(({ object }) => object?.referenceId.trim() && /^[a-f0-9]{64}$/i.test(object.referenceSha256))
     ? savedGraph : undefined, [manifest, savedGraph]);
   const [selected, setSelected] = useState<string | null>(null);

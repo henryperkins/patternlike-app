@@ -4,6 +4,7 @@ import {
   isCodexPortraitMeshFailure,
   PORTRAIT_MESH_MAX_TRANSPORT_BYTES,
   PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION,
+  PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION,
   type PortraitAutomationRequest,
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
@@ -19,6 +20,7 @@ import {
   completePortraitMesh,
   failPortraitMesh,
 } from "../services/pattern-portrait-mesh.js";
+import { PORTRAIT_PROTOCOL_HEADER, portraitProtocol } from "../services/portrait-protocol.js";
 type Ctx = Context<{ Bindings: Env; Variables: AppVariables }>;
 export const portraitMeshRoutes = new Hono<{
   Bindings: Env;
@@ -62,7 +64,9 @@ async function json(request: Request, max: number): Promise<unknown> {
 async function respond(c: Ctx, work: () => Promise<Response>) {
   c.header("cache-control", "private, no-store");
   c.header("x-content-type-options", "nosniff");
+  c.header("Vary", PORTRAIT_PROTOCOL_HEADER);
   try {
+    portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER));
     return await work();
   } catch (error) {
     if (error instanceof PortraitError)
@@ -81,7 +85,7 @@ async function respond(c: Ctx, work: () => Promise<Response>) {
 }
 portraitMeshRoutes.get("/v1/pattern-portrait/automation", (c) =>
   respond(c, async () =>
-    c.json(await readPortraitAutomation(c.env, c.get("userId"))),
+    c.json(await readPortraitAutomation(c.env, c.get("userId"), portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)))),
   ),
 );
 portraitMeshRoutes.put("/v1/pattern-portrait/automation", (c) =>
@@ -96,8 +100,8 @@ portraitMeshRoutes.put("/v1/pattern-portrait/automation", (c) =>
       value.chart_id.length < 1 ||
       value.chart_id.length > 100 ||
       typeof value.enabled !== "boolean" ||
-      value.consent_policy_version !==
-        PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION ||
+      ![PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION, PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION].includes(value.consent_policy_version as "1.1.0" | "2.0.0") ||
+      (value.consent_policy_version === PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION && portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)) !== "v2") ||
       value.confirm !==
         (value.enabled
           ? "ENABLE AUTOMATIC PORTRAITS"
@@ -109,13 +113,14 @@ portraitMeshRoutes.put("/v1/pattern-portrait/automation", (c) =>
         c.env,
         c.get("userId"),
         value as unknown as PortraitAutomationRequest,
+        portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)),
       ),
     );
   }),
 );
 portraitMeshRoutes.get("/v1/pattern-portrait/explorer", (c) =>
   respond(c, async () =>
-    c.json(await readPortraitExplorer(c.env, c.get("userId"))),
+    c.json(await readPortraitExplorer(c.env, c.get("userId"), portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)))),
   ),
 );
 portraitMeshRoutes.get("/v1/pattern-portrait/models/:referenceId", (c) =>
@@ -123,7 +128,7 @@ portraitMeshRoutes.get("/v1/pattern-portrait/models/:referenceId", (c) =>
     const id = c.req.param("referenceId");
     if (!/^ppmodel_[a-f0-9]{32}$/.test(id))
       throw new PortraitError(404, "portrait_model_not_found");
-    const bytes = await portraitModel(c.env, c.get("userId"), id);
+    const bytes = await portraitModel(c.env, c.get("userId"), id, portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)));
     c.header("content-type", "model/gltf-binary");
     return c.body(bytes.slice().buffer);
   }),
@@ -134,6 +139,7 @@ portraitMeshRoutes.get("/v1/pattern-portrait/explorer/download", (c) =>
       c.env,
       c.get("userId"),
       new URL(c.req.url).searchParams,
+      portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)),
     );
     c.header(
       "content-disposition",
@@ -152,7 +158,7 @@ codexPortraitMeshRoutes.post("/v1/portrait-meshes/claim", (c) =>
       Object.keys(value).length
     )
       throw new PortraitError(400, "invalid_request");
-    const claim = await claimPortraitMesh(c.env);
+    const claim = await claimPortraitMesh(c.env, new Date(), portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)));
     return claim ? c.json(claim) : c.body(null, 204);
   }),
 );
@@ -162,12 +168,13 @@ codexPortraitMeshRoutes.post("/v1/portrait-meshes/:jobId/complete", (c) =>
     const value = await json(c.req.raw, PORTRAIT_MESH_MAX_TRANSPORT_BYTES);
     if (
       !/^ppmesh_[a-f0-9]{32}$/.test(id) ||
-      !isCodexPortraitMeshCompletion(value)
+      !isCodexPortraitMeshCompletion(value) ||
+      ("schema_version" in value && portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)) !== "v2")
     )
       throw new PortraitError(400, "invalid_request");
     await completePortraitMesh(c.env, id, value);
     return c.json({
-      schema_version: "codex-portrait-mesh-terminal/v1",
+      schema_version: "schema_version" in value ? "codex-portrait-mesh-terminal/v2" : "codex-portrait-mesh-terminal/v1",
       status: "accepted",
     });
   }),
@@ -176,11 +183,11 @@ codexPortraitMeshRoutes.post("/v1/portrait-meshes/:jobId/fail", (c) =>
   respond(c, async () => {
     const id = c.req.param("jobId");
     const value = await json(c.req.raw, 1024);
-    if (!/^ppmesh_[a-f0-9]{32}$/.test(id) || !isCodexPortraitMeshFailure(value))
+    if (!/^ppmesh_[a-f0-9]{32}$/.test(id) || !isCodexPortraitMeshFailure(value) || ("schema_version" in value && portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)) !== "v2"))
       throw new PortraitError(400, "invalid_request");
     await failPortraitMesh(c.env, id, value);
     return c.json({
-      schema_version: "codex-portrait-mesh-terminal/v1",
+      schema_version: "schema_version" in value ? "codex-portrait-mesh-terminal/v2" : "codex-portrait-mesh-terminal/v1",
       status: "accepted",
     });
   }),

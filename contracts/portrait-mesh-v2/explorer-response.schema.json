@@ -1,0 +1,581 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "portrait",
+    "chapter_count",
+    "document_revision",
+    "completed_models",
+    "retryable",
+    "models"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pattern-portrait-explorer/v2"
+    },
+    "status": {
+      "enum": [
+        "unavailable",
+        "not_started",
+        "generating",
+        "failed",
+        "ready"
+      ]
+    },
+    "portrait": {
+      "$ref": "https://patternlike.app/contracts/portrait-v2/portrait.schema.json#/$defs/response"
+    },
+    "chapter_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        3,
+        4,
+        5,
+        6,
+        null
+      ]
+    },
+    "document_revision": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "completed_models": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "models": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "$ref": "./model.schema.json"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "portrait": {
+            "properties": {
+              "chapter_count": {
+                "const": 3
+              }
+            }
+          },
+          "completed_models": {
+            "maximum": 3
+          },
+          "models": {
+            "maxItems": 3,
+            "prefixItems": [
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-1"
+                  },
+                  "chapter_index": {
+                    "const": 0
+                  },
+                  "chapter_count": {
+                    "const": 3
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-2"
+                  },
+                  "chapter_index": {
+                    "const": 1
+                  },
+                  "chapter_count": {
+                    "const": 3
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-3"
+                  },
+                  "chapter_index": {
+                    "const": 2
+                  },
+                  "chapter_count": {
+                    "const": 3
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "portrait": {
+            "properties": {
+              "chapter_count": {
+                "const": 4
+              }
+            }
+          },
+          "completed_models": {
+            "maximum": 4
+          },
+          "models": {
+            "maxItems": 4,
+            "prefixItems": [
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-1"
+                  },
+                  "chapter_index": {
+                    "const": 0
+                  },
+                  "chapter_count": {
+                    "const": 4
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-2"
+                  },
+                  "chapter_index": {
+                    "const": 1
+                  },
+                  "chapter_count": {
+                    "const": 4
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-3"
+                  },
+                  "chapter_index": {
+                    "const": 2
+                  },
+                  "chapter_count": {
+                    "const": 4
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-4"
+                  },
+                  "chapter_index": {
+                    "const": 3
+                  },
+                  "chapter_count": {
+                    "const": 4
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 5
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "portrait": {
+            "properties": {
+              "chapter_count": {
+                "const": 5
+              }
+            }
+          },
+          "completed_models": {
+            "maximum": 5
+          },
+          "models": {
+            "maxItems": 5,
+            "prefixItems": [
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-1"
+                  },
+                  "chapter_index": {
+                    "const": 0
+                  },
+                  "chapter_count": {
+                    "const": 5
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-2"
+                  },
+                  "chapter_index": {
+                    "const": 1
+                  },
+                  "chapter_count": {
+                    "const": 5
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-3"
+                  },
+                  "chapter_index": {
+                    "const": 2
+                  },
+                  "chapter_count": {
+                    "const": 5
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-4"
+                  },
+                  "chapter_index": {
+                    "const": 3
+                  },
+                  "chapter_count": {
+                    "const": 5
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-5"
+                  },
+                  "chapter_index": {
+                    "const": 4
+                  },
+                  "chapter_count": {
+                    "const": 5
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 6
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "portrait": {
+            "properties": {
+              "chapter_count": {
+                "const": 6
+              }
+            }
+          },
+          "completed_models": {
+            "maximum": 6
+          },
+          "models": {
+            "maxItems": 6,
+            "prefixItems": [
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-1"
+                  },
+                  "chapter_index": {
+                    "const": 0
+                  },
+                  "chapter_count": {
+                    "const": 6
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-2"
+                  },
+                  "chapter_index": {
+                    "const": 1
+                  },
+                  "chapter_count": {
+                    "const": 6
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-3"
+                  },
+                  "chapter_index": {
+                    "const": 2
+                  },
+                  "chapter_count": {
+                    "const": 6
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-4"
+                  },
+                  "chapter_index": {
+                    "const": 3
+                  },
+                  "chapter_count": {
+                    "const": 6
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-5"
+                  },
+                  "chapter_index": {
+                    "const": 4
+                  },
+                  "chapter_count": {
+                    "const": 6
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "chapter_id": {
+                    "const": "chapter-6"
+                  },
+                  "chapter_index": {
+                    "const": 5
+                  },
+                  "chapter_count": {
+                    "const": 6
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 3
+          },
+          "status": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "completed_models": {
+            "const": 3
+          },
+          "models": {
+            "minItems": 3
+          },
+          "retryable": {
+            "const": false
+          },
+          "portrait": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 4
+          },
+          "status": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "completed_models": {
+            "const": 4
+          },
+          "models": {
+            "minItems": 4
+          },
+          "retryable": {
+            "const": false
+          },
+          "portrait": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 5
+          },
+          "status": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "completed_models": {
+            "const": 5
+          },
+          "models": {
+            "minItems": 5
+          },
+          "retryable": {
+            "const": false
+          },
+          "portrait": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": 6
+          },
+          "status": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "completed_models": {
+            "const": 6
+          },
+          "models": {
+            "minItems": 6
+          },
+          "retryable": {
+            "const": false
+          },
+          "portrait": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "chapter_count": {
+            "const": null
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "document_revision": {
+            "type": "null"
+          },
+          "status": {
+            "const": "unavailable"
+          },
+          "completed_models": {
+            "const": 0
+          },
+          "models": {
+            "maxItems": 0
+          },
+          "portrait": {
+            "properties": {
+              "chapter_count": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/explorer-response.schema.json"
+}

@@ -1,0 +1,68 @@
+{
+  "chapter_count": 2,
+  "chapter_index": 2,
+  "chapter_id": "chapter-3",
+  "document_revision": "revision-fictional",
+  "schema_version": "codex-portrait-mesh-completion/v2",
+  "lease_token": "12345678-1234-1234-1234-123456789abc",
+  "program": {
+    "version": "portrait-mesh-program/v2",
+    "chapter_count": 3,
+    "chapter_id": "chapter-3",
+    "materials": [
+      {
+        "id": "oak",
+        "color": "#ad8151",
+        "metalness": 0,
+        "roughness": 0.7
+      }
+    ],
+    "parts": [
+      {
+        "name": "body",
+        "material": "oak",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "box",
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "bevel": 0.04
+        }
+      }
+    ]
+  },
+  "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "glb_base64": "AAAA",
+  "glb_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compiler_version": "portrait-mesh-compiler/v2",
+  "audit": {
+    "schema_version": "portrait-mesh-audit/v1",
+    "accepted": true,
+    "recognizable": true,
+    "substantial": true,
+    "source_correspondence": true,
+    "no_severe_intersections": true,
+    "view_count": 4,
+    "notes": "Four bounded views checked against the accepted source image."
+  },
+  "provider_request_id": "request",
+  "audit_request_id": "audit"
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/automation-response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "available",
+    "chart_id",
+    "enabled",
+    "consent_policy_version",
+    "legacy_enabled"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "portrait-automation/v2"
+    },
+    "available": {
+      "type": "boolean"
+    },
+    "chart_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "consent_policy_version": {
+      "const": "2.0.0"
+    },
+    "legacy_enabled": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "not": {
+        "properties": {
+          "enabled": {
+            "const": true
+          },
+          "legacy_enabled": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}

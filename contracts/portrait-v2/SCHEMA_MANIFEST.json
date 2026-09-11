@@ -1,0 +1,13 @@
+{
+  "package": "contracts/portrait-v2",
+  "schema_version": "pattern-portrait/v2",
+  "document_date": "2026-09-11",
+  "status": "additive_preview",
+  "schemas": [
+    "portrait.schema.json"
+  ],
+  "openapi": [
+    "openapi/openapi.yaml"
+  ],
+  "note": "New protocol identities; all v1 schemas and accepted assets remain unchanged. Runtime validators additionally enforce cross-field digest/revision bindings, ordered completeness, graph connectivity and geometry budgets."
+}

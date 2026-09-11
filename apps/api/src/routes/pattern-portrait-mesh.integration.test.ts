@@ -7,6 +7,9 @@ import type {
   PatternResponseV7,
 } from "@patternlike/shared";
 import { b64 } from "../crypto.js";
+import { contentHash } from "@patternlike/shared";
+import { decryptPatternDocument, loadAnyPatternDocument } from "../services/pattern-state.js";
+import { encryptUnderContentKey, randomNonce, unwrapContentKey } from "../services/pattern-crypto.js";
 
 import { collectDeletionArtifactKeys } from "../services/deletion-manifest.js";
 import { app } from "../index.js";
@@ -36,6 +39,7 @@ const enabledEnv = () =>
   Object.defineProperties(Object.create(env), {
     PATTERN_PORTRAIT_ENABLED: { value: "1", configurable: true },
     PATTERN_PORTRAIT_MESH_ENABLED: { value: "1", configurable: true },
+    PATTERN_ADAPTIVE_PORTRAITS_ENABLED: { value: "1", configurable: true },
     CODEX_RUNNER_TOKEN: { value: TOKEN, configurable: true },
   });
 async function user(
@@ -59,7 +63,7 @@ async function user(
     enabledEnv(),
   );
 }
-async function machine(path: string, body: unknown, bindings = enabledEnv()) {
+async function machine(path: string, body: unknown, bindings = enabledEnv(), protocol = "v1") {
   return app.fetch(
     new Request(`https://api.test/codex-provider/v1/portraits${path}`, {
       method: "POST",
@@ -67,6 +71,7 @@ async function machine(path: string, body: unknown, bindings = enabledEnv()) {
       headers: {
         authorization: `Bearer ${TOKEN}`,
         "content-type": "application/json",
+        ...(protocol === "v2" ? { "X-Patternlike-Portrait-Protocol": "v2" } : {}),
       },
     }),
     bindings,
@@ -76,6 +81,7 @@ let document: PatternResponseV7;
 let chartId: string;
 
 beforeEach(async () => {
+  const chapterCount = Number(expect.getState().currentTestName?.match(/adaptive count=(3|4|5|6)/)?.[1] ?? 4);
   await resetDb();
   await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
   installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
@@ -154,7 +160,8 @@ beforeEach(async () => {
   const pattern = await user("/v1/pattern");
   expect(pattern.status).toBe(200);
   document = (await pattern.json()) as PatternResponseV7;
-  expect(document.core_chapters).toHaveLength(4);
+  if (chapterCount !== 4) await replaceChapterCount(chapterCount);
+  expect(document.core_chapters).toHaveLength(chapterCount);
 });
 afterEach(() => {
   disablePatternAi();
@@ -295,12 +302,16 @@ import {
 import { fixtureGlb } from "../../test/portrait-mesh-fixture.js";
 const PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1kAAAAASUVORK5CYII=";
-async function images(count = 4) {
-  await preference();
+async function images(count = 4, adaptive = false) {
+  if (adaptive) {
+    const result = await user("/v1/pattern-portrait/automation", { ...automation(), consent_policy_version: "2.0.0" }, USER_A,
+      { method: "PUT", headers: { "X-Patternlike-Portrait-Protocol": "v2" } });
+    expect(result.status, await result.clone().text()).toBe(200);
+  } else await preference();
   await maintainPortraitMeshes(enabledEnv());
   for (let i = 0; i < count; i++) {
     const claim = (await (
-      await machine("/claim", {})
+      await machine("/claim", {}, enabledEnv(), adaptive ? "v2" : "v1")
     ).json()) as CodexPortraitClaim;
     const pixels = new Uint8Array(128 * 128 * 4);
     for (let y = 0; y < 128; y++)
@@ -313,6 +324,9 @@ async function images(count = 4) {
         pixels[at + 3] = 255;
       }
     const completion: CodexPortraitCompletion = {
+      ...(claim.schema_version === "codex-portrait-claim/v2" ? { schema_version: "codex-portrait-completion/v2" as const,
+        chapter_count: claim.chapter_count, chapter_index: claim.chapter_index, chapter_id: claim.chapter_id,
+        document_revision: claim.document_revision } : {}),
       lease_token: claim.lease_token,
       source_sha256: claim.source_sha256,
       label: "Source object",
@@ -324,14 +338,14 @@ async function images(count = 4) {
       image_request_id: "native-tool",
       image_model: "gpt-image-2",
     };
-    const result = await machine(`/${claim.job_id}/complete`, completion);
+    const result = await machine(`/${claim.job_id}/complete`, completion, enabledEnv(), adaptive ? "v2" : "v1");
     expect(result.status, await result.clone().text()).toBe(200);
   }
   return (await (
-    await user("/v1/pattern-portrait")
+    await user("/v1/pattern-portrait", undefined, USER_A, { headers: adaptive ? { "X-Patternlike-Portrait-Protocol": "v2" } : {} })
   ).json()) as PatternPortraitResponse;
 }
-async function meshMachine(path: string, body: unknown) {
+async function meshMachine(path: string, body: unknown, bindings = enabledEnv(), protocol = "v1") {
   return app.fetch(
     new Request(`https://api.test/codex-provider/v1/portrait-meshes${path}`, {
       method: "POST",
@@ -339,16 +353,19 @@ async function meshMachine(path: string, body: unknown) {
       headers: {
         authorization: `Bearer ${TOKEN}`,
         "content-type": "application/json",
+        ...(protocol === "v2" ? { "X-Patternlike-Portrait-Protocol": "v2" } : {}),
       },
     }),
-    enabledEnv(),
+    bindings,
   );
 }
 async function meshCompletion(
   claim: CodexPortraitMeshClaim,
 ): Promise<CodexPortraitMeshCompletion> {
   const program = {
-    version: "portrait-mesh-program/v1" as const,
+    ...(claim.schema_version === "codex-portrait-mesh-claim/v2"
+      ? { version: "portrait-mesh-program/v2" as const, chapter_count: claim.chapter_count, chapter_id: claim.chapter_id }
+      : { version: "portrait-mesh-program/v1" as const }),
     materials: [
       { id: "solid", color: "#778899", metalness: 0, roughness: 0.5 },
     ],
@@ -376,13 +393,17 @@ async function meshCompletion(
     sourceTextSha256: claim.source_text_sha256,
     programSha256: programHash,
     compilerVersion: claim.compiler_version,
-    authoring: "codex-parametric/v1",
+    authoring: claim.schema_version === "codex-portrait-mesh-claim/v2" ? "codex-parametric/v2" : "codex-parametric/v1",
+    ...(claim.schema_version === "codex-portrait-mesh-claim/v2" ? { chapterCount: claim.chapter_count } : {}),
   });
   const hash = Array.from(
     new Uint8Array(await crypto.subtle.digest("SHA-256", glb)),
     (x) => x.toString(16).padStart(2, "0"),
   ).join("");
   return {
+    ...(claim.schema_version === "codex-portrait-mesh-claim/v2" ? { schema_version: "codex-portrait-mesh-completion/v2" as const,
+      chapter_count: claim.chapter_count, chapter_index: claim.chapter_index, chapter_id: claim.chapter_id,
+      document_revision: claim.document_revision } : {}),
     lease_token: claim.lease_token,
     program,
     program_sha256: programHash,
@@ -401,8 +422,197 @@ async function meshCompletion(
     },
     provider_request_id: "mesh:turn",
     audit_request_id: "audit:turn",
-  };
+  } as CodexPortraitMeshCompletion;
 }
+
+async function replaceChapterCount(count: number) {
+  const row = (await loadAnyPatternDocument(env, USER_A))!;
+  const internal = await decryptPatternDocument(env, IDENTITY_A, row);
+  internal.artifact.chapters = Array.from({ length: count }, (_, index) => ({
+    ...internal.artifact.chapters[index % 4]!, chapter_key: `chapter_0${index + 1}`,
+  }));
+  const key = await unwrapContentKey(env, IDENTITY_A, row.id, "pattern_documents.wrapped_document_key_enc", {
+    key_version: row.wrapped_document_key_version, nonce: row.wrapped_document_key_nonce, ciphertext: b64(row.wrapped_document_key_enc),
+  });
+  const nonce = randomNonce();
+  const cipher = await encryptUnderContentKey(internal, key, nonce, new TextEncoder().encode(JSON.stringify(["patternlike.pattern-document", 1, row.id, row.generation_id])));
+  await env.DB.prepare("UPDATE pattern_documents SET document_enc=?,document_nonce=?,content_hash=? WHERE id=?")
+    .bind(cipher, b64(nonce), await contentHash(JSON.stringify(internal)), row.id).run();
+  document = await (await user("/v1/pattern")).json() as PatternResponseV7;
+}
+const adaptiveHeaders = { "X-Patternlike-Portrait-Protocol": "v2" };
+const adaptiveUser = (path: string) => user(path, undefined, USER_A, { headers: adaptiveHeaders });
+const adaptiveOff = () => Object.defineProperty(enabledEnv(), "PATTERN_ADAPTIVE_PORTRAITS_ENABLED", { value: "0" });
+
+describe("adaptive mesh artwork v2", () => {
+  it.each([3, 4, 5, 6])("adaptive count=%i completes and downloads every ordered model", async (count) => {
+    const portrait = await images(count, true);
+    expect(portrait).toMatchObject({ schema_version: "pattern-portrait/v2", chapter_count: count, status: "ready" });
+    // Capability filtering happens before lease acquisition, leaving v2 jobs untouched.
+    expect((await meshMachine("/claim", {})).status).toBe(204);
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_mesh_jobs WHERE attempts!=0 OR status!='pending'").first()).toEqual({ n: 0 });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_mesh_jobs").first()).toEqual({ n: count });
+    expect(await user("/v1/pattern-portrait/explorer").then(result => result.json())).toMatchObject({
+      schema_version: "pattern-portrait-explorer/v1", status: "unavailable", models: [],
+    });
+    for (let index = 0; index < count; index++) {
+      const response = await meshMachine("/claim", {}, enabledEnv(), "v2");
+      expect(response.status, await response.clone().text()).toBe(200);
+      const claim = await response.json() as CodexPortraitMeshClaim;
+      expect(claim).toMatchObject({ schema_version: "codex-portrait-mesh-claim/v2", chapter_count: count,
+        chapter_index: index, chapter_id: `chapter-${index + 1}`, document_revision: portrait.document_revision,
+        compiler_version: "portrait-mesh-compiler/v2", prompt_version: "portrait-mesh/v2" });
+      const input = await meshCompletion(claim);
+      // Already-reserved work finishes even when adaptive production is disabled.
+      const complete = await meshMachine(`/${claim.job_id}/complete`, input, adaptiveOff(), "v2");
+      expect(complete.status, await complete.clone().text()).toBe(200);
+      expect(await complete.json()).toMatchObject({ schema_version: "codex-portrait-mesh-terminal/v2" });
+      const progress = await adaptiveUser("/v1/pattern-portrait/explorer").then(result => result.json()) as {
+        status: string; completed_models: number; models: Array<{ chapter_id: string; reference_id: string }>;
+      };
+      expect(progress.completed_models).toBe(index + 1);
+      expect(progress.status).toBe(index === count - 1 ? "ready" : "generating");
+      expect(progress.models).toHaveLength(index === count - 1 ? count : 0);
+    }
+    const url = new URLSearchParams({ chart_id: chartId, pattern_id: document.pattern_id, generated_at: document.generated_at });
+    const download = await adaptiveUser(`/v1/pattern-portrait/explorer/download?${url}`);
+    expect(download.status, await download.clone().text()).toBe(200);
+    expect(download.headers.get("vary")).toContain("X-Patternlike-Portrait-Protocol");
+    expect(download.headers.get("cache-control")).toBe("private, no-store");
+    const bundle = await download.json() as { schema_version: string; images: unknown[];
+      models: Array<{ reference_id: string; program: { chapter_id: string; chapter_count: number }; audit: { view_count: number } }> };
+    expect(bundle.schema_version).toBe("pattern-portrait-explorer-download/v2");
+    expect(bundle.images).toHaveLength(count);
+    expect(bundle.models).toHaveLength(count);
+    expect(bundle.models.map(model => model.program.chapter_id)).toEqual(Array.from({ length: count }, (_, index) => `chapter-${index + 1}`));
+    expect(bundle.models.every(model => model.program.chapter_count === count && model.audit.view_count === 4)).toBe(true);
+    expect((await user(`/v1/pattern-portrait/models/${bundle.models.at(-1)!.reference_id}`)).status).toBe(404);
+    expect((await adaptiveUser(`/v1/pattern-portrait/models/${bundle.models.at(-1)!.reference_id}`)).status).toBe(200);
+    const offRead = await app.fetch(new Request("https://api.test/v1/pattern-portrait/explorer", {
+      headers: { "x-user-id": USER_A, ...adaptiveHeaders },
+    }), adaptiveOff());
+    expect(await offRead.json()).toMatchObject({ status: "ready", completed_models: count });
+  }, 30000);
+
+  it("adaptive count=6 requires renewed policy and supports withdrawal with creation disabled", async () => {
+    expect((await preference()).status).toBe(200);
+    const old = await env.DB.prepare("SELECT id,policy_version FROM portrait_automation_grants WHERE enabled=1").first();
+    await maintainPortraitMeshes(enabledEnv());
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portraits").first()).toEqual({ n: 0 });
+    expect(await env.DB.prepare("SELECT status FROM portrait_start_outbox").first()).toEqual({ status: "unsupported" });
+    expect(await adaptiveUser("/v1/pattern-portrait/automation").then(result => result.json())).toMatchObject({ enabled: false, available: true, consent_policy_version: "2.0.0" });
+    await images(6, true);
+    // A legacy client cannot implicitly cancel the new wider grant or its jobs.
+    expect((await preference()).status).toBe(409);
+    expect(await env.DB.prepare("SELECT policy_version FROM portrait_automation_grants WHERE enabled=1").first()).toEqual({ policy_version: "2.0.0" });
+    expect(await env.DB.prepare("SELECT id,policy_version FROM portrait_automation_grants WHERE enabled=0").first()).toEqual(old);
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_start_outbox").first()).toEqual({ n: 1 });
+    const claimResponse = await meshMachine("/claim", {}, enabledEnv(), "v2");
+    const claim = await claimResponse.json() as CodexPortraitMeshClaim;
+    const disabled = await app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+      method: "PUT", headers: { "x-user-id": USER_A, "content-type": "application/json", ...adaptiveHeaders },
+      body: JSON.stringify({ ...automation(false), consent_policy_version: "2.0.0" }),
+    }), adaptiveOff());
+    expect(disabled.status, await disabled.clone().text()).toBe(200);
+    expect(await disabled.json()).toMatchObject({ enabled: false, available: false });
+    expect((await meshMachine(`/${claim.job_id}/complete`, await meshCompletion(claim), adaptiveOff(), "v2")).status).toBe(409);
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_mesh_jobs WHERE status='running'").first()).toEqual({ n: 0 });
+  });
+
+  it("adaptive count=6 binds terminal schema, count, revision, source and GLB identity", async () => {
+    await images(6, true);
+    const claim = await meshMachine("/claim", {}, enabledEnv(), "v2").then(result => result.json()) as CodexPortraitMeshClaim;
+    const input = await meshCompletion(claim);
+    expect((await meshMachine(`/${claim.job_id}/complete`, input)).status).toBe(400);
+    for (const mutation of [
+      { schema_version: "codex-portrait-mesh-completion/v1" },
+      { chapter_count: 5 }, { chapter_index: 1, chapter_id: "chapter-2" },
+      { document_revision: "different-revision" }, { compiler_version: "portrait-mesh-compiler/v1" },
+      { program: { ...input.program, version: "portrait-mesh-program/v1" } },
+    ]) {
+      const response = await meshMachine(`/${claim.job_id}/complete`, { ...input, ...mutation }, enabledEnv(), "v2");
+      expect([400, 409]).toContain(response.status);
+    }
+    const wrongCountGlb = fixtureGlb({ chapterId: claim.chapter_id, chapterCount: 5,
+      documentRevision: claim.document_revision, sourceTextSha256: claim.source_text_sha256,
+      sourceImageSha256: claim.source_image_sha256, compilerVersion: claim.compiler_version,
+      programSha256: input.program_sha256, authoring: "codex-parametric/v2" });
+    const wrongCountHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", wrongCountGlb)), byte => byte.toString(16).padStart(2, "0")).join("");
+    expect((await meshMachine(`/${claim.job_id}/complete`, { ...input, glb_base64: b64(wrongCountGlb), glb_sha256: wrongCountHash }, enabledEnv(), "v2")).status).toBe(400);
+    const legacy = { ...input } as Record<string, unknown>;
+    for (const key of ["schema_version", "chapter_count", "chapter_index", "chapter_id", "document_revision"]) delete legacy[key];
+    expect((await meshMachine(`/${claim.job_id}/complete`, legacy)).status).toBe(409);
+    expect((await meshMachine(`/${claim.job_id}/fail`, { lease_token: claim.lease_token, code: "generation_failed" })).status).toBe(409);
+    expect(await env.DB.prepare("SELECT status,attempts FROM portrait_mesh_jobs WHERE id=?").bind(claim.job_id).first()).toEqual({ status: "running", attempts: 1 });
+    const failure = { schema_version: "codex-portrait-mesh-failure/v2", chapter_count: 6, chapter_index: claim.chapter_index,
+      chapter_id: claim.chapter_id, document_revision: claim.document_revision, lease_token: claim.lease_token, code: "generation_failed" };
+    expect((await meshMachine(`/${claim.job_id}/fail`, failure)).status).toBe(400);
+    expect((await meshMachine(`/${claim.job_id}/fail`, failure, adaptiveOff(), "v2")).status).toBe(200);
+  });
+
+  it("adaptive count=6 resumes its reserved image jobs after renewed consent and admission rollback", async () => {
+    const update = (enabled: boolean, headers: Record<string, string> = adaptiveHeaders) => user("/v1/pattern-portrait/automation",
+      { ...automation(enabled), consent_policy_version: "2.0.0" }, USER_A, { method: "PUT", headers });
+    expect((await update(true, {})).status).toBe(400);
+    expect((await update(true)).status).toBe(200);
+    await maintainPortraitMeshes(enabledEnv());
+    const claim = await (await machine("/claim", {}, enabledEnv(), "v2")).json() as CodexPortraitClaim;
+    expect(claim.chapter_index).toBe(0);
+    expect((await update(false)).status).toBe(200);
+    expect(await env.DB.prepare("SELECT status,attempts FROM pattern_portrait_jobs WHERE id=?").bind(claim.job_id).first())
+      .toEqual({ status: "cancelled", attempts: 1 });
+    expect((await update(true)).status).toBe(200);
+    await maintainPortraitMeshes(adaptiveOff());
+    expect(await env.DB.prepare("SELECT status,attempts FROM pattern_portrait_jobs WHERE id=?").bind(claim.job_id).first())
+      .toEqual({ status: "pending", attempts: 1 });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_jobs").first()).toEqual({ n: 6 });
+    expect(await env.DB.prepare("SELECT status FROM portrait_start_outbox").first()).toEqual({ status: "complete" });
+    const resumed = await (await machine("/claim", {}, adaptiveOff(), "v2")).json() as CodexPortraitClaim;
+    expect(resumed.job_id).toBe(claim.job_id);
+    expect(await env.DB.prepare("SELECT attempts FROM pattern_portrait_jobs WHERE id=?").bind(claim.job_id).first())
+      .toEqual({ attempts: 2 });
+  });
+
+  it("shows and stops the original grant when adaptive creation is disabled", async () => {
+    await preference();
+    const response = await app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+      headers: { "x-user-id": USER_A, ...adaptiveHeaders },
+    }), adaptiveOff());
+    expect(await response.json()).toMatchObject({ enabled: false, legacy_enabled: true, available: false, chart_id: chartId });
+    const disabled = await app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+      method: "PUT", headers: { "x-user-id": USER_A, "content-type": "application/json", ...adaptiveHeaders },
+      body: JSON.stringify(automation(false)),
+    }), adaptiveOff());
+    expect(disabled.status).toBe(200);
+    expect(await disabled.json()).toMatchObject({ enabled: false, legacy_enabled: false, available: false });
+  });
+
+  it("adaptive count=3 fences revoked consent and erases model inventory with the document", async () => {
+    await images(3, true);
+    const claim = await meshMachine("/claim", {}, enabledEnv(), "v2").then(result => result.json()) as CodexPortraitMeshClaim;
+    const input = await meshCompletion(claim);
+    expect((await meshMachine(`/${claim.job_id}/complete`, input, enabledEnv(), "v2")).status).toBe(200);
+    const unfinished = await meshMachine("/claim", {}, enabledEnv(), "v2").then(result => result.json()) as CodexPortraitMeshClaim;
+    await env.DB.prepare("UPDATE consents SET status='revoked' WHERE user_id=? AND kind='pattern_generation'").bind(USER_A).run();
+    expect((await meshMachine(`/${unfinished.job_id}/complete`, await meshCompletion(unfinished), adaptiveOff(), "v2")).status).toBe(409);
+    expect(await env.DB.prepare("SELECT status FROM portrait_mesh_jobs WHERE id=?").bind(claim.job_id).first()).toEqual({ status: "complete" });
+    await env.DB.prepare("DELETE FROM pattern_documents WHERE user_id=?").bind(USER_A).run();
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_mesh_assets WHERE cleanup_at IS NULL").first()).toEqual({ n: 0 });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_mesh_assets").first()).toEqual({ n: 2 });
+    await maintainPortraitMeshes(adaptiveOff());
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_mesh_assets WHERE deleted_at IS NOT NULL").first()).toEqual({ n: 2 });
+  });
+
+  it("keeps existing four-chapter assets and v1 claims readable by a v2 client", async () => {
+    await images();
+    const response = await meshMachine("/claim", {}, enabledEnv(), "v2");
+    const claim = await response.json() as CodexPortraitMeshClaim;
+    expect(claim.schema_version).toBe("codex-portrait-mesh-claim/v1");
+    expect((await meshMachine(`/${claim.job_id}/complete`, await meshCompletion(claim), enabledEnv(), "v2")).status).toBe(200);
+    expect(await adaptiveUser("/v1/pattern-portrait/explorer").then(result => result.json())).toMatchObject({ schema_version: "pattern-portrait-explorer/v1", completed_models: 1 });
+  });
+});
+
 describe("private durable models", () => {
   it("repairs accepted images, admits exact source, and delivers only complete owner models", async () => {
     const portrait = await images();

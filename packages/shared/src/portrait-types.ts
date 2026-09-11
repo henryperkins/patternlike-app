@@ -24,7 +24,7 @@ export interface LegacyPortraitImageModelProvenance {
 
 export type PortraitImageModelProvenance = RecordedPortraitImageModelProvenance | LegacyPortraitImageModelProvenance;
 
-export interface PortraitGraph {
+export interface PortraitGraphV1 {
   engine_version: typeof PORTRAIT_ENGINE_VERSION;
   positions: number[];
   source_indices: number[];
@@ -53,7 +53,7 @@ export interface PatternPortraitChapter {
   image_model_provenance?: PortraitImageModelProvenance;
 }
 
-export interface PatternPortraitResponse {
+export interface PatternPortraitResponseV1 {
   schema_version: typeof PORTRAIT_SCHEMA_VERSION;
   status: "unavailable" | "not_started" | "generating" | "failed" | "ready";
   portrait_id: string | null;
@@ -65,10 +65,10 @@ export interface PatternPortraitResponse {
   completed_chapters: number;
   retryable: boolean;
   chapters: PatternPortraitChapter[];
-  graph: PortraitGraph | null;
+  graph: PortraitGraphV1 | null;
 }
 
-export interface PatternPortraitGenerationRequest {
+export interface PatternPortraitGenerationRequestV1 {
   pattern_id: string;
   generated_at: string;
   chart_id: string;
@@ -76,9 +76,9 @@ export interface PatternPortraitGenerationRequest {
   consent_policy_version: typeof PORTRAIT_CONSENT_POLICY_VERSION;
 }
 
-export interface PatternPortraitDownload {
+export interface PatternPortraitDownloadV1 {
   schema_version: "pattern-portrait-download/v1";
-  portrait: PatternPortraitResponse;
+  portrait: PatternPortraitResponseV1;
   images: Array<{
     reference_id: string;
     content_type: "image/png";
@@ -89,7 +89,7 @@ export interface PatternPortraitDownload {
 }
 
 /** Opaque machine claim; only this chapter's full text enters its prompt. */
-export interface CodexPortraitClaim {
+export interface CodexPortraitClaimV1 {
   schema_version: "codex-portrait-claim/v1";
   job_id: string;
   portrait_id: string;
@@ -106,7 +106,7 @@ export interface CodexPortraitClaim {
 }
 
 /** PNG and samples are decoded from the one native generated image by the runner. */
-export interface CodexPortraitCompletion {
+export interface CodexPortraitCompletionV1 {
   lease_token: string;
   source_sha256: string;
   label: string;
@@ -122,7 +122,55 @@ export interface CodexPortraitCompletion {
   image_model_provenance?: RecordedPortraitImageModelProvenance;
 }
 
-export interface CodexPortraitFailure {
+export interface CodexPortraitFailureV1 {
   lease_token: string;
   code: "generation_failed" | "generation_refused" | "image_invalid" | "authentication_failed";
 }
+
+export const PORTRAIT_V2_SCHEMA_VERSION = "pattern-portrait/v2" as const;
+export const PORTRAIT_V2_CONSENT_POLICY_VERSION = "2.0.0" as const;
+export const PORTRAIT_V2_ENGINE_VERSION = "constellation-v2" as const;
+export type PortraitChapterCount = 3 | 4 | 5 | 6;
+export function isPortraitChapterCount(value: unknown): value is PortraitChapterCount {
+  return value === 3 || value === 4 || value === 5 || value === 6;
+}
+export interface PortraitChapterBindingV2 {
+  chapter_count: PortraitChapterCount;
+  chapter_index: number;
+  chapter_id: string;
+  document_revision: string;
+}
+export interface PortraitGraphV2 extends Omit<PortraitGraphV1, "engine_version"> {
+  engine_version: typeof PORTRAIT_V2_ENGINE_VERSION;
+  chapter_count: PortraitChapterCount;
+}
+export interface PatternPortraitResponseV2 extends Omit<PatternPortraitResponseV1, "schema_version" | "graph"> {
+  schema_version: typeof PORTRAIT_V2_SCHEMA_VERSION;
+  chapter_count: PortraitChapterCount | null;
+  graph: PortraitGraphV2 | null;
+}
+export interface PatternPortraitGenerationRequestV2 extends Omit<PatternPortraitGenerationRequestV1, "consent_policy_version"> {
+  chapter_count: PortraitChapterCount;
+  consent_policy_version: typeof PORTRAIT_V2_CONSENT_POLICY_VERSION;
+}
+export interface PatternPortraitDownloadV2 extends Omit<PatternPortraitDownloadV1, "schema_version" | "portrait"> {
+  schema_version: "pattern-portrait-download/v2";
+  portrait: PatternPortraitResponseV2;
+}
+export interface CodexPortraitClaimV2 extends Omit<CodexPortraitClaimV1, "schema_version">, PortraitChapterBindingV2 {
+  schema_version: "codex-portrait-claim/v2";
+}
+export interface CodexPortraitCompletionV2 extends CodexPortraitCompletionV1, PortraitChapterBindingV2 {
+  schema_version: "codex-portrait-completion/v2";
+}
+export interface CodexPortraitFailureV2 extends CodexPortraitFailureV1, PortraitChapterBindingV2 {
+  schema_version: "codex-portrait-failure/v2";
+  source_sha256: string;
+}
+export type PortraitGraph = PortraitGraphV1 | PortraitGraphV2;
+export type PatternPortraitResponse = PatternPortraitResponseV1 | PatternPortraitResponseV2;
+export type PatternPortraitGenerationRequest = PatternPortraitGenerationRequestV1 | PatternPortraitGenerationRequestV2;
+export type PatternPortraitDownload = PatternPortraitDownloadV1 | PatternPortraitDownloadV2;
+export type CodexPortraitClaim = CodexPortraitClaimV1 | CodexPortraitClaimV2;
+export type CodexPortraitCompletion = CodexPortraitCompletionV1 | CodexPortraitCompletionV2;
+export type CodexPortraitFailure = CodexPortraitFailureV1 | CodexPortraitFailureV2;

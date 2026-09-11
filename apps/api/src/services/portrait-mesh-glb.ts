@@ -1,7 +1,7 @@
 /** Worker-safe GLB admission: one bounded embedded buffer, indexed solids, exact compiler identity. */
 export function validatePortraitMeshGlb(
   bytes: Uint8Array,
-  identity: Record<string, string>,
+  identity: Record<string, string | number>,
 ): boolean {
   try {
     if (bytes.length < 40 || bytes.length > 750000) return false;

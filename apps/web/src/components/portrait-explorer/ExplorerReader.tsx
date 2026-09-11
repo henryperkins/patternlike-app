@@ -72,22 +72,31 @@ interface ReaderProps {
   activePassages: Readonly<Record<string, number>>;
   onFacet: (facet: Facet) => void;
   onPassage: (chapterId: string, index: number) => void;
+  onInspect: (chapterId: string) => void;
   passageRef: (chapterId: string, index: number, element: HTMLParagraphElement | null) => void;
   graphicsAvailable: boolean;
   embedded?: boolean;
 }
-export function ExplorerReader({ chapters, chapterCount, facet, activePassages, onFacet, onPassage, passageRef, graphicsAvailable, embedded = false }: ReaderProps) {
+function ChapterArtwork({ chapter, onInspect }: { chapter: PortraitChapter; onInspect?: (chapterId: string) => void }) {
+  if (!chapter.object) return null;
+  return <div className="explorer-artwork">
+    <details><summary>About this artwork</summary><p><strong>{chapter.object.label}</strong></p><p>{chapter.object.rationale}</p></details>
+    {onInspect && <button className="explorer-text-button" onClick={() => onInspect(chapter.id)}>Inspect original image for {chapter.title} <span aria-hidden="true">↗</span></button>}
+  </div>;
+}
+
+export function ExplorerReader({ chapters, chapterCount, facet, activePassages, onFacet, onPassage, onInspect, passageRef, graphicsAvailable, embedded = false }: ReaderProps) {
   const panelId = useId();
   const compare = chapters.length === 2;
   const Heading = embedded ? "h3" : "h2";
   const ChapterHeading = embedded ? "h4" : "h3";
   return <>
-    {!compare && <><Heading data-reader-heading tabIndex={-1}>{chapters[0].title}</Heading><p className="explorer-chapter-meta">Chapter {chapters[0].ordinal} of {chapterCount}</p><p className="explorer-summary">{chapters[0].summary}</p></>}
+    {!compare && <><Heading data-reader-heading tabIndex={-1}>{chapters[0].title}</Heading><p className="explorer-chapter-meta">Chapter {chapters[0].ordinal} of {chapterCount}</p><p className="explorer-summary">{chapters[0].summary}</p><ChapterArtwork key={chapters[0].id} chapter={chapters[0]} /></>}
     {compare && <><Heading data-reader-heading tabIndex={-1}>Read them together</Heading><p className="explorer-summary">Explore the same perspective in each chapter.</p></>}
     <FacetTabs facet={facet} onChange={onFacet} panelId={panelId} />
     <div id={panelId} role="tabpanel" tabIndex={0} aria-labelledby={`${panelId}-${facet}`} className={compare ? "explorer-passages explorer-comparison" : "explorer-passages"}>
       {chapters.map((chapter) => <section key={chapter.id} aria-label={compare ? chapter.title : undefined}>
-        {compare && <><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-summary">{chapter.summary}</p></>}
+        {compare && <><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-summary">{chapter.summary}</p><ChapterArtwork chapter={chapter} onInspect={onInspect} /></>}
         {chapterPassages(chapter, facet).map((text, index) => <div className="explorer-passage" data-active={index === (activePassages[chapter.id] ?? 0)} key={`${facet}-${index}`}>
           <div className="explorer-passage-caption"><span>Passage {index + 1}</span>{" "}<span className="explorer-passage-selection" aria-hidden={!graphicsAvailable || index !== (activePassages[chapter.id] ?? 0)} style={{ visibility: graphicsAvailable && index === (activePassages[chapter.id] ?? 0) ? "visible" : "hidden" }}>Selected in portrait</span></div>
           <p tabIndex={-1} ref={(element) => passageRef(chapter.id, index, element)}>{text}</p>

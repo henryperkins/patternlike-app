@@ -1,5 +1,5 @@
 ---
-name: Pattern/Like zodiac observatory
+name: Pattern/Like Pattern observatory
 description: A calibrated natal zodiac instrument and a reading station for every published chapter, with optional saved artwork and complete native reading.
 colors:
   forest: "#173f35"
@@ -34,6 +34,11 @@ typography:
     fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.6
+  artwork:
+    fontFamily: "Avenir Next, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.65
   control:
     fontFamily: "Avenir Next, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: "0.75rem"
@@ -204,6 +209,8 @@ Unknown birth time removes Moon and rising. Suppressed `moon_time_sensitive` rem
 
 ### Scene navigation and chapter displays
 
+The entry is titled Your Pattern observatory. Its orientation separates the courtyard setting, chapter artwork as a visual metaphor when available, saved reading, and calculated birth-chart placements. About this artwork sits beside each selected chapter's summary and discloses the saved object label and metaphor explanation without opening the image dialog. Chapters without artwork omit these artwork controls.
+
 Your Pattern returns to the existing chapter selection, perspective, and reader position. Opening the sky from phone reading temporarily shows the scene while retaining the reading history, including comparisons; Back to Pattern restores that reading context. Choosing an object or named chapter approaches that display. The approach centers the object with a smaller allowance for its plinth and folio; shallow objects get an elevated view based only on their physical bounds. Look closer selects a separate inspection framing; Step back restores the approach bookmark. Reset view refits the current chapter, inspection, comparison, sky or overview. Whole portrait always refits all chapter displays in the current assembled or unfolded layout, including when already in overview. These camera commands leave the reader's facet and passage choices intact. View bookmarks distinguish sky, chapter selection, assembly, and inspection. Navigation uses chapter destinations and orbit controls.
 
 Entering sky adds one browser-history step with the originating chapter, facet, active passage, and presentation preserved in private session memory. Selecting a different sky body updates that visit without adding extra Back steps. Your Pattern and Back to Pattern unwind any presentations opened within that sky visit before returning to its Pattern origin; native Back traverses those same steps individually. Closing an expanded sky retains its current body choice. Forward restores the saved sky visit. A new reading opened after a return creates its own history entry after the return completes, preserving every earlier chapter step. Camera steps, lighting, and hover remain outside navigation history. Browser state contains only an opaque scope and index, never chapter text or sky facts. Account close/reopen and route remounts retain navigation, reading positions, lighting, roof cutaway, per-chapter desks and turns, inspection choice and camera bookmarks for the same source. The scene cache compares the manifest with `sunSign` set to null and per-chapter `object` bindings omitted, so optional artwork delivery does not replace the reading's session identity. It stays in private session memory, with no localStorage, sessionStorage, URL or history serialization. A replaced source or session starts fresh; existing access/deletion invalidation clears scene memory, and late renderer cleanup cannot restore cleared bookmarks. Graphics quality, motion controls and disclosure state remain mount-local; operating-system reduced motion still applies on entry.
@@ -211,6 +218,8 @@ Entering sky adds one browser-history step with the originating chapter, facet, 
 Comparison is a deliberate view of two saved objects, replacing the former text-only comparison layout. The first chosen chapter sits on the left and the second on the right in the initial camera view, matching reading order. Their original meshes, turns, plinths, desks and lanterns retain their identity; the unselected chapter displays, courtyard architecture, roof and zodiac instrument are temporarily excluded. A camera-space fit includes both complete displays. The arrangement expresses reading order only, and introduces no connection, compatibility score or new interpretation. Facet changes update both complete readings and their source annotations without moving the camera.
 
 Each comparison object keeps its chapter name and an exact chapter/facet/passage link. Every paragraph in either column can return to that object's annotation without ending comparison. Expanded scene annotations close the expansion and focus the corresponding paragraph in the preserved pair. Native named links keep each reading reachable when graphics are paused or a label is occluded. Ending comparison restores its originating chapter, facet, active passage, reader position and camera bookmark; courtyard, roof, assembly, desk, lighting and inspection choices remain as they were. Sky Back/Forward, Full reading and account session invalidation continue to use the existing private navigation controller.
+
+Each compared chapter with artwork also has a direct Inspect original image action naming that chapter. Image inspection retains the requested chapter in private navigation history, so closing the dialog or using Back restores the comparison and its opener, and Forward reopens the same image. These source actions remain available when the scene is paused.
 
 Selected annotations retain the complete chapter name above the current perspective and explicit passage number, in ordinary exploration and comparison. These remain one chapter-level source anchor per selected object; perspectives do not invent mesh features or alter saved geometry. The selected native chapter button repeats the perspective and Read passage action in its visible and accessible name, returning to that exact paragraph; choosing a different chapter still approaches its display. Comparison retains one named source link for each object. On the narrowest layouts, an `8rem` minimum choice width keeps two normal-size choices but stacks enlarged names before their source links become cramped.
 

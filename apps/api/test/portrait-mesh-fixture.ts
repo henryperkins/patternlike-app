@@ -1,5 +1,5 @@
 export function fixtureGlb(
-  extras: Record<string, string>,
+  extras: Record<string, string | number>,
   override: Record<string, unknown> = {},
 ) {
   const binary = new Uint8Array(80);

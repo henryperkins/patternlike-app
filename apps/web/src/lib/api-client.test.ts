@@ -61,6 +61,8 @@ describe("private Pattern portrait transport", () => {
     await expect(getPortraitAutomation()).resolves.toEqual(preference);
     await expect(setPortraitAutomation(input, "automation-key")).resolves.toMatchObject({ enabled: true });
     expect(capturedFor("/v1/pattern-portrait/automation").at(-1)?.body).toEqual(input);
+    expect(capturedFor("/v1/pattern-portrait/automation").at(-1)?.headers.get("idempotency-key")).toBe("automation-key");
+    expect(capturedFor("/v1/pattern-portrait/automation").every(request => request.headers.get("x-patternlike-portrait-protocol") === "v2")).toBe(true);
     await expect(getPatternPortraitExplorer()).resolves.toMatchObject({ completed_models: 2 });
   });
 
@@ -72,6 +74,7 @@ describe("private Pattern portrait transport", () => {
     expect((await getPatternPortraitModel("opaque/model", signal)).size).toBe(3);
     expect(fetchMock.mock.calls[0][0]).toBe("/v1/pattern-portrait/models/opaque%2Fmodel");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: "include", cache: "no-store", signal });
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get("x-patternlike-portrait-protocol")).toBe("v2");
     await downloadPatternPortraitExplorer({ chart_id: "chart-1", pattern_id: "pattern-1", generated_at: "now" }, signal);
     expect(fetchMock.mock.calls[1][0]).toBe("/v1/pattern-portrait/explorer/download?chart_id=chart-1&pattern_id=pattern-1&generated_at=now");
   });
@@ -97,6 +100,8 @@ describe("private Pattern portrait transport", () => {
     const [posted] = capturedFor("/v1/pattern-portrait-generations");
     expect(posted.body).toEqual(identity);
     expect(posted.headers.get("idempotency-key")).toBe("portrait-key");
+    expect(posted.headers.get("x-patternlike-portrait-protocol")).toBe("v2");
+    expect(capturedFor("/v1/pattern-portrait")[0].headers.get("x-patternlike-portrait-protocol")).toBe("v2");
     expect(posted.signal).toBe(signal);
   });
 
@@ -110,6 +115,7 @@ describe("private Pattern portrait transport", () => {
     expect(image.size).toBe(3);
     expect(fetchMock.mock.calls[0][0]).toBe("/v1/pattern-portrait/images/ref%2Fwith%3Fdelimiters");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: "include", cache: "no-store", signal });
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get("x-patternlike-portrait-protocol")).toBe("v2");
     const download = await downloadPatternPortrait({ chart_id: "chart-1", pattern_id: "pattern-1", generated_at: "2026-09-05T00:00:00Z" }, signal);
     expect(download.type).toBe("application/json");
     expect(fetchMock.mock.calls[1][0]).toBe("/v1/pattern-portrait/download?chart_id=chart-1&pattern_id=pattern-1&generated_at=2026-09-05T00%3A00%3A00Z");

@@ -360,10 +360,13 @@ invalid, or unavailable. Verified artwork replaces those folios when ready;
 opening the observatory does not grant permission to generate artwork. See the
 [default-observatory release](docs/reviews/2026-09-08-default-pattern-observatory.md).
 
-The current artwork-generation contract still binds four chapter images and
-optionally four meshes to an accepted four-chapter Pattern. Its generation
-eligibility is separate from observatory presentation. Wire contract:
-[`contracts/portrait-v1/`](contracts/portrait-v1/).
+Artwork v2 binds one image and, with automation consent, one mesh to every
+chapter in an accepted three-to-six-chapter Pattern. The count is frozen when
+work is reserved; progress and downloads require the entire ordered set.
+Saved four-chapter v1 artwork remains readable in its original format.
+Wire contracts: [`portrait-v1`](contracts/portrait-v1/),
+[`portrait-v2`](contracts/portrait-v2/) and
+[`portrait-mesh-v2`](contracts/portrait-mesh-v2/).
 Image-model evidence:
 [`docs/deploy/portrait-image-model-provenance.md`](docs/deploy/portrait-image-model-provenance.md).
 Runner enablement: [`apps/codex-runner/README.md`](apps/codex-runner/README.md).
@@ -376,6 +379,12 @@ requires the image flag. `PATTERN_GENERATION_ENABLED=0` does **not** pause
 portrait generation. These flags gate the artwork APIs; the observatory's
 local folios and complete reading remain available independently.
 
+`PATTERN_ADAPTIVE_PORTRAITS_ENABLED` is explicitly `0` in both committed
+environments. Only exact `1` admits new v2 reservations; absent, `0`, and
+malformed values refuse adaptive admission. This switch does not stop completion,
+private reads, downloads or cleanup of already reserved v2 work. Follow the
+[adaptive artwork rollout](docs/deploy/adaptive-portrait-artwork.md) before enabling it.
+
 **Consent.** `POST /v1/pattern-portrait-generations` requires live
 `account_processing` and `pattern_generation` grants, an 8–128 character
 `Idempotency-Key`, `confirm: "CREATE MY PORTRAIT"`, and
@@ -384,6 +393,11 @@ local folios and complete reading remain available independently.
 Automation is a distinct per-chart grant:
 `PUT /v1/pattern-portrait/automation` with policy `1.1.0` and the typed
 `ENABLE AUTOMATIC PORTRAITS` / `DISABLE AUTOMATIC PORTRAITS` confirm strings.
+V2 uses explicit policy `2.0.0` for each action and adds the exact
+`chapter_count` to one-time creation. An existing automation policy `1.1.0`
+grant continues to authorize only four-chapter work until explicitly renewed.
+New clients and runners send `X-Patternlike-Portrait-Protocol: v2`; callers
+without that capability cannot lease v2 jobs or receive v2 artwork envelopes.
 
 **Local loop.** After `db:local`, put the two flags and a `CODEX_RUNNER_TOKEN`
 in `apps/api/.dev.vars`. Real generation also needs the installed runner with

@@ -50,6 +50,8 @@ describe("Portrait exploration", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Rotate left" })).toBeEnabled());
     expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
     expect(within(screen.getByRole("navigation", { name: "Pattern chapters" })).getAllByRole("button")).toHaveLength(count);
+    await userEvent.click(screen.getByRole("button", { name: "Your sky" }));
+    expect(screen.getByText(/^Your chapters bring the chart into a personal reading\./)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Full reading" }));
     for (const item of document.core_chapters) expect(screen.getByRole("heading", { name: item.title })).toBeVisible();
     expect(screen.queryByText(/authored models|fictional study/i)).not.toBeInTheDocument();
@@ -776,6 +778,8 @@ describe("Portrait exploration", () => {
   it("opens the exact source image and restores focus when closed", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
     const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    await user.click(within(reader).getByText("About this artwork"));
+    expect(within(reader).getByText(nativeImageBindings[0].object.rationale)).toBeVisible();
     reader.scrollTop = 240; fireEvent.scroll(reader);
     await user.click(screen.getByRole("button", { name: "Inspect original image" }));
     const dialog = screen.getByRole("dialog", { name: "Original chapter image" });
@@ -790,6 +794,50 @@ describe("Portrait exploration", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Inspect original image" })).toHaveFocus();
     expect(reader.scrollTop).toBe(240);
+  });
+
+  it.each([false, true])("inspects either compared image and restores its reading and opener (paused: %s)", async (paused) => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    if (paused) await user.click(screen.getByRole("button", { name: "Lose graphics" }));
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    reader.scrollTop = 240; fireEvent.scroll(reader);
+    for (const index of [0, 1]) {
+      const item = nativePattern.core_chapters[index];
+      const object = nativeImageBindings[index].object;
+      const section = within(reader).getByRole("region", { name: item.title });
+      await user.click(within(section).getByText("About this artwork"));
+      expect(within(section).getByText(object.rationale)).toBeVisible();
+      const opener = within(section).getByRole("button", { name: `Inspect original image for ${item.title}` });
+      await user.click(opener);
+      const dialog = screen.getByRole("dialog", { name: "Original chapter image" });
+      expect(within(dialog).getByRole("img")).toHaveAttribute("src", object.imageUrl);
+      expect(within(dialog).getByText(object.rationale)).toBeVisible();
+      expect(within(dialog).getByText(`${item.title} · Image reference ${object.referenceId}`)).toBeVisible();
+      await user.click(within(dialog).getByRole("button", { name: "Close image" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(opener).toHaveFocus();
+      expect(reader.scrollTop).toBe(240);
+      expect(scene.props?.selectedIds).toEqual(["chapter-1", "chapter-2"]);
+      expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    }
+    act(() => window.history.forward());
+    const restored = await screen.findByRole("dialog", { name: "Original chapter image" });
+    expect(within(restored).getByRole("img")).toHaveAttribute("src", nativeImageBindings[1].object.imageUrl);
+    act(() => window.history.back());
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "End comparison" })).toBeVisible();
+  });
+
+  it("offers the second compared image when the first chapter has no artwork", async () => {
+    const user = userEvent.setup();
+    render(<PortraitExplorer source={source} objectBindings={nativeImageBindings.slice(1)} />);
+    await screen.findByTestId("scene"); await chapter(user);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    expect(screen.queryByRole("button", { name: `Inspect original image for ${nativePattern.core_chapters[0].title}` })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: `Inspect original image for ${nativePattern.core_chapters[1].title}` }));
+    expect(within(screen.getByRole("dialog")).getByRole("img")).toHaveAttribute("src", nativeImageBindings[1].object.imageUrl);
   });
 
   it("offers a manual guided journey and reversible assembly", async () => {
@@ -929,4 +977,26 @@ describe("Portrait exploration", () => {
     for (const c of document.core_chapters) for (const paragraph of c.sections) expect(within(reading).getByText(paragraph.text)).toBeInTheDocument();
     for (const signature of document.additional_signatures) expect(within(reading).getByText(signature.text)).toBeInTheDocument();
   });
+});
+
+import { adaptiveFixture } from "../../test/adaptive-portrait-fixture.js";
+import { bindingsFor } from "../../lib/account-portrait.js";
+it.each([5, 6] as const)("retains both original images when comparing the final chapters of a %i-chapter reading", async count => {
+  const f = adaptiveFixture(count);
+  const bindings = bindingsFor(f.portrait, f.portrait.chapters.map((_, index) => `blob:adaptive-source-${index + 1}`));
+  const user = userEvent.setup();
+  render(<PortraitExplorer source={{ status: "ready", document: f.document }} objectBindings={bindings} />);
+  await screen.findByTestId("scene"); await chapter(user, count - 1);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), `chapter-${count}`);
+  const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+  for (const ordinal of [count - 1, count]) {
+    const section = within(reader).getByRole("region", { name: `Chapter ${ordinal}` });
+    const opener = within(section).getByRole("button", { name: `Inspect original image for Chapter ${ordinal}` });
+    await user.click(opener);
+    const dialog = screen.getByRole("dialog", { name: "Original chapter image" });
+    expect(within(dialog).getByRole("img")).toHaveAttribute("src", `blob:adaptive-source-${ordinal}`);
+    await user.click(within(dialog).getByRole("button", { name: "Close image" }));
+    await waitFor(() => expect(opener).toHaveFocus());
+    expect(scene.props?.selectedIds).toEqual([`chapter-${count - 1}`, `chapter-${count}`]);
+  }
 });

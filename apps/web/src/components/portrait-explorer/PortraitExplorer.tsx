@@ -76,6 +76,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
   const selectedIds = selectedChapterIds(state);
   const selected = manifest.chapters.filter((chapter) => selectedIds.includes(chapter.id)).sort((a, b) => selectedIds.indexOf(a.id) - selectedIds.indexOf(b.id));
   const chapter = selected[0];
+  const inspectedChapter = selected.find(item => item.id === state.inspectChapterId);
   const facet = currentFacet(state);
   const facetLabel = facets.find(item => item.id === facet)!.label;
   const [status, setStatus] = useState<SceneStatus>("loading");
@@ -436,14 +437,15 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
       onPattern={() => returnPattern(true)} /> : chapter ? <>
       {state.view.kind === "guided" && <div className="explorer-guide"><span>Guided exploration · Stop {state.view.step + 1} of {manifest.chapters.length}</span><button onClick={() => endView("guided")}>Exit guide</button></div>}
       <ExplorerReader embedded={embedded} chapterCount={manifest.chapters.length} chapters={selected} facet={facet} activePassages={state.passages} onFacet={(value) => dispatch({ type: "facet", facet: value })}
-        onPassage={showPassage} passageRef={bindPassage} graphicsAvailable={graphicsAvailable} />
+        onPassage={showPassage} onInspect={(chapterId) => dispatch({ type: "inspect", open: true, chapterId })} passageRef={bindPassage} graphicsAvailable={graphicsAvailable} />
       {state.view.kind === "guided" ? <div className="explorer-next"><button disabled={state.view.step === 0} onClick={() => { pendingFocus.current = "heading"; dispatch({ type: "guide-step", step: state.view.kind === "guided" ? state.view.step - 1 : 0 }); }}>Previous stop</button>{state.view.step < manifest.chapters.length - 1 ? <button onClick={() => { pendingFocus.current = "heading"; dispatch({ type: "guide-step", step: state.view.kind === "guided" ? state.view.step + 1 : 0 }); }}>Next stop</button> : <button onClick={() => endView("guided")}>Finish exploration</button>}</div>
         : state.view.kind === "chapter" && <button className="explorer-next-chapter" onClick={() => select(manifest.chapters[chapter.ordinal % manifest.chapters.length].id, true)}><span>Next chapter</span><strong>{manifest.chapters[chapter.ordinal % manifest.chapters.length].title} <span aria-hidden="true">→</span></strong></button>}
     </> : <div className="explorer-introduction"><ReaderHeading data-reader-heading tabIndex={-1}>Your Pattern, in {manifest.chapters.length} chapters</ReaderHeading>
-      <p>Each reading station opens a saved chapter, with its tensions, resources, and another expression. Choose a station or its chapter name to explore.</p><button className="explorer-primary" onClick={() => select(manifest.chapters[0].id, "scene")}>Explore the first chapter <span aria-hidden="true">→</span></button>
+      <p>Each station holds a chapter of your Pattern. The courtyard is a setting for your reading.{manifest.chapters.some(item => item.object) && " Saved artwork offers a visual metaphor for its chapter."}</p>
+      <p>Choose a station or its chapter name to explore tensions, resources, and another expression.</p><button className="explorer-primary" onClick={() => select(manifest.chapters[0].id, "scene")}>Explore the first chapter <span aria-hidden="true">→</span></button>
       <p className="explorer-intro-note">Your birth chart supplies the placements. Your saved Pattern supplies the reading.</p></div>}
   </div></aside>
-    {!skyView && chapter && <ReaderFooter readerRef={readerElement} readerId={readerId} contentKey={`${readerKey}:${presentation}`} reducedMotion={reducedMotion}>
+    {!skyView && chapter && !comparing && <ReaderFooter readerRef={readerElement} readerId={readerId} contentKey={`${readerKey}:${presentation}`} reducedMotion={reducedMotion}>
       <div className="explorer-reader-actions">{chapter.object && <button className="explorer-text-button" onClick={() => dispatch({ type: "inspect", open: true })}>Inspect original image <span aria-hidden="true">↗</span></button>}
         {state.view.kind === "chapter" && <label className="explorer-compare-label"><span className="explorer-sr-only">Compare with another chapter</span><select aria-label="Compare with another chapter" value="" onChange={(event) => { pendingFocus.current = "compare-start"; dispatch({ type: "compare", chapterId: event.target.value }); }}><option value="" disabled>Compare with…</option>{manifest.chapters.filter((item) => item.id !== chapter.id).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}</div>
     </ReaderFooter>}
@@ -456,7 +458,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
     {embedded ? <nav className="explorer-embedded-bar" aria-label="Portrait navigation"><button onClick={navigation.close}>Back to reading</button>{fullReadingControl}</nav> : (<header className="explorer-header"><a href="#portrait-start" className="explorer-wordmark" onClick={(event) => { event.preventDefault(); document.getElementById("portrait-start")?.scrollIntoView({ behavior: reducedMotion ? "instant" : "smooth" }); }}>Pattern<span>/</span>Like</a><div><span className="explorer-study-label">{!meshBundle ? "Your Pattern" : meshBundle.authoring === "codex-parametric/v1" ? "Private portrait" : "Fictional study"}</span>{fullReadingControl}</div></header>)}
 
     {presentation === "full" ? <CompleteReading manifest={manifest} embedded={embedded} /> : <>
-      <div className="explorer-title">{embedded ? <h2>Your zodiac observatory</h2> : <h1>Your zodiac observatory.</h1>}
+      <div className="explorer-title">{embedded ? <h2>Your Pattern observatory</h2> : <h1>Your Pattern observatory.</h1>}
         {presentation !== "reading" && !comparing && observatoryViews}
       </div>
       <div className="explorer-mobile-modes">{comparing ? <button data-end-comparison onClick={() => endView("compare")}>End comparison</button> : <button aria-pressed={presentation === "explore"} onClick={() => presentation !== "explore" && back()}>{presentation === "reading" ? "Return to portrait" : "Explore"}</button>}<button ref={readButton} aria-pressed={comparing ? undefined : presentation === "reading"} onClick={readChapter}>{comparing ? "Read both chapters" : "Read chapter"}</button>
@@ -467,7 +469,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
       <div className={`explorer-workspace${!skyView && selected.length === 2 ? " explorer-is-comparing" : ""}`}>{presentation !== "scene" && scenePanel}{reader}</div>
       {presentation === "scene" && <Modal label="Expanded portrait scene" className="explorer-expanded-dialog" onClose={closeScene} restoreFocus={() => restoreExpandedFocus.current}><div className="explorer-dialog-heading"><h2>Portrait scene</h2><button onClick={closeScene}>Close expanded scene</button></div>{scenePanel}</Modal>}
     </>}
-    {state.inspectImage && chapter?.object && <Modal label="Original chapter image" onClose={() => dispatch({ type: "inspect", open: false })}><div className="explorer-dialog-heading"><div><p className="explorer-eyebrow">Original chapter image</p><h2>{chapter.object.label}</h2></div><button onClick={() => dispatch({ type: "inspect", open: false })}>Close image</button></div><img src={chapter.object.imageUrl} alt={chapter.object.label} /><h3>Visual metaphor</h3><p>{chapter.object.rationale}</p><p className="explorer-image-source">{chapter.title} · Image reference {chapter.object.referenceId}</p></Modal>}
+    {state.inspectImage && inspectedChapter?.object && <Modal label="Original chapter image" onClose={() => dispatch({ type: "inspect", open: false })}><div className="explorer-dialog-heading"><div><p className="explorer-eyebrow">Original chapter image</p><h2>{inspectedChapter.object.label}</h2></div><button onClick={() => dispatch({ type: "inspect", open: false })}>Close image</button></div><img src={inspectedChapter.object.imageUrl} alt={inspectedChapter.object.label} /><h3>Visual metaphor</h3><p>{inspectedChapter.object.rationale}</p><p className="explorer-image-source">{inspectedChapter.title} · Image reference {inspectedChapter.object.referenceId}</p></Modal>}
     {!embedded && <footer className="explorer-footer"><span>{!meshBundle ? "Reading stations for your saved chapters." : meshBundle.authoring === "codex-parametric/v1" ? "Four objects created from your chapters and their saved images." : "Four authored models based on the fictional chapter images."}</span><span>Personal meaning stays in the reading.</span></footer>}
   </Root>;
 }

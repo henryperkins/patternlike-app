@@ -103,3 +103,41 @@ describe("automatic portrait permission", () => {
     expect(changed).toHaveBeenCalledOnce();
   });
 });
+
+it("can withdraw a saved adaptive grant while new creation is switched off", async () => {
+  vi.mocked(getPortraitAutomation).mockResolvedValue({ schema_version: "portrait-automation/v2", legacy_enabled: false, available: false, chart_id: "chart-current", enabled: true, consent_policy_version: "2.0.0" });
+  vi.mocked(setPortraitAutomation).mockResolvedValue({ schema_version: "portrait-automation/v2", legacy_enabled: false, available: false, chart_id: "chart-current", enabled: false, consent_policy_version: "2.0.0" });
+  render(<PortraitAutomationControl chartId="chart-current" canEnable={false} onUnauthorized={vi.fn()} />);
+  const choice = await screen.findByRole("checkbox");
+  expect(choice).toBeEnabled(); expect(choice).toBeChecked();
+  await userEvent.click(choice);
+  expect(setPortraitAutomation).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, consent_policy_version: "2.0.0" }), expect.any(String), expect.any(AbortSignal));
+});
+
+it("shows and stops earlier four-chapter permission even with adaptive creation unavailable", async () => {
+  vi.mocked(getPortraitAutomation).mockResolvedValue({ schema_version: "portrait-automation/v2", legacy_enabled: true, available: false, chart_id: "chart-current", enabled: false, consent_policy_version: "2.0.0" });
+  vi.mocked(setPortraitAutomation).mockResolvedValue({ schema_version: "portrait-automation/v2", legacy_enabled: false, available: false, chart_id: "chart-current", enabled: false, consent_policy_version: "2.0.0" });
+  render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+  const stop = await screen.findByRole("button", { name: "Stop four-chapter automatic artwork" });
+  expect(stop).toBeEnabled(); expect(screen.getByRole("checkbox")).toBeDisabled();
+  await userEvent.click(stop);
+  expect(setPortraitAutomation).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, consent_policy_version: "1.1.0" }), expect.any(String), expect.any(AbortSignal));
+});
+
+it("explicitly renews visible legacy permission for every chapter with policy 2.0", async () => {
+  const preference = { schema_version: "portrait-automation/v2" as const, legacy_enabled: true, available: true, chart_id: "chart-current", enabled: false, consent_policy_version: "2.0.0" as const };
+  vi.mocked(getPortraitAutomation).mockResolvedValue(preference);
+  vi.mocked(setPortraitAutomation).mockResolvedValue({ ...preference, legacy_enabled: false, enabled: true });
+  render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+  const choice = await screen.findByRole("checkbox", { name: "Renew automatic artwork for every chapter" });
+  expect(screen.getByText(/one image and one 3D model.*three to six/)).toBeInTheDocument();
+  expect(setPortraitAutomation).not.toHaveBeenCalled();
+  await userEvent.click(choice);
+  expect(setPortraitAutomation).toHaveBeenCalledWith(expect.objectContaining({ enabled: true, consent_policy_version: "2.0.0" }), expect.any(String), expect.any(AbortSignal));
+});
+it.each([{ chart_id: "wrong-chart", enabled: false }, { chart_id: "chart-current", enabled: true }])("rejects contradictory or wrong-chart legacy grants", async patch => {
+  vi.mocked(getPortraitAutomation).mockResolvedValue({ schema_version: "portrait-automation/v2", legacy_enabled: true, available: false, consent_policy_version: "2.0.0", ...patch });
+  render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+  await screen.findByText(/no longer matches this chart/);
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+});

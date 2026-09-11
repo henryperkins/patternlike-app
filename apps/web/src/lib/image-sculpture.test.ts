@@ -173,8 +173,8 @@ describe("createImageSculpture constellation", () => {
     dispose(first); dispose(second);
   });
 
-  it("requires exactly four complete, visible, contrasting pixel buffers", () => {
-    expect(() => createImageSculpture([])).toThrow(/four|4/i);
+  it("requires supported counts of complete, visible, contrasting pixel buffers", () => {
+    expect(() => createImageSculpture([])).toThrow(/three|six/i);
     expect(() => createImageSculpture(new Array<ImagePixels>(4))).toThrow(/image 1/i);
     const blank = { width: 96, height: 128, data: new Uint8ClampedArray(96 * 128 * 4) };
     expect(() => createImageSculpture([pixels(), pixels(), pixels(), blank])).toThrow(/image 4.*visible|image 4.*blank/i);

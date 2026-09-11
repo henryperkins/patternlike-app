@@ -15,6 +15,7 @@ export interface ExplorerSnapshot {
   unfolded: boolean;
   presentation: "explore" | "reading" | "scene" | "full";
   inspectImage: boolean;
+  inspectChapterId: string | null;
 }
 
 export interface ExplorerState extends ExplorerSnapshot {
@@ -32,7 +33,7 @@ export type ExplorerAction =
   | { type: "guide" }
   | { type: "guide-step"; step: number }
   | { type: "presentation"; presentation: ExplorerSnapshot["presentation"] }
-  | { type: "inspect"; open: boolean }
+  | { type: "inspect"; open: boolean; chapterId?: string }
   | { type: "unfold"; overview?: boolean }
   | { type: "back" };
 
@@ -46,6 +47,7 @@ export function createExplorerState(chapterIds: readonly string[]): ExplorerStat
     unfolded: false,
     presentation: "explore",
     inspectImage: false,
+    inspectChapterId: null,
     past: [],
     chapterIds: ids,
   };
@@ -68,8 +70,8 @@ export function currentFacet(state: ExplorerState): Facet {
 export function canGoBack(state: ExplorerState): boolean { return state.past.length > 0; }
 
 function snapshot(state: ExplorerState): ExplorerSnapshot {
-  const { sky, view, facets, passages, unfolded, presentation, inspectImage } = state;
-  return { sky, view, facets, passages, unfolded, presentation, inspectImage };
+  const { sky, view, facets, passages, unfolded, presentation, inspectImage, inspectChapterId } = state;
+  return { sky, view, facets, passages, unfolded, presentation, inspectImage, inspectChapterId };
 }
 
 function transition(state: ExplorerState, update: Partial<ExplorerSnapshot>, remember = true): ExplorerState {
@@ -145,9 +147,13 @@ export function explorerReducer(state: ExplorerState, action: ExplorerAction): E
     case "presentation":
       if (!["explore", "reading", "scene", "full"].includes(action.presentation) || action.presentation === state.presentation) return state;
       return action.presentation === "explore" ? back(state) : transition(state, { presentation: action.presentation });
-    case "inspect":
+    case "inspect": {
       if (typeof action.open !== "boolean" || action.open === state.inspectImage || !selectedChapterIds(state).length) return state;
-      return action.open ? transition(state, { inspectImage: true }) : back(state);
+      if (!action.open) return back(state);
+      const chapterId = action.chapterId ?? selectedChapterIds(state)[0];
+      return selectedChapterIds(state).includes(chapterId)
+        ? transition(state, { inspectImage: true, inspectChapterId: chapterId }) : state;
+    }
     case "unfold":
       return transition(state, {
         unfolded: !state.unfolded,

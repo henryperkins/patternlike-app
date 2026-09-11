@@ -61,12 +61,12 @@ describe("portrait projection", () => {
     }
   });
 
-  it("rejects every missing reference and any chapter count other than four", () => {
+  it("rejects every missing reference and unsupported chapter counts", () => {
     for (let index = 0; index < 4; index++) {
       expect(portraitImageUrls(createPortraitManifest(fictionalPattern, imageStudyBindings.filter((_, i) => index !== i)))).toBeNull();
     }
     const manifest = createPortraitManifest(fictionalPattern, imageStudyBindings);
-    expect(portraitImageUrls({ ...manifest, chapters: manifest.chapters.slice(0, 3) })).toBeNull();
+    expect(portraitImageUrls({ ...manifest, chapters: manifest.chapters.slice(0, 2) })).toBeNull();
     expect(portraitImageUrls({ ...manifest, chapters: [...manifest.chapters, manifest.chapters[0]] })).toBeNull();
   });
 

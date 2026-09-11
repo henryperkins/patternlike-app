@@ -4,9 +4,12 @@ import { readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import sharp from "sharp";
-import type { CodexPortraitMeshClaim, PortraitMeshProgram } from "@patternlike/shared";
+import { isCodexPortraitMeshClaim, type CodexPortraitMeshClaim, type CodexPortraitMeshClaimV2, type PortraitMeshProgram, type PortraitMeshProgramV2 } from "@patternlike/shared";
 import { jsonFixture } from "./portrait-mesh-test-fixture.js";
 import { runPortraitMeshInvocation } from "./portrait-mesh-invocation.js";
+import { installPortableTestScriptSpawn } from "./portable-script-spawn.test-helper.js";
+
+installPortableTestScriptSpawn();
 
 export const SIMPLE_PROGRAM: PortraitMeshProgram = { version: "portrait-mesh-program/v1", materials: [{ id: "oak", color: "#ad8151", metalness: 0, roughness: 0.7 }], parts: [{ name: "solid body", material: "oak", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], repeat: null, geometry: { kind: "box", size: [1, 1.3, 0.7], bevel: 0.04 } }] };
 const AUDIT = { schema_version: "portrait-mesh-audit/v1", accepted: true, recognizable: true, substantial: true, source_correspondence: true, no_severe_intersections: true, view_count: 4, notes: "All four views depict a solid fictional wooden block." };
@@ -58,6 +61,52 @@ test("mesh generation binds complete text/image, compiles unchanged program, and
     assert.equal(out.completion.audit.view_count, 4);
     assert.notEqual(out.completion.provider_request_id, out.completion.audit_request_id);
     assert.deepEqual(await readdir(join(f.root, "attempts")), []);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("adaptive mesh generation binds a six-chapter last chapter while retaining exactly four audit viewpoints", async () => {
+  const adaptiveProgram: PortraitMeshProgramV2 = { ...SIMPLE_PROGRAM, version: "portrait-mesh-program/v2", chapter_count: 6, chapter_id: "chapter-6" };
+  const f = await fixture(SIMPLE_PROGRAM);
+  const claim: CodexPortraitMeshClaimV2 = {
+    ...f.claim,
+    schema_version: "codex-portrait-mesh-claim/v2",
+    chapter_count: 6,
+    chapter_index: 5,
+    chapter_id: "chapter-6",
+    prompt_version: "portrait-mesh/v2",
+    compiler_version: "portrait-mesh-compiler/v2",
+  };
+  try {
+    assert.equal(isCodexPortraitMeshClaim(claim), true, "fixture must satisfy the negotiated v2 claim contract");
+    const out = await runPortraitMeshInvocation({ ...f.options, claim });
+    const count = await readFile(join(f.root, "count"), "utf8").catch(() => "not-launched");
+    assert.equal(out.ok, true, JSON.stringify({ out, count })); if (!out.ok) return;
+    assert.deepEqual({
+      schema_version: out.completion.schema_version,
+      chapter_count: out.completion.chapter_count,
+      chapter_index: out.completion.chapter_index,
+      chapter_id: out.completion.chapter_id,
+      document_revision: out.completion.document_revision,
+      compiler_version: out.completion.compiler_version,
+      program: out.completion.program,
+      view_count: out.completion.audit.view_count,
+    }, {
+      schema_version: "codex-portrait-mesh-completion/v2",
+      chapter_count: 6,
+      chapter_index: 5,
+      chapter_id: "chapter-6",
+      document_revision: claim.document_revision,
+      compiler_version: "portrait-mesh-compiler/v2",
+      program: adaptiveProgram,
+      view_count: 4,
+    });
+    for (const stage of ["turn-0", "turn-1"]) {
+      const turn = JSON.parse(await readFile(join(f.root, `${stage}.json`), "utf8"));
+      const sent = JSON.stringify(turn.input);
+      assert(!sent.includes(claim.document_revision));
+      assert(!sent.includes("chapter_count"));
+      if (stage === "turn-0") assert(!JSON.stringify(turn.outputSchema).includes("chapter_count"));
+    }
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
 

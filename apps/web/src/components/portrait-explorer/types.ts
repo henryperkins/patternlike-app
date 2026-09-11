@@ -18,17 +18,18 @@ export interface PortraitMeshAsset {
   sourceImageSha256: string;
   sourceText: string;
   provenance?: {
-    authoring: "codex-parametric/v1";
+    authoring: "codex-parametric/v1" | "codex-parametric/v2";
     documentRevision: string;
     sourceTextSha256: string;
     programSha256: string;
-    compilerVersion: "portrait-mesh-compiler/v1";
+    compilerVersion: "portrait-mesh-compiler/v1" | "portrait-mesh-compiler/v2";
+    chapterCount?: 3 | 4 | 5 | 6;
   };
 }
 export interface PortraitMeshBundle {
   version: "portrait-mesh-1";
   documentRevision: string;
-  authoring: "authored-fictional-fixtures" | "codex-parametric/v1";
+  authoring: "authored-fictional-fixtures" | "codex-parametric/v1" | "codex-parametric/v2";
   assets: readonly PortraitMeshAsset[];
 }
 export type SceneStatus = "loading" | "ready" | "unavailable";

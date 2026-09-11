@@ -1,0 +1,240 @@
+{
+  "schema_version": "pattern-portrait-explorer/v2",
+  "status": "ready",
+  "portrait": {
+    "schema_version": "pattern-portrait/v2",
+    "status": "ready",
+    "portrait_id": "ppor_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "pattern_id": "pat_fictional_portrait",
+    "generated_at": "2026-09-05T12:00:00Z",
+    "chart_id": "cht_fictional_portrait",
+    "document_revision": "revision-fictional",
+    "sun_sign": "aries",
+    "completed_chapters": 5,
+    "retryable": false,
+    "chapters": [
+      {
+        "chapter_id": "chapter-1",
+        "reference_id": "ppimg_11111111111111111111111111111111",
+        "label": "Compass",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source_text": "{\"title\":\"Chapter 1\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-2",
+        "reference_id": "ppimg_22222222222222222222222222222222",
+        "label": "Cup",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "source_text": "{\"title\":\"Chapter 2\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-3",
+        "reference_id": "ppimg_33333333333333333333333333333333",
+        "label": "Anchor",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "source_text": "{\"title\":\"Chapter 3\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-4",
+        "reference_id": "ppimg_44444444444444444444444444444444",
+        "label": "Telescope",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "source_text": "{\"title\":\"Chapter 4\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-5",
+        "reference_id": "ppimg_55555555555555555555555555555555",
+        "label": "Compass",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source_text": "{\"title\":\"Chapter 1\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      }
+    ],
+    "graph": {
+      "engine_version": "constellation-v2",
+      "chapter_count": 5,
+      "positions": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source_indices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "star_strengths": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "connections": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "color": [
+        0.3,
+        0.4,
+        0.5
+      ],
+      "contributions": [
+        {
+          "index": 0,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 1,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 2,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 3,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 4,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        }
+      ]
+    },
+    "chapter_count": 5
+  },
+  "chapter_count": 5,
+  "document_revision": "revision-fictional",
+  "completed_models": 4,
+  "retryable": false,
+  "models": [
+    {
+      "chapter_count": 5,
+      "chapter_index": 0,
+      "chapter_id": "chapter-1",
+      "reference_id": "ppmodel_11111111111111111111111111111111",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_image_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_text": "{\"title\":\"Chapter 1\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}",
+      "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiler_version": "portrait-mesh-compiler/v2",
+      "authoring": "codex-parametric/v2",
+      "document_revision": "revision-fictional"
+    },
+    {
+      "chapter_count": 5,
+      "chapter_index": 1,
+      "chapter_id": "chapter-2",
+      "reference_id": "ppmodel_22222222222222222222222222222222",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_image_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_text": "{\"title\":\"Chapter 2\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}",
+      "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiler_version": "portrait-mesh-compiler/v2",
+      "authoring": "codex-parametric/v2",
+      "document_revision": "revision-fictional"
+    },
+    {
+      "chapter_count": 5,
+      "chapter_index": 2,
+      "chapter_id": "chapter-3",
+      "reference_id": "ppmodel_33333333333333333333333333333333",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_image_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_text": "{\"title\":\"Chapter 3\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}",
+      "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiler_version": "portrait-mesh-compiler/v2",
+      "authoring": "codex-parametric/v2",
+      "document_revision": "revision-fictional"
+    },
+    {
+      "chapter_count": 5,
+      "chapter_index": 3,
+      "chapter_id": "chapter-4",
+      "reference_id": "ppmodel_44444444444444444444444444444444",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_image_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "source_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_text": "{\"title\":\"Chapter 4\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}",
+      "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiler_version": "portrait-mesh-compiler/v2",
+      "authoring": "codex-parametric/v2",
+      "document_revision": "revision-fictional"
+    },
+    {
+      "chapter_count": 5,
+      "chapter_index": 4,
+      "chapter_id": "chapter-5",
+      "reference_id": "ppmodel_55555555555555555555555555555555",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_image_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_text": "{\"title\":\"Chapter 1\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}",
+      "program_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiler_version": "portrait-mesh-compiler/v2",
+      "authoring": "codex-parametric/v2",
+      "document_revision": "revision-fictional"
+    }
+  ]
+}

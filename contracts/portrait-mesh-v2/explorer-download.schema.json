@@ -1,0 +1,271 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reading",
+    "explorer",
+    "images",
+    "models"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pattern-portrait-explorer-download/v2"
+    },
+    "reading": {
+      "$ref": "https://patternlike.app/contracts/m7/pattern-response.schema.json#/$defs/patternResponse"
+    },
+    "explorer": {
+      "allOf": [
+        {
+          "$ref": "./explorer-response.schema.json"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "ready"
+            }
+          }
+        }
+      ]
+    },
+    "images": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference_id",
+          "content_type",
+          "sha256",
+          "data_base64"
+        ],
+        "properties": {
+          "reference_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 38,
+            "pattern": "^ppimg_[a-f0-9]{32}$"
+          },
+          "content_type": {
+            "const": "image/png"
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "data_base64": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2796204,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+          },
+          "image_model_provenance": {
+            "$ref": "https://patternlike.app/contracts/portrait-v2/portrait.schema.json#/$defs/imageModelProvenance"
+          }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference_id",
+          "content_type",
+          "sha256",
+          "data_base64",
+          "program",
+          "audit",
+          "provider_request_id",
+          "audit_request_id"
+        ],
+        "properties": {
+          "reference_id": {
+            "type": "string",
+            "pattern": "^ppmodel_[a-f0-9]{32}$"
+          },
+          "content_type": {
+            "const": "model/gltf-binary"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "data_base64": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000000,
+            "contentEncoding": "base64"
+          },
+          "program": {
+            "$ref": "./program.schema.json"
+          },
+          "audit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema_version",
+              "accepted",
+              "recognizable",
+              "substantial",
+              "source_correspondence",
+              "no_severe_intersections",
+              "view_count",
+              "notes"
+            ],
+            "properties": {
+              "schema_version": {
+                "const": "portrait-mesh-audit/v1"
+              },
+              "accepted": {
+                "const": true
+              },
+              "recognizable": {
+                "const": true
+              },
+              "substantial": {
+                "const": true
+              },
+              "source_correspondence": {
+                "const": true
+              },
+              "no_severe_intersections": {
+                "const": true
+              },
+              "view_count": {
+                "const": 4
+              },
+              "notes": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            }
+          },
+          "provider_request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "audit_request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-mesh-v2/explorer-download.schema.json",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "explorer": {
+            "properties": {
+              "chapter_count": {
+                "const": 3
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "images": {
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "models": {
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "explorer": {
+            "properties": {
+              "chapter_count": {
+                "const": 4
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "images": {
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "models": {
+            "minItems": 4,
+            "maxItems": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "explorer": {
+            "properties": {
+              "chapter_count": {
+                "const": 5
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "images": {
+            "minItems": 5,
+            "maxItems": 5
+          },
+          "models": {
+            "minItems": 5,
+            "maxItems": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "explorer": {
+            "properties": {
+              "chapter_count": {
+                "const": 6
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "images": {
+            "minItems": 6,
+            "maxItems": 6
+          },
+          "models": {
+            "minItems": 6,
+            "maxItems": 6
+          }
+        }
+      }
+    }
+  ]
+}

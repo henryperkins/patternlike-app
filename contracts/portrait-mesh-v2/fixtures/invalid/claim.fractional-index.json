@@ -1,0 +1,19 @@
+{
+  "schema_version": "codex-portrait-mesh-claim/v2",
+  "job_id": "ppmesh_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "portrait_id": "ppor_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "chapter_index": 1.5,
+  "chapter_id": "chapter-3",
+  "lease_token": "12345678-1234-1234-1234-123456789abc",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "prompt_version": "portrait-mesh/v2",
+  "timeout_ms": 900000,
+  "source_text": "{\"title\":\"Fictional compass\",\"summary\":\"A fictional chapter.\",\"sections\":[],\"tensions\":[],\"resources\":[],\"counterExpression\":\"\"}",
+  "source_text_sha256": "1789b441f61ae790e28f0295219322ed021a467261f066fa29048ea73360f2ad",
+  "source_image_sha256": "a6d0203222a4d067bc30f4a735a5ffe2c8589e92d8dcfc20b324f1ea183e35e0",
+  "document_revision": "revision-fictional",
+  "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1kAAAAASUVORK5CYII=",
+  "compiler_version": "portrait-mesh-compiler/v2",
+  "chapter_count": 3
+}

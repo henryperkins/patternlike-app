@@ -55,7 +55,7 @@ export function SkyReader({ sky, sunSign, selected, onPattern, embedded, graphic
     </> : savedSun ? <p>The saved portrait includes your Sun sign. Its exact position is not available in this view.</p>
       : <p>Your birth-chart placements are not available in this view. {graphicsAvailable ? "The twelve-sign ring remains available to explore." : "Your saved Pattern remains available to read."}</p>}
     {sky?.uncertainty && <p className="explorer-uncertainty">{sky.uncertainty}</p>}
-    <div className="sky-reading-bridge"><Subheading>From your sky to your Pattern</Subheading><p>Your four chapters bring the chart into a personal reading. Return to a chapter to explore its tensions, resources, and another expression.</p>
+    <div className="sky-reading-bridge"><Subheading>From your sky to your Pattern</Subheading><p>Your chapters bring the chart into a personal reading. Return to a chapter to explore its tensions, resources, and another expression.</p>
       <button type="button" className="explorer-primary" onClick={onPattern}>Explore your Pattern</button>
       {embedded && <a className="sky-today-link" href="#today">Open today’s reading</a>}
     </div>

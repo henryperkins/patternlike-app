@@ -167,3 +167,17 @@ describe("portrait mesh source binding", () => {
     }
   });
 });
+
+it.each([3, 4, 5, 6] as const)("binds all %i adaptive mesh assets without accepting legacy retags", count => {
+  const f = fixture();
+  const original = f.manifest.chapters;
+  f.manifest.chapters = Array.from({ length: count }, (_, index) => ({ ...original[index % 4], id: `chapter-${index + 1}`, ordinal: index + 1,
+    object: { ...original[index % 4].object!, imageUrl: `blob:image-${index}`, referenceId: `reference-${index}`, referenceSha256: "a".repeat(64) } }));
+  const bundle: PortraitMeshBundle = { version: "portrait-mesh-1", documentRevision: f.manifest.revision, authoring: "codex-parametric/v2",
+    assets: f.manifest.chapters.map((chapter, index) => ({ chapterId: chapter.id, url: `blob:model-${index}`, sha256: "b".repeat(64), sourceImageSha256: "a".repeat(64), sourceText,
+      provenance: { authoring: "codex-parametric/v2", documentRevision: f.manifest.revision, sourceTextSha256: "c".repeat(64), programSha256: "d".repeat(64), compilerVersion: "portrait-mesh-compiler/v2", chapterCount: count } })) };
+  expect(validateMeshBundle(f.manifest, bundle)).toBe(true);
+  expect(validateMeshBundle(f.manifest, { ...bundle, assets: [...bundle.assets].reverse() })).toBe(false);
+  expect(validateMeshBundle(f.manifest, { ...bundle, authoring: "codex-parametric/v1" })).toBe(false);
+  expect(validateMeshBundle(f.manifest, { ...bundle, assets: bundle.assets.slice(1) })).toBe(false);
+});
