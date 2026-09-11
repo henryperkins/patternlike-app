@@ -2,10 +2,10 @@
 .reading-connection-link:hover { color: var(--coral-ink); }
 .reading-paragraph-connections { margin-bottom: 16px; }
 .reading-connections { width: min(100%, 1540px); min-width: 0; margin: 0 auto; padding: 64px clamp(34px, 5vw, 88px) 96px; }
-.reading-connections > .reading-article { width: 100%; margin: 0; padding: 0; }
-.history-detail > .reading-connection-source > .reading-article { padding-top: 30px; }
+.reading-connections > .reading-connection-content > .reading-article { width: 100%; margin: 0; padding: 0; }
+.history-detail > .reading-connection-source > .reading-connection-content > .reading-article { padding-top: 30px; }
 .reading-connection-back { min-height: 44px; margin-bottom: 32px; padding: 8px 0; color: var(--ink); border: 0; border-bottom: 1px solid var(--line-dark); background: transparent; cursor: pointer; }
-.reading-connections > section, .reading-connections-links, .reading-connection-timing { max-width: 760px; }
+.reading-connections > section, .reading-connection-content > section, .reading-connections-links, .reading-connection-timing { max-width: 760px; }
 .reading-connections h1 { font-family: var(--serif); font-weight: 400; }
 .reading-connections [data-connection-heading] { scroll-margin-top: 28px; }
 .reading-connections blockquote { max-width: 65ch; margin: 28px 0; padding: 24px; border: 1px solid var(--line); background: var(--paper-light); font: 23px/1.6 var(--serif); }
@@ -27,8 +27,8 @@
 .reading-feedback__permission { font-size: 13px; line-height: 1.65; max-width: 70ch; color: var(--ink-soft); }
 @media (max-width: 700px) {
   .reading-connections { padding: 36px 18px 62px; }
-  .reading-connections > .reading-article { padding: 0; }
-  .history-detail > .reading-connection-source > .reading-article { padding-top: 22px; }
+  .reading-connections > .reading-connection-content > .reading-article { padding: 0; }
+  .history-detail > .reading-connection-source > .reading-connection-content > .reading-article { padding-top: 22px; }
   .reading-connections blockquote { padding: 18px; font-size: 20px; }
   .reading-connections [data-connection-heading], .connected-pattern-reading [data-reading-chapter] { scroll-margin-top: 86px; }
   .reading-connection-timing .timing-cycle__span { flex-wrap: wrap; gap: 8px; }

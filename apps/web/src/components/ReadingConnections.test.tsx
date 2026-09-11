@@ -51,6 +51,26 @@ function mount(onUnauthorized = vi.fn()) {
   return { ...rendered, onReload, onUnauthorized };
 }
 
+async function openFeedbackDraft() {
+  const fixture = await setup(), user = userEvent.setup();
+  fixture.responses[targetPath]!.body = fixture.timingResponse;
+  const view = mount();
+  await user.click(screen.getByRole("link", { name: "Connections for passage 1" }));
+  await user.click(await screen.findByRole("link", { name: "Open Timing pass 2" }));
+  await screen.findByRole("heading", { name: "Saturn square your Sun" });
+  const timingEntry = window.history.state;
+  fixture.responses[targetPath]!.body = fixture.savedResponse;
+  await user.click(screen.getByRole("link", { name: "Open saved Daily reading" }));
+  await screen.findByText("The exact earlier saved passage.");
+  const mixed = screen.getByRole("radio", { name: "Mixed" });
+  await user.click(mixed);
+  await user.click(screen.getByRole("button", { name: "A sentence, if you want" }));
+  const note = screen.getByRole("textbox", { name: "A sentence, if you want" });
+  const draft = "An unsent thought about this reading.";
+  await user.type(note, draft);
+  return { fixture, user, view, timingEntry, mixed, note, draft };
+}
+
 beforeEach(() => {
   window.history.replaceState({ unrelated: "retained" }, "", "#today");
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -174,6 +194,85 @@ describe("account reading connections", () => {
     await screen.findByRole("heading", { name: "This connection is unavailable" });
     expect(screen.queryByText("The routines that support you can be small enough to change with your life.")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open Timing pass 2" })).not.toBeInTheDocument();
+  });
+
+  it.each(["note", "radio"])("preserves the unsent draft and %s focus through paired foreground events", async (focus) => {
+    const { fixture, mixed, note, draft } = await openFeedbackDraft();
+    const focused = focus === "note" ? note : mixed;
+    focused.focus();
+    vi.spyOn(window, "scrollY", "get").mockReturnValue(720);
+    const gate = deferred();
+    fixture.responses[targetPath]!.gate = gate.promise;
+    const previousChecks = capturedFor(graphPath).length;
+    fireEvent(document, new Event("visibilitychange"));
+    fireEvent.focus(window);
+    await waitFor(() => expect(capturedFor(targetPath).at(-1)!.signal!.aborted).toBe(false));
+    expect(screen.getByRole("status")).toHaveTextContent("Checking the exact reading");
+    expect(note).toBeInTheDocument();
+    expect(note).not.toBeVisible();
+    expect(note.closest("[inert]")).not.toBeNull();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    await act(async () => gate.release());
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "A sentence, if you want" })).toBe(note));
+    expect(note).toHaveValue(draft);
+    expect(mixed).toBeChecked();
+    expect(focused).toHaveFocus();
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 720, behavior: "instant" });
+    expect(capturedFor(graphPath)).toHaveLength(previousChecks + 1);
+    expect(capturedFor(`/v1/readings/${fixture.saved.reading_id}/feedback`).map((call) => call.method)).toEqual(["GET"]);
+  });
+
+  it("keeps a draft hidden after a failed check and restores it only after a successful retry", async () => {
+    const { fixture, user, mixed, note, draft } = await openFeedbackDraft();
+    fixture.responses[graphPath]!.unreachable = true;
+    fireEvent.focus(window);
+    const failure = await screen.findByRole("heading", { name: "The connection could not be checked" });
+    expect(failure).toHaveFocus();
+    expect(note).toBeInTheDocument();
+    expect(note).not.toBeVisible();
+    expect(note.closest("[inert]")).not.toBeNull();
+    fixture.responses[graphPath]!.unreachable = false;
+    const gate = deferred();
+    fixture.responses[graphPath]!.gate = gate.promise;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(note).not.toBeVisible();
+    await act(async () => gate.release());
+    await waitFor(() => expect(note).toBeVisible());
+    expect(note).toHaveValue(draft);
+    expect(mixed).toBeChecked();
+    expect(note).toHaveFocus();
+    expect(capturedFor(`/v1/readings/${fixture.saved.reading_id}/feedback`).map((call) => call.method)).toEqual(["GET"]);
+  });
+
+  it.each(["unavailable", "mismatched", "forbidden", "unauthorized"])("discards the retained draft when foreground access is %s", async (result) => {
+    const { fixture, view, note } = await openFeedbackDraft();
+    if (result === "unavailable") fixture.responses[graphPath]!.body = { ...fixture.graph, status: "unavailable", items: [] };
+    else if (result === "mismatched") fixture.responses[targetPath]!.body = fixture.timingResponse;
+    else fixture.responses[graphPath] = { status: result === "forbidden" ? 403 : 401, body: { error: { code: result, message: "Access denied" } } };
+    fireEvent.focus(window);
+    await screen.findByRole("heading", { name: "This connection is unavailable" });
+    expect(note).not.toBeInTheDocument();
+    expect(screen.queryByText("The exact earlier saved passage.")).not.toBeInTheDocument();
+    if (result === "unauthorized") expect(view.onUnauthorized).toHaveBeenCalledOnce();
+    expect(capturedFor(`/v1/readings/${fixture.saved.reading_id}/feedback`).map((call) => call.method)).toEqual(["GET"]);
+  });
+
+  it("discards a draft on Back and ignores a late foreground response", async () => {
+    const { fixture, timingEntry, note } = await openFeedbackDraft();
+    const gate = deferred();
+    fixture.responses[targetPath]!.gate = gate.promise;
+    const previousChecks = capturedFor(targetPath).length;
+    fireEvent.focus(window);
+    await waitFor(() => expect(capturedFor(targetPath)).toHaveLength(previousChecks + 1));
+    const pending = capturedFor(targetPath).at(-1)!;
+    fixture.responses[targetPath] = { status: 200, body: fixture.timingResponse };
+    fireEvent.popState(window, { state: timingEntry });
+    await screen.findByRole("heading", { name: "Saturn square your Sun" });
+    expect(note).not.toBeInTheDocument();
+    expect(pending.signal!.aborted).toBe(true);
+    await act(async () => gate.release());
+    expect(screen.getByRole("heading", { name: "Saturn square your Sun" })).toBeVisible();
+    expect(screen.queryByText("The exact earlier saved passage.")).not.toBeInTheDocument();
   });
 
   it("hands an expired session to the app and aborts outstanding loads on unmount", async () => {

@@ -42,17 +42,18 @@ export function ReadingConnections({ response, onUnauthorized, onReload, reloadL
   const position = useRef(0);
   const scope = useRef(`reading-${Math.random().toString(36).slice(2)}`);
   const entries = useRef(new Map<number, Entry>());
-  const pendingFocus = useRef<{ id: string | null; scrollY?: number } | null>(null);
+  const pendingFocus = useRef<{ id: string | null; element?: HTMLElement | null; scrollY?: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const refresh = useRef<() => void>(() => {});
   const visitEntry = useRef<(entry: Entry) => void>(() => {});
 
-  async function load(visit: Visit) {
+  async function load(visit: Visit, retainContent = false) {
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
     const version = ++epoch.current;
-    setState({ visit, status: "loading", graph: null, destination: null });
+    const retained = retainContent ? current.current : null;
+    setState({ visit, status: "loading", graph: retained?.graph ?? null, destination: retained?.destination ?? null });
     const finish = (status: State["status"], graph: ReaderRelationshipsResponse | null = null, destination: ReadingRelationshipTargetResponse | null = null) => {
       if (!controller.signal.aborted && version === epoch.current) setState({ visit, status, graph, destination });
     };
@@ -88,16 +89,23 @@ export function ReadingConnections({ response, onUnauthorized, onReload, reloadL
     } catch (error) {
       if (controller.signal.aborted || version !== epoch.current) return;
       if (error instanceof ApiError && error.status === 401) {
+        finish("unavailable");
         source.current = null; entries.current.clear(); onUnauthorized(); return;
       }
-      finish(error instanceof ApiError && [403, 404, 409, 410].includes(error.status) ? "unavailable" : "error");
+      if (error instanceof ApiError && [403, 404, 409, 410].includes(error.status)) finish("unavailable");
+      else finish("error", retained?.graph ?? null, retained?.destination ?? null);
+    } finally {
+      if (request.current === controller) request.current = null;
     }
   }
 
   refresh.current = () => {
-    if (!paragraph.current) return;
-    pendingFocus.current = { id: (document.activeElement as HTMLElement | null)?.id || null, scrollY: window.scrollY };
-    void load(current.current.visit);
+    // Visibility and focus often arrive together. Keep the first focus/scroll
+    // snapshot, including across a failed check and its retry.
+    if (!paragraph.current || request.current) return;
+    const element = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    pendingFocus.current ??= { id: element?.id || null, element, scrollY: window.scrollY };
+    void load(current.current.visit, true);
   };
   visitEntry.current = (entry) => {
     paragraph.current = entry.paragraphId;
@@ -133,9 +141,15 @@ export function ReadingConnections({ response, onUnauthorized, onReload, reloadL
 
   useLayoutEffect(() => {
     if (state.status === "loading" || !pendingFocus.current) return;
+    if (state.status === "error") {
+      container.current?.querySelector<HTMLElement>("[data-connection-heading]")?.focus({ preventScroll: true });
+      return;
+    }
     const pending = pendingFocus.current;
     pendingFocus.current = null;
-    let target = pending.id ? document.getElementById(pending.id) : null;
+    let target = pending.element?.isConnected && container.current?.contains(pending.element)
+      && !pending.element.closest("[hidden], [inert]") ? pending.element : null;
+    target ??= pending.id ? document.getElementById(pending.id) : null;
     if (!target && state.destination?.status === "available" && state.destination.kind === "pattern") {
       target = container.current?.querySelector<HTMLElement>(`[data-reading-chapter="chapter-${state.destination.target.chapter_index + 1}"]`) ?? null;
     }
@@ -191,12 +205,19 @@ export function ReadingConnections({ response, onUnauthorized, onReload, reloadL
     {state.graph?.truncated ? <p className="reading-connection-boundary">Showing a bounded selection of supported connections.</p> : null}
   </section>;
 
-  if (state.visit.kind === "source" && (state.status === "idle" || state.status === "ready")) return <div ref={container} className="reading-connection-source">{renderSource(action)}</div>;
-  return <div ref={container} className="reading-connections">
-    <button className="reading-connection-back" type="button" onClick={() => window.history.back()}>Back to where you were</button>
-    {state.status === "loading" ? <p role="status">Checking the exact reading and its connections.</p> : state.status === "error" ? <section><h1 data-connection-heading tabIndex={-1}>The connection could not be checked</h1><p>Your last reading has not been replaced.</p><button className="button button--secondary" type="button" onClick={() => refresh.current()}>Try again</button></section> : state.status === "unavailable" ? <section><h1 data-connection-heading tabIndex={-1}>This connection is unavailable</h1><p>The exact edition or its supporting evidence is no longer available. A newer reading will not be substituted.</p><button className="button button--secondary" type="button" onClick={onReload}>{reloadLabel}</button></section> : state.visit.kind === "explanation" ? <section><h1 data-connection-heading tabIndex={-1}>Where this passage connects</h1><blockquote>{sourceParagraph?.text}</blockquote><p className="reading-connection-boundary">These links follow retained support for this passage. Similar wording alone does not create a connection.</p>{links}</section> : state.destination?.status === "available" ? <>
-      {state.destination.kind === "daily" ? renderDaily(state.destination.reading, state.destination.reading_status, () => refresh.current()) : state.destination.kind === "pattern" ? <ConnectedPatternReading document={state.destination.pattern} target={state.destination.target} chartId={chartId!} onUnauthorized={onUnauthorized} /> : <ConnectedTimingReading timing={state.destination.timing} />}
-      {state.destination.kind !== "daily" ? links : null}
-    </> : null}
+  const contentVisible = state.status === "idle" || state.status === "ready";
+  const hasContent = contentVisible || ((state.status === "loading" || state.status === "error") && state.graph !== null);
+  const showingSource = state.visit.kind === "source" && contentVisible;
+  return <div ref={container} className={showingSource ? "reading-connection-source" : "reading-connections"}>
+    {!showingSource ? <button className="reading-connection-back" type="button" onClick={() => window.history.back()}>Back to where you were</button> : null}
+    {state.status === "loading" ? <p role="status">Checking the exact reading and its connections.</p> : state.status === "error" ? <section><h1 data-connection-heading tabIndex={-1}>The connection could not be checked</h1><p>Your last reading has not been replaced.</p><button className="button button--secondary" type="button" onClick={() => refresh.current()}>Try again</button></section> : state.status === "unavailable" ? <section><h1 data-connection-heading tabIndex={-1}>This connection is unavailable</h1><p>The exact edition or its supporting evidence is no longer available. A newer reading will not be substituted.</p><button className="button button--secondary" type="button" onClick={onReload}>{reloadLabel}</button></section> : null}
+    {/* Keep the same subtree mounted during revalidation so local drafts survive.
+        Hidden/inert content cannot be read or edited until access is confirmed. */}
+    <div className="reading-connection-content" hidden={!contentVisible} inert={!contentVisible}>
+      {hasContent ? state.visit.kind === "source" ? renderSource(action) : state.visit.kind === "explanation" ? <section><h1 data-connection-heading tabIndex={-1}>Where this passage connects</h1><blockquote>{sourceParagraph?.text}</blockquote><p className="reading-connection-boundary">These links follow retained support for this passage. Similar wording alone does not create a connection.</p>{links}</section> : state.destination?.status === "available" ? <>
+        {state.destination.kind === "daily" ? renderDaily(state.destination.reading, state.destination.reading_status, () => refresh.current()) : state.destination.kind === "pattern" ? <ConnectedPatternReading document={state.destination.pattern} target={state.destination.target} chartId={chartId!} onUnauthorized={onUnauthorized} /> : <ConnectedTimingReading timing={state.destination.timing} />}
+        {state.destination.kind !== "daily" ? links : null}
+      </> : null : null}
+    </div>
   </div>;
 }
