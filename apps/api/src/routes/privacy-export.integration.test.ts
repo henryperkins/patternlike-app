@@ -6,7 +6,10 @@ import {
   SELF,
 } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { CALC_CONTRACT_ID } from "@patternlike/shared";
+import {
+  CALC_CONTRACT_ID, FEEDBACK_EXPORT_SCHEMA_VERSION,
+  type ReadingFeedbackEventReceipt, type ReadingFeedbackOptionsResponse,
+} from "@patternlike/shared";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import m0Common from "../../../../contracts/m0/common.schema.json";
@@ -24,6 +27,8 @@ import m7Common from "../../../../contracts/m7/common.schema.json";
 import m7PatternResponse from "../../../../contracts/m7/pattern-response.schema.json";
 import m8Common from "../../../../contracts/m8/common.schema.json";
 import m8AccountExport from "../../../../contracts/m8/account-export.schema.json";
+import readingFeedback from "../../../../contracts/reading-feedback-v1/reading-feedback.schema.json";
+import feedbackAccountExport from "../../../../contracts/reading-feedback-v1/account-export.schema.json";
 import worker, { app } from "../index.js";
 import type { Env, PrivacyMessage } from "../env.js";
 import { encryptPayload } from "../db/users.js";
@@ -35,6 +40,7 @@ import {
 } from "../db/privacy-jobs.js";
 import { openExport, sealExport } from "../services/export-envelope.js";
 import { processExportMessage } from "../services/privacy-jobs.js";
+import { assembleAccountExport } from "../services/account-export.js";
 import { runPrivacyMaintenance } from "../services/privacy-maintenance.js";
 import {
   ALICE,
@@ -67,10 +73,13 @@ for (const schema of [
   m7PatternResponse,
   m8Common,
   m8AccountExport,
+  readingFeedback,
+  feedbackAccountExport,
 ]) {
   exportAjv.addSchema(schema);
 }
 const validateM8AccountExport = exportAjv.getSchema(m8AccountExport.$id)!;
+const validateFeedbackAccountExport = exportAjv.getSchema(feedbackAccountExport.$id)!;
 
 interface WorkflowAccepted {
   schema_version: "0.2.0";
@@ -298,11 +307,11 @@ beforeEach(async () => {
 });
 
 describe("account export", () => {
-  it("pins new export commands to the M8 document schema", async () => {
-    const accepted = await postExport(USER_A, "idem-export-command-m8");
+  it("pins new export commands to the categorical feedback successor", async () => {
+    const accepted = await postExport(USER_A, "idem-export-command-feedback");
     const claim = await claimExportJob(env, accepted.body.job_id);
 
-    expect(claim?.command.export_schema_version).toBe("0.8.0");
+    expect(claim?.command.export_schema_version).toBe(FEEDBACK_EXPORT_SCHEMA_VERSION);
   });
 
   it("defaults only an absent pre-M8 pin to M7 and rejects null or unknown versions", async () => {
@@ -581,10 +590,11 @@ describe("account export", () => {
     expect(download.headers.get("cache-control")).toBe("no-store");
     const artifact = JSON.parse(downloadText) as Record<string, unknown>;
     expect(artifact).toMatchObject({
-      schema_version: "0.8.0",
+      schema_version: FEEDBACK_EXPORT_SCHEMA_VERSION,
       export_id: accepted.body.resource_id,
       account: { user_id: USER_A, status: "active" },
       readings: { status: "omitted_by_request", items: [] },
+      reading_feedback_events: { status: "omitted_by_request", items: [] },
       journal: { status: "not_available", items: [] },
       patterns: { status: "not_available", items: [] },
     });
@@ -725,10 +735,10 @@ describe("account export", () => {
         items: Array<Record<string, unknown>>;
       };
     };
-    expect(artifact.schema_version).toBe("0.8.0");
+    expect(artifact.schema_version).toBe(FEEDBACK_EXPORT_SCHEMA_VERSION);
     expect(
-      validateM8AccountExport(artifact),
-      JSON.stringify(validateM8AccountExport.errors),
+      validateFeedbackAccountExport(artifact),
+      JSON.stringify(validateFeedbackAccountExport.errors),
     ).toBe(true);
     expect(artifact.readings.status).toBe("included");
     expect(artifact.readings.items).toHaveLength(1);
@@ -743,7 +753,10 @@ describe("account export", () => {
     expect(JSON.stringify(artifact)).not.toContain("evidence_enc");
   });
 
-  it("retries a stored pre-M8 command as M7 without adding Save metadata", async () => {
+  it.each([
+    { label: "pre-M8", pin: undefined, expected: "0.7.0", includesSave: false },
+    { label: "M8", pin: "0.8.0", expected: "0.8.0", includesSave: true },
+  ])("retries a stored $label command without adding categorical feedback", async ({ pin, expected, includesSave }) => {
     const { readingId } = await seedReadingWithEvidence();
     await env.DB.prepare(
       `INSERT INTO reading_saves (user_id, reading_id, saved_at)
@@ -757,6 +770,7 @@ describe("account export", () => {
     await replaceExportCommand(accepted.body, {
       command_version: 1,
       job_type: "export_account",
+      ...(pin === undefined ? {} : { export_schema_version: pin }),
       request: {
         include_readings: true,
         include_journal: false,
@@ -779,9 +793,62 @@ describe("account export", () => {
       schema_version: string;
       readings: { items: Array<Record<string, unknown>> };
     };
-    expect(artifact.schema_version).toBe("0.7.0");
+    expect(artifact.schema_version).toBe(expected);
+    expect(artifact).not.toHaveProperty("reading_feedback_events");
     expect(artifact.readings.items).toHaveLength(1);
-    expect(artifact.readings.items[0]).not.toHaveProperty("saved_at");
+    if (includesSave) {
+      expect(artifact.readings.items[0]).toHaveProperty("saved_at", "2026-09-06T08:00:00.000Z");
+      expect(validateM8AccountExport(artifact), JSON.stringify(validateM8AccountExport.errors)).toBe(true);
+    } else {
+      expect(artifact.readings.items[0]).not.toHaveProperty("saved_at");
+    }
+  });
+
+  it("exports retained categorical notes after feedback revocation, but excludes omitted, foreign and expired records", async () => {
+    const { readingId, paragraphId } = await seedReadingWithEvidence();
+    const optionsResponse = await SELF.fetch(
+      `http://api.test/v1/readings/${readingId}/feedback-options?revision=1&paragraph_id=${paragraphId}`,
+      { headers: { "x-user-id": USER_A } },
+    );
+    expect(optionsResponse.status).toBe(200);
+    const options = await optionsResponse.json() as ReadingFeedbackOptionsResponse;
+    const note = "The same idea appeared in the previous reading.";
+    const created = await SELF.fetch(`http://api.test/v1/readings/${readingId}/feedback-events`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": USER_A, "idempotency-key": "feedback-export-note-fixture" },
+      body: JSON.stringify({
+        schema_version: "reading-feedback-event/v1", category: "repetitive",
+        revision: options.target.revision, content_hash: options.target.content_hash, paragraph_id: paragraphId,
+        note, feedback_use_policy_version: options.feedback_use_policy_version,
+        expected_grant_state: options.expected_grant_state, confirm_feedback_use: true,
+      }),
+    });
+    const createdText = await created.text();
+    expect(created.status, createdText).toBe(201);
+    const receipt = JSON.parse(createdText) as ReadingFeedbackEventReceipt;
+    if (receipt.effect_expires_at === null) throw new Error("repetition effect expiry missing");
+    await env.DB.batch([
+      env.DB.prepare("UPDATE consents SET status = 'revoked' WHERE user_id = ? AND source_id = 'USR-12'").bind(USER_A),
+      env.DB.prepare("UPDATE context_source_permissions SET enabled = 0, permission_state = 'revoked' WHERE user_id = ? AND source_id = 'USR-12'").bind(USER_A),
+    ]);
+    const afterEffect = new Date(Date.parse(receipt.effect_expires_at) + 1).toISOString();
+    const exportOptions = { include_readings: true, include_journal: false, include_patterns: false };
+    const readExport = async (identity = IDENTITY_A, at = afterEffect, includeReadings = true) => JSON.parse(
+      new TextDecoder().decode(await assembleAccountExport(env, identity, "exp_feedback_portability", at,
+        { ...exportOptions, include_readings: includeReadings })),
+    ) as Record<string, unknown>;
+    const retained = await readExport();
+    expect(validateFeedbackAccountExport(retained), JSON.stringify(validateFeedbackAccountExport.errors)).toBe(true);
+    expect(retained.reading_feedback_events).toEqual({ status: "included", items: [{ ...receipt, note }] });
+    expect(await readExport(IDENTITY_A, afterEffect, false)).toMatchObject({
+      reading_feedback_events: { status: "omitted_by_request", items: [] },
+    });
+    expect(await readExport(IDENTITY_B)).toMatchObject({ reading_feedback_events: { status: "included", items: [] } });
+    expect(await readExport(IDENTITY_A, receipt.retention_expires_at)).toMatchObject({
+      reading_feedback_events: { status: "included", items: [] },
+    });
+    // Expiry exclusion belongs to the read path as well as the later cleanup.
+    expect(await rows("SELECT id FROM reading_feedback_events WHERE user_id = ?", USER_A)).toHaveLength(1);
   });
 
   it("exports a Codex-authored reading under its own provenance", async () => {

@@ -138,16 +138,19 @@ describe("TodayView", () => {
     expect(reading).not.toBeNull();
     expect(reading!.compareDocumentPosition(checkIn!) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Did this meet you?" }))
-      .not.toBeInTheDocument();
-    expect(screen.queryByRole("radio", { name: "This helped" }))
-      .not.toBeInTheDocument();
+    const feedback = await screen.findByRole("region", { name: "Did this meet you?" });
+    expect(screen.getAllByRole("heading", { name: "Did this meet you?" })).toHaveLength(1);
+    expect(within(feedback).getAllByRole("radio", { name: "This helped" })).toHaveLength(1);
+    expect(within(checkIn!).queryByRole("radio", { name: "This helped" })).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole("radio", { name: /Quiet/i }));
     await user.click(screen.getByRole("button", { name: /Keep this/i }));
-    expect(await screen.findByText(/Held until/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Fresh until/i)).toBeInTheDocument();
+    expect(within(checkIn!).getByText(/stored for up to 13 months/)).toBeInTheDocument();
     expect(screen.getByText(firstParagraph)).toBeInTheDocument();
     expect(capturedFor(TODAY)).toHaveLength(1);
+    expect(capturedFor(`/v1/readings/${READING_ID}/feedback`).filter(call => call.method === "POST"))
+      .toHaveLength(0);
   });
 
   it("orders paragraphs by `order`, not by array position", async () => {
@@ -946,7 +949,7 @@ describe("the Today surface", () => {
       [EVIDENCE_V5]: ok(evidenceGraphV5),
     });
 
-    it("ends with future context instead of a second feedback prompt", async () => {
+    it("ends with one feedback prompt and a separate future-context check-in", async () => {
       const { container } = renderToday(v5());
       await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
 
@@ -956,10 +959,15 @@ describe("the Today surface", () => {
       expect(checkIn).not.toBeNull();
       expect(reading!.compareDocumentPosition(checkIn!) & Node.DOCUMENT_POSITION_FOLLOWING)
         .toBeTruthy();
-      expect(screen.queryByRole("heading", { name: "Did this meet you?" }))
-        .not.toBeInTheDocument();
-      expect(screen.queryByRole("radio", { name: "This helped" }))
-        .not.toBeInTheDocument();
+      const feedback = await screen.findByRole("region", { name: "Did this meet you?" });
+      expect(screen.getAllByRole("heading", { name: "Did this meet you?" })).toHaveLength(1);
+      expect(screen.getAllByRole("radio", { name: "This helped" })).toHaveLength(1);
+      expect(screen.getAllByRole("region", { name: "How are you arriving?" })).toHaveLength(1);
+      expect(reading!.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+      expect(feedback.compareDocumentPosition(checkIn!) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+      expect(within(checkIn!).queryByRole("radio", { name: "This helped" })).not.toBeInTheDocument();
     });
 
     it("renders the headline as the lead's quiet kicker, not a second heading", async () => {

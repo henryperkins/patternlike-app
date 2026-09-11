@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/reading-feedback-v1/reading-feedback.schema.json",
+  "title": "Exact-edition categorical reading feedback v1",
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reading_id",
+        "revision",
+        "content_hash",
+        "paragraph_id"
+      ],
+      "properties": {
+        "reading_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "paragraph_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "category",
+        "revision",
+        "content_hash",
+        "feedback_use_policy_version",
+        "expected_grant_state",
+        "confirm_feedback_use"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "reading-feedback-event/v1"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "repetitive",
+            "not_relevant_today",
+            "unclear"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "paragraph_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "feedback_use_policy_version": {
+          "type": "string",
+          "const": "categorized-feedback-use/v1"
+        },
+        "expected_grant_state": {
+          "type": "string",
+          "pattern": "^feedback-grant:[a-f0-9]{64}$"
+        },
+        "confirm_feedback_use": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "target",
+        "category",
+        "created_at",
+        "effect_expires_at",
+        "retention_expires_at",
+        "feedback_use_policy_version"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "reading-feedback-event-receipt/v1"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "repetitive",
+            "not_relevant_today",
+            "unclear"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "effect_expires_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retention_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "feedback_use_policy_version": {
+          "type": "string",
+          "const": "categorized-feedback-use/v1"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "category": {
+                "const": "unclear"
+              }
+            },
+            "required": [
+              "category"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_expires_at": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "effect_expires_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "optionsResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "target",
+        "feedback_use_policy_version",
+        "expected_grant_state",
+        "grant_action",
+        "categories",
+        "effect_window_days",
+        "retention_months",
+        "generation_effects_active",
+        "latest_event"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "reading-feedback-options/v1"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "feedback_use_policy_version": {
+          "type": "string",
+          "const": "categorized-feedback-use/v1"
+        },
+        "expected_grant_state": {
+          "type": "string",
+          "pattern": "^feedback-grant:[a-f0-9]{64}$"
+        },
+        "grant_action": {
+          "enum": [
+            "create",
+            "reuse",
+            "renew"
+          ]
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "repetitive",
+              "not_relevant_today",
+              "unclear"
+            ]
+          }
+        },
+        "effect_window_days": {
+          "type": "integer",
+          "const": 7
+        },
+        "retention_months": {
+          "type": "integer",
+          "const": 24
+        },
+        "generation_effects_active": {
+          "type": "boolean"
+        },
+        "latest_event": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/receipt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "exportEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "target",
+        "category",
+        "created_at",
+        "effect_expires_at",
+        "retention_expires_at",
+        "feedback_use_policy_version",
+        "note"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "reading-feedback-event-receipt/v1"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "repetitive",
+            "not_relevant_today",
+            "unclear"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "effect_expires_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retention_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "feedback_use_policy_version": {
+          "type": "string",
+          "const": "categorized-feedback-use/v1"
+        },
+        "note": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "category": {
+                "const": "unclear"
+              }
+            },
+            "required": [
+              "category"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_expires_at": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "effect_expires_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "exportSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "items"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "included",
+            "omitted_by_request"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exportEvent"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "omitted_by_request"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/request"
+}

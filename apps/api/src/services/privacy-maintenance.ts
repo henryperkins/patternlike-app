@@ -22,6 +22,7 @@ export interface PrivacyMaintenanceOptions {
 export interface PrivacyMaintenanceSummary {
   signalsExpired: number;
   signalsPurged: number;
+  feedbackEventsPurged: number;
   exportsExpired: number;
   failedExportArtifactsCleaned: number;
   deletionArtifactsCleaned: number;
@@ -110,6 +111,23 @@ async function purgeRetainedSignals(
          LIMIT ?
        )`,
     ).bind(nowIso, limit),
+  ]);
+  return results[1]?.meta.changes ?? 0;
+}
+
+async function purgeFeedbackEvents(env: Env, nowIso: string, limit: number): Promise<number> {
+  // The encrypted event also owns the request/receipt used for replay. Deleting
+  // it removes the note and mutation copy together; effect expiry alone does not.
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE context_source_permissions SET last_signal_id = NULL, updated_at = ?
+      WHERE source_id = 'USR-12' AND last_signal_id IN (
+        SELECT id FROM reading_feedback_events WHERE retention_expires_at <= ?
+        ORDER BY retention_expires_at, id LIMIT ?
+      )`).bind(nowIso, nowIso, limit),
+    env.DB.prepare(`DELETE FROM reading_feedback_events WHERE id IN (
+      SELECT id FROM reading_feedback_events WHERE retention_expires_at <= ?
+      ORDER BY retention_expires_at, id LIMIT ?
+    )`).bind(nowIso, limit),
   ]);
   return results[1]?.meta.changes ?? 0;
 }
@@ -381,6 +399,7 @@ export async function runPrivacyMaintenance(
 
   const signalsExpired = await expireSignals(env, nowIso, limit);
   const signalsPurged = await purgeRetainedSignals(env, nowIso, limit);
+  const feedbackEventsPurged = await purgeFeedbackEvents(env, nowIso, limit);
   const exportsExpired = await expireExports(env, nowIso, limit);
   const failedExportArtifactsCleaned = await cleanupFailedExportArtifacts(
     env,
@@ -417,6 +436,7 @@ export async function runPrivacyMaintenance(
   return {
     signalsExpired,
     signalsPurged,
+    feedbackEventsPurged,
     exportsExpired,
     failedExportArtifactsCleaned,
     deletionArtifactsCleaned,

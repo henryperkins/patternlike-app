@@ -20,7 +20,6 @@ import type {
   ReadingPublisherProvider,
 } from "@patternlike/shared";
 import {
-  SELECTION_POLICY_VERSION,
   VALIDATION_POLICY_VERSION,
 } from "@patternlike/reading-engine";
 import type { Env } from "../env.js";
@@ -29,6 +28,7 @@ import type {
   CodexProviderSafeDetailCode,
 } from "../db/codex-provider-jobs.js";
 import { readReadingV5Rollout, type ReadingV5Rollout } from "./reading-rollout.js";
+import { resolveFeedbackGenerationPolicy } from "./reading-feedback-policy.js";
 
 // ---------------------------------------------------------------------------
 // Pinned configuration
@@ -608,6 +608,9 @@ export function resolvePublisherConfiguration(
     }
   }
 
+  const feedbackPolicy = resolveFeedbackGenerationPolicy(env.CATEGORIZED_FEEDBACK_EFFECTS_ENABLED);
+  if (!feedbackPolicy) return misconfigured("CATEGORIZED_FEEDBACK_EFFECTS_ENABLED must be 0 or 1");
+
   if (rollout === "off") return { ok: true, rollout, config: null };
 
   const promptVersion = env.OPENAI_READING_PROMPT_VERSION?.trim();
@@ -618,7 +621,7 @@ export function resolvePublisherConfiguration(
   // automatically replaceable. A prompt bump that misses the deployed variable
   // would 424 every reading for every user until an operator noticed. Refusing
   // here turns that into 503 configuration_error on the first request instead.
-  if (promptVersion !== undefined && promptVersion !== "" && promptVersion !== READING_PROMPT_VERSION) {
+  if (promptVersion !== undefined && promptVersion !== "" && promptVersion !== feedbackPolicy.promptVersion) {
     return misconfigured(
       "OPENAI_READING_PROMPT_VERSION must be the exact compiled prompt version",
     );
@@ -685,7 +688,7 @@ export function resolvePublisherConfiguration(
         output_schema: "daily-reading-v5",
         // Filled by the caller that freezes a command; the engine owns both
         // numbers and this pin records which ones a command was built under.
-        selection_policy_version: SELECTION_POLICY_VERSION,
+        selection_policy_version: feedbackPolicy.selectionVersion,
         validation_policy_version: VALIDATION_POLICY_VERSION,
         max_output_tokens: OPENAI_READING_MAX_OUTPUT_TOKENS,
         context_max_bytes: READING_CONTEXT_MAX_BYTES,

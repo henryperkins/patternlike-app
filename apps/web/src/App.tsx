@@ -16,6 +16,7 @@ import { TodayView } from "./components/TodayView.js";
 import { SignedOut } from "./components/SignedOut.js";
 import { PortraitSessionProvider } from "./components/portrait-explorer/portrait-session.js";
 import { ReadingConnectionChartContext } from "./components/ReadingConnections.js";
+import { ReadingBirthCorrectionContext } from "./components/ReadingResponseCard.js";
 import {
   ApiError,
   createBirthProfile,
@@ -504,9 +505,15 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   return (
     <PortraitSessionProvider key={chart?.id ?? "no-chart"}>
       <ReadingConnectionChartContext value={chart?.id ?? null}>
+        <ReadingBirthCorrectionContext value={chart ? () => {
+          window.location.hash = "privacy";
+          setView("privacy");
+          setCorrectingBirth(true);
+        } : null}>
         <AppShell activeView={view} chartStatus={shellStatus}>
           {content}
         </AppShell>
+        </ReadingBirthCorrectionContext>
       </ReadingConnectionChartContext>
     </PortraitSessionProvider>
   );

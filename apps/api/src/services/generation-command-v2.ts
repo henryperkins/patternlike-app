@@ -26,7 +26,6 @@ import {
 import {
   ConstrainedInputError,
   prepareConstrainedReadingInput,
-  SELECTION_POLICY_VERSION,
   VALIDATION_POLICY_VERSION,
   type AssemblyUncertaintyInput,
   type ConstrainedContextRef,
@@ -653,7 +652,10 @@ export async function buildGenerationCommandV2(
   }
   const skyResponse: DailySkyResponseSuccess = sky.response;
 
-  const context = await loadConstrainedContext(env, identity, ctx.targetLocalDate);
+  const context = await loadConstrainedContext(env, identity, ctx.targetLocalDate, {
+    selectionVersion: config.pin.selection_policy_version,
+    anchor: ctx.now,
+  });
   const natalFacts = await projectNatalFacts(chart);
   const cycles = scan.response.cycles;
   const derived: PersistedCycle[] = await deriveCycles(cycles);
@@ -683,7 +685,7 @@ export async function buildGenerationCommandV2(
 
   const pin: PublisherConfigPin = {
     ...config.pin,
-    selection_policy_version: SELECTION_POLICY_VERSION,
+    selection_policy_version: config.pin.selection_policy_version,
     validation_policy_version: VALIDATION_POLICY_VERSION,
   };
 

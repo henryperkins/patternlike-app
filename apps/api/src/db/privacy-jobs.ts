@@ -1,4 +1,4 @@
-import { newId } from "@patternlike/shared";
+import { FEEDBACK_EXPORT_SCHEMA_VERSION, newId } from "@patternlike/shared";
 import { asCryptoSubject, b64 } from "../crypto.js";
 import type { Env } from "../env.js";
 import {
@@ -79,7 +79,8 @@ async function loadCommand(
     : candidate.export_schema_version;
   if (
     exportSchemaVersion !== M7_EXPORT_SCHEMA_VERSION &&
-    exportSchemaVersion !== M8_EXPORT_SCHEMA_VERSION
+    exportSchemaVersion !== M8_EXPORT_SCHEMA_VERSION &&
+    exportSchemaVersion !== FEEDBACK_EXPORT_SCHEMA_VERSION
   ) {
     throw new Error("unsupported export schema version");
   }
@@ -166,7 +167,7 @@ export async function reserveAccountExport(
   const command: ExportJobCommand = {
     command_version: 1,
     job_type: EXPORT_JOB_TYPE,
-    export_schema_version: M8_EXPORT_SCHEMA_VERSION,
+    export_schema_version: FEEDBACK_EXPORT_SCHEMA_VERSION,
     request,
     accepted_response: response,
     accepted_at: acceptedAt,

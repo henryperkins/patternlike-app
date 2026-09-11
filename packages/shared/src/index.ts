@@ -294,3 +294,4 @@ export function requireIdempotencyKey(
 }
 
 export * from "./reader-relationships-types.js";
+export * from "./reading-feedback-types.js";

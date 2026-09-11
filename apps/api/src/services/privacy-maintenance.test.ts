@@ -166,6 +166,26 @@ beforeEach(async () => {
 });
 
 describe("privacy maintenance", () => {
+  it("purges categorical event and encrypted mutation together at retention, with a bounded batch", async () => {
+    await rows(`INSERT INTO daily_readings
+      (id,user_id,local_date,release_version,reading_key,chart_fingerprint,contract_id,assembly_mode,status,revision,revision_reason,command_generation,created_at,updated_at)
+      VALUES ('rdg_retained_feedback',?,'2026-08-08',NULL,'reading-v5:retained-feedback','sha256:f','c','constrained_model','failed',1,'initial',1,?,?)`, USER_A, NOW.toISOString(), NOW.toISOString());
+    const dates = ["2026-08-12T17:59:59.000Z", NOW.toISOString(), "2026-08-12T18:00:00.001Z"];
+    for (const [index, expiry] of dates.entries()) {
+      await rows(`INSERT INTO reading_feedback_events
+        (id,user_id,reading_id,idempotency_key,event_enc,event_key_version,event_nonce,created_at,effect_expires_at,retention_expires_at)
+        VALUES (?,?,'rdg_retained_feedback',?,X'001122',1,'nonce','2024-08-12T18:00:00.000Z','2024-08-19T18:00:00.000Z',?)`,
+      `rfe_retention_${index}`, USER_A, `retention-${index}`, expiry);
+    }
+    const first = await runPrivacyMaintenance(env, NOW, { batchLimit: 1 });
+    expect(first.feedbackEventsPurged).toBe(1);
+    expect(await rows("SELECT id FROM reading_feedback_events ORDER BY id")).toEqual([{ id: "rfe_retention_1" }, { id: "rfe_retention_2" }]);
+    const second = await runPrivacyMaintenance(env, NOW, { batchLimit: 1 });
+    expect(second.feedbackEventsPurged).toBe(1);
+    expect(await rows("SELECT id FROM reading_feedback_events ORDER BY id")).toEqual([{ id: "rfe_retention_2" }]);
+    expect((await runPrivacyMaintenance(env, NOW, { batchLimit: 1 })).feedbackEventsPurged).toBe(0);
+  });
+
   it("runs bounded expiry, retention, and recovery lanes", async () => {
     await seedContextRows();
     const exportId = await seedExpiredExport();
@@ -184,6 +204,7 @@ describe("privacy maintenance", () => {
     expect(summary).toEqual({
       signalsExpired: 1,
       signalsPurged: 1,
+      feedbackEventsPurged: 0,
       exportsExpired: 1,
       failedExportArtifactsCleaned: 0,
       deletionArtifactsCleaned: 0,

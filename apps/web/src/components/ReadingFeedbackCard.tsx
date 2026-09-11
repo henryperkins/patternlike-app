@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   ApiError,
   getReadingFeedback,
@@ -33,14 +33,18 @@ interface ReadingFeedbackCardProps {
 /**
  * A quiet postscript, not a second panel.
  *
- * Resonance is stored so later readings can avoid repeating a framing the
- * reader already rejected. It does not feed the deterministic ranker —
- * `resonance_feedback` is not a ranking factor.
+ * The receipt confirms storage for this reading. Permission and generation
+ * admission determine later use; note text is never generation context.
  */
 export function ReadingFeedbackCard({
   readingId,
   onUnauthorized,
 }: ReadingFeedbackCardProps) {
+  const id = useId();
+  const headingId = `${id}-heading`;
+  const inviteId = `${id}-invite`;
+  const permissionId = `${id}-permission`;
+  const noteId = `${id}-note`;
   const [existing, setExisting] = useState<ReadingFeedbackRecord | null>(null);
   const [resonance, setResonance] = useState<FeedbackResonance | "">("");
   const [note, setNote] = useState("");
@@ -148,27 +152,35 @@ export function ReadingFeedbackCard({
   };
 
   return (
-    <section className="reading-feedback" aria-labelledby="feedback-heading">
-      <h2 id="feedback-heading">Did this meet you?</h2>
+    <section className="reading-feedback" aria-labelledby={headingId}>
+      <h2 id={headingId}>Did this meet you?</h2>
       {existing ? (
-        <p className="reading-feedback__saved">
-          Noted — {resonanceLabel(existing.resonance).toLowerCase()}. Later
-          readings can take this into account.
-        </p>
+        <>
+          <p className="reading-feedback__saved" role="status" aria-label="Feedback receipt">
+            Noted — {resonanceLabel(existing.resonance).toLowerCase()}.
+            {" "}Recorded for this chapter. The published text stays as it is.
+          </p>
+          <p className="reading-feedback__permission">
+            With active feedback permission, your choice may be used for repetition
+            control and theme ranking in later readings. This receipt does not
+            establish that a later reading used it. Notes are not offered as
+            generation context.
+          </p>
+        </>
       ) : (
         <form className="reading-feedback__form" onSubmit={(event) => void submit(event)}>
-          <p className="reading-feedback__invite" id="reading-feedback-invite">
-            Optional. It never changes the published chapter.
+          <p className="reading-feedback__invite" id={inviteId}>
+            Optional feedback on this chapter. It never changes the published text.
           </p>
-          <p className="reading-feedback__permission" id="reading-feedback-permission">
+          <p className="reading-feedback__permission" id={permissionId}>
             Sending this enables reading feedback for content quality, repetition
-            control, and theme ranking. An optional note is stored encrypted; its
-            text is not used for repetition control or theme ranking. This does
-            not enable model training.
+            control, and theme ranking, including if you previously turned it off.
+            An optional note is stored encrypted and is not offered as generation
+            context. This does not enable model training.
           </p>
           <fieldset
             className="reading-feedback__choices"
-            aria-describedby="reading-feedback-invite reading-feedback-permission"
+            aria-describedby={`${inviteId} ${permissionId}`}
           >
             <legend>How this reading landed</legend>
             <div className="reading-feedback__options">
@@ -176,7 +188,7 @@ export function ReadingFeedbackCard({
                 <label key={option.value}>
                   <input
                     type="radio"
-                    name="resonance"
+                    name={`${id}-resonance`}
                     value={option.value}
                     checked={resonance === option.value}
                     onChange={() => setResonance(option.value)}
@@ -195,17 +207,17 @@ export function ReadingFeedbackCard({
                 className="reading-feedback__note-toggle"
                 type="button"
                 aria-expanded={noteOpen}
-                aria-controls="reading-feedback-note"
+                aria-controls={noteId}
                 onClick={() => setNoteOpen((open) => !open)}
               >
                 <Icon name={noteOpen ? "minus" : "plus"} />
                 {noteOpen ? "Hide the note" : "A sentence, if you want"}
               </button>
               {noteOpen ? (
-                <label className="reading-feedback__note" htmlFor="reading-feedback-note">
+                <label className="reading-feedback__note" htmlFor={noteId}>
                   <span>A sentence, if you want</span>
                   <textarea
-                    id="reading-feedback-note"
+                    id={noteId}
                     rows={2}
                     maxLength={2000}
                     value={note}

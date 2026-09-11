@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Exact-edition reading feedback v1
+  version: 1.0.0
+  description: Additive categorical responses. Existing resonance and frozen export contracts are unchanged.
+paths:
+  /v1/readings/{id}/feedback-options:
+    get:
+      operationId: getReadingFeedbackOptions
+      description: >-
+        Discover the owner's exact readable revision/hash and optional paragraph,
+        current grant-state precondition, and allowed category effects. This read
+        cannot create or renew a grant. Unknown and duplicate query keys are rejected.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+        - in: query
+          name: revision
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - in: query
+          name: paragraph_id
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_-]{1,128}$'
+      responses:
+        '200':
+          description: 'Exact options and latest receipt; Cache-Control: private, no-store.'
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/reading-feedback-v1/reading-feedback.schema.json#/$defs/optionsResponse
+        '400':
+          description: Invalid or repeated coordinates.
+        '401':
+          description: Authentication required.
+        '404':
+          description: Exact owned artifact or requested paragraph is unavailable.
+        default:
+          description: Structured error with no private artifact; private, no-store.
+  /v1/readings/{id}/feedback-events:
+    post:
+      operationId: createReadingFeedbackEvent
+      description: >-
+        Record a deliberate categorical response to the exact edition. A completed
+        same-key/same-body replay returns its original receipt without renewing a
+        grant, even after later revocation. New writes compare expected_grant_state
+        atomically with any grant renewal and event insertion. Event, note and
+        idempotency payload retention is 24 calendar months; eligible repetition
+        or relevance effects expire after seven days. Unclear has no generation
+        effect, and note text is never generation input. Earlier superseded or
+        invalidated editions remain eligible while their exact artifact is retained.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 256
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: https://patternlike.app/contracts/reading-feedback-v1/reading-feedback.schema.json#/$defs/request
+      responses:
+        '201':
+          description: 'Recorded event or completed idempotent replay; Cache-Control: private, no-store.'
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/reading-feedback-v1/reading-feedback.schema.json#/$defs/receipt
+        '400':
+          description: Invalid closed body or missing idempotency key.
+        '401':
+          description: Authentication required.
+        '404':
+          description: Exact owned artifact or requested paragraph is unavailable.
+        '409':
+          description: >-
+            feedback_use_changed requires refreshed options and a fresh deliberate
+            submission. idempotency_conflict means the key names a different request.
+            Neither result creates a grant or event.
+        default:
+          description: Structured error with no private artifact; private, no-store.
+components:
+  parameters:
+    ReadingId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{1,128}$'
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session

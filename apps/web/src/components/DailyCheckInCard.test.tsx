@@ -106,8 +106,8 @@ describe("daily check-in card", () => {
     });
     expect(capturedFor(CHECK_INS)[0]!.headers.get("idempotency-key"))
       .toMatch(/^web-check-in-/);
-    expect(await screen.findByText(/Held until/i)).toBeInTheDocument();
-    expect(screen.getByText(/The next reading can use this/i))
+    expect(await screen.findByText(/Fresh until/i)).toBeInTheDocument();
+    expect(screen.getByText(/Selection is not guaranteed/i))
       .toBeInTheDocument();
     expect(screen.getByText(/Today's chapter stays as it is/i))
       .toBeInTheDocument();

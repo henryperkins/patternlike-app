@@ -92,6 +92,16 @@ function hostileRequest(): ReadingGenerationRequest {
 }
 
 describe("provider request body", () => {
+  it("keeps the incumbent prompt bytes and gives categorical feedback its own bounded instructions", () => {
+    const incumbent = buildResponsesRequest(hostileRequest(), PIN);
+    const categorical = buildResponsesRequest(hostileRequest(), { ...PIN, prompt_version: "1.0.4", selection_policy_version: "1.2.0" });
+    expect(incumbent.instructions).toBe(READING_SYSTEM_POLICY);
+    expect(categorical.instructions).toContain("A repetitive signal may guide repetition control only");
+    expect(categorical.instructions).toContain("not reader notes");
+    expect(categorical.instructions).toContain("never removes calculated facts");
+    expect(categorical.input).toEqual(incumbent.input);
+    expect(categorical.text).toEqual(incumbent.text);
+  });
   it("identifies the personable Daily prompt revision", () => {
     expect(READING_PROMPT_VERSION).toBe("1.0.3");
   });

@@ -34,6 +34,30 @@ import {
 } from "./constrained-input.js";
 import type { NormalizedCycle } from "./types.js";
 
+test("categorical feedback keeps exact private targets in frozen pins and aliases the provider projection", () => {
+  const input = baseInput({
+    selection_policy_version: "1.2.0", prompt_version: "1.0.4",
+    context_sources: [source("USR-12", ["repetition_control"])],
+    context_signals: [signal("rfe_private", "USR-12", ["repetition_control"], "2026-07-29T10:00:00Z", {
+      category: "reading_feedback", content: { kind: "structured", value: {
+        schema_version: "reading-feedback-signal/v1", category: "repetitive",
+        target: { reading_id: "rdg_private", paragraph_id: "par_private", revision: 1, content_hash: "sha256:private" },
+        fact_ids: ["fact_a"], theme_ids: [],
+      } },
+    })],
+  });
+  const prepared = prepareConstrainedReadingInput(input);
+  const packet = JSON.stringify(prepared.request);
+  assert.equal(packet.includes("rdg_private"), false);
+  assert.equal(packet.includes("par_private"), false);
+  assert.equal(packet.includes("rfe_private"), false);
+  assert.match(packet, /target_ref/);
+  assert.equal(JSON.stringify(prepared.selected_context).includes("rdg_private"), true);
+  const incumbent = prepareConstrainedReadingInput({ ...input, selection_policy_version: "1.1.0", prompt_version: "1.0.3" });
+  assert.deepEqual(prepared.selected_facts, incumbent.selected_facts);
+  assert.notEqual(prepared.identity_canonical, incumbent.identity_canonical);
+});
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------

@@ -153,7 +153,7 @@ describe("HistoryView", () => {
     expect(await screen.findByText(todayResponse.reading.paragraphs[0]!.text)).toBeInTheDocument();
     expect(screen.getByText("Chapter loaded for Sunday, August 9, 2026.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Did this meet you?" })).toBeInTheDocument();
-    expect(screen.getByText("Optional. It never changes the published chapter."))
+    expect(screen.getByText("Optional feedback on this chapter. It never changes the published text."))
       .toBeInTheDocument();
     expect(screen.queryByText("How are you arriving?")).not.toBeInTheDocument();
     await user.click(screen.getByText("Why this reading?"));

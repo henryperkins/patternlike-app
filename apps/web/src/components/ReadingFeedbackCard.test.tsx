@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ReadingFeedbackCard } from "./ReadingFeedbackCard.js";
@@ -33,6 +33,10 @@ describe("Reading feedback", () => {
     expect(
       await screen.findByText(/Noted — this helped/i),
     ).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Feedback receipt" }))
+      .toHaveTextContent("Recorded for this chapter");
+    expect(screen.getByText(/does not establish that a later reading used it/i)).toBeInTheDocument();
+    expect(screen.getByText(/notes are not offered as generation context/i)).toBeInTheDocument();
   });
 
   it("keeps the optional note behind a second ask", async () => {
@@ -77,6 +81,30 @@ describe("Reading feedback", () => {
       await screen.findByText(/Noted — not quite/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Send this/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/with active feedback permission/i)).toBeInTheDocument();
+  });
+
+  it("keeps labels bound to the visible feedback when a source reading remains mounted", async () => {
+    const user = userEvent.setup();
+    const nextReadingId = "rdg_feedback_000000000002";
+    mockApiResponses({
+      [`GET ${PATH}`]: { status: 404, body: errorBody("feedback_not_found", "No feedback") },
+      [`GET /v1/readings/${nextReadingId}/feedback`]: {
+        status: 404, body: errorBody("feedback_not_found", "No feedback"),
+      },
+    });
+    const { container } = render(<>
+      <div hidden><ReadingFeedbackCard readingId={READING_ID} /></div>
+      <ReadingFeedbackCard readingId={nextReadingId} />
+    </>);
+    const feedback = within(screen.getByRole("region", { name: "Did this meet you?" }));
+    await user.click(feedback.getByRole("radio", { name: "Mixed" }));
+    await user.click(feedback.getByRole("button", { name: "A sentence, if you want" }));
+    const note = feedback.getByRole("textbox", { name: "A sentence, if you want" });
+    await user.type(note, "For this edition only.");
+    expect(note).toHaveValue("For this edition only.");
+    const ids = [...container.querySelectorAll("[id]")].map((element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("delegates an authentication failure while loading prior feedback", async () => {

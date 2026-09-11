@@ -49,6 +49,7 @@ M9 = ROOT / "m9"
 GEOCODER_V2 = ROOT / "geocoder-v2"
 PORTRAIT_V1 = ROOT / "portrait-v1"
 READER_RELATIONSHIPS_V1 = ROOT / "reader-relationships-v1"
+READING_FEEDBACK_V1 = ROOT / "reading-feedback-v1"
 PATTERN_PROVIDER_BOUNDARY_POLICY_PATH = (
     ROOT / "policies" / "pattern-provider-boundary-v1.json"
 )
@@ -66,10 +67,17 @@ M9_BASE = "https://patternlike.app/contracts/m9/"
 GEOCODER_V2_BASE = "https://patternlike.app/contracts/geocoder-v2/"
 PORTRAIT_V1_BASE = "https://patternlike.app/contracts/portrait-v1/"
 READER_RELATIONSHIPS_V1_BASE = "https://patternlike.app/contracts/reader-relationships-v1/"
+READING_FEEDBACK_V1_BASE = "https://patternlike.app/contracts/reading-feedback-v1/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
 FIXTURE_SCHEMA = {
+    "reading-feedback-v1": {
+        "feedback-request": READING_FEEDBACK_V1_BASE + "reading-feedback.schema.json#/$defs/request",
+        "feedback-receipt": READING_FEEDBACK_V1_BASE + "reading-feedback.schema.json#/$defs/receipt",
+        "feedback-options": READING_FEEDBACK_V1_BASE + "reading-feedback.schema.json#/$defs/optionsResponse",
+        "feedback-account-export": READING_FEEDBACK_V1_BASE + "account-export.schema.json#/$defs/accountExport",
+    },
     "reader-relationships-v1": {
         "reader-source": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/sourceResponse",
         "reader-relationships": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/relationshipsResponse",
@@ -225,6 +233,7 @@ FIXTURE_SCHEMA = {
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
 # may legitimately accept them; the policy check below must not.
 POLICY_ONLY = {
+    "reading-feedback-v1": set(),
     "reader-relationships-v1": set(),
     "portrait-v1": set(),
     "geocoder-v2": set(),
@@ -407,7 +416,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, READER_RELATIONSHIPS_V1):
+    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1404,7 +1413,7 @@ def validate_package(
             return _m7_policy_errors(fixture, instance)
         if name == "m8":
             return _m8_policy_errors(fixture, instance)
-        if name in ("m9", "geocoder-v2", "portrait-v1", "reader-relationships-v1"):
+        if name in ("m9", "geocoder-v2", "portrait-v1", "reader-relationships-v1", "reading-feedback-v1"):
             return []
         raise ValueError(f"unregistered contract package policy: {name}")
 
@@ -1474,6 +1483,7 @@ PACKAGE_BASE = {
     "geocoder-v2": GEOCODER_V2_BASE,
     "portrait-v1": PORTRAIT_V1_BASE,
     "reader-relationships-v1": READER_RELATIONSHIPS_V1_BASE,
+    "reading-feedback-v1": READING_FEEDBACK_V1_BASE,
 }
 
 
@@ -1553,7 +1563,7 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            if package in (M8, M9, GEOCODER_V2, PORTRAIT_V1, READER_RELATIONSHIPS_V1):
+            if package in (M8, M9, GEOCODER_V2, PORTRAIT_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1):
                 # The validate() shortcut builds SchemaPath with its own handlers
                 # before instantiating `cls`, so a custom class cannot affect
                 # retrieval there. Construct the validator from the raw mapping.
@@ -4058,6 +4068,10 @@ def main() -> int:
     print("\n== contracts/reader-relationships-v1 ==")
     errors += validate_package(registry, "reader-relationships-v1", READER_RELATIONSHIPS_V1, set())
     errors += check_openapi(READER_RELATIONSHIPS_V1, registry)
+
+    print("\n== contracts/reading-feedback-v1 ==")
+    errors += validate_package(registry, "reading-feedback-v1", READING_FEEDBACK_V1, set())
+    errors += check_openapi(READING_FEEDBACK_V1, registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")

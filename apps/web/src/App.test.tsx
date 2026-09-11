@@ -1543,7 +1543,7 @@ describe("web application shell", () => {
     await user.click(screen.getAllByRole("link", { name: "Today" })[0]);
     await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
     expect(screen.queryByRole("heading", { name: /Did this meet you/i }))
-      .not.toBeInTheDocument();
+      .toBeInTheDocument();
 
     // Opened, because the drawer's contents are the part with the most markup
     // and the only place a heading-order violation could hide.
@@ -1555,6 +1555,39 @@ describe("web application shell", () => {
     });
 
     expect(results.violations).toEqual([]);
+  });
+
+  it("opens existing birth correction from a reading response without sending feedback or granting use", async () => {
+    const user = userEvent.setup();
+    window.location.hash = "today";
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/readings/today": { status: 200, body: todayResponse },
+      [`GET /v1/readings/${READING_ID}/feedback-options`]: {
+        status: 200,
+        body: {
+          schema_version: "reading-feedback-options/v1",
+          target: { reading_id: READING_ID, revision: todayResponse.reading.revision, content_hash: `sha256:${"a".repeat(64)}`, paragraph_id: null },
+          feedback_use_policy_version: "categorized-feedback-use/v1",
+          expected_grant_state: "opaque-grant",
+          grant_action: "create",
+          categories: ["repetitive", "not_relevant_today", "unclear"],
+          effect_window_days: 7,
+          retention_months: 24,
+          generation_effects_active: false,
+          latest_event: null,
+        },
+      },
+    });
+    render(<App />);
+    await user.click(await screen.findByRole("link", { name: "My birth details are wrong" }));
+    expect(await screen.findByRole("heading", { name: "Replace what the chart is built from." })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#privacy");
+    expect(capturedFor(`/v1/readings/${READING_ID}/feedback-events`)).toHaveLength(0);
+    expect(capturedFor("/v1/birth-profiles")).toHaveLength(0);
+    expect(capturedFor("/v1/consents/account-processing").filter(call => call.method !== "GET")).toHaveLength(0);
+    await user.click(screen.getAllByRole("link", { name: "Today" })[0]!);
+    expect(await screen.findByText(todayResponse.reading.paragraphs[0]!.text)).toBeInTheDocument();
   });
 
   it("keeps History reachable without an active chart and exposes six navigation destinations", async () => {

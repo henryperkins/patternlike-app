@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/reading-feedback-v1/account-export.schema.json",
+  "title": "Portable account export with categorical feedback",
+  "description": "Retains M8 sections under an additive successor. Older pinned export commands remain on their original formats.",
+  "$defs": {
+    "accountExport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "export_id",
+        "generated_at",
+        "account",
+        "birth_profiles",
+        "chart_snapshots",
+        "preferences",
+        "timezone_changes",
+        "consents",
+        "context_sources",
+        "context_signals",
+        "readings",
+        "journal",
+        "patterns",
+        "reading_feedback_events"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "account-export-feedback/v1"
+        },
+        "export_id": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/export_id"
+        },
+        "generated_at": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/generated_at"
+        },
+        "account": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/account"
+        },
+        "birth_profiles": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/birth_profiles"
+        },
+        "chart_snapshots": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/chart_snapshots"
+        },
+        "preferences": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/preferences"
+        },
+        "timezone_changes": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/timezone_changes"
+        },
+        "consents": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/consents"
+        },
+        "context_sources": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/context_sources"
+        },
+        "context_signals": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/context_signals"
+        },
+        "readings": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/readings"
+        },
+        "journal": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/journal"
+        },
+        "patterns": {
+          "$ref": "https://patternlike.app/contracts/m8/account-export.schema.json#/$defs/accountExport/properties/patterns"
+        },
+        "reading_feedback_events": {
+          "$ref": "https://patternlike.app/contracts/reading-feedback-v1/reading-feedback.schema.json#/$defs/exportSection"
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/accountExport"
+}
