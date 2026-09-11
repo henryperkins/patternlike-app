@@ -1,0 +1,81 @@
+[
+  {
+    "results": [
+      {
+        "id": "job_20b4f89395d4c4ff12b9dce53cdb3438",
+        "status": "succeeded",
+        "result_class": "published",
+        "attempts": 1,
+        "finished_at": "2026-09-11T21:04:42.061Z"
+      },
+      {
+        "id": "job_2178d22b207b72b25016dd178a77a5eb",
+        "status": "failed",
+        "result_class": "publisher_output_invalid",
+        "attempts": 2,
+        "finished_at": "2026-09-11T21:12:13.227Z"
+      },
+      {
+        "id": "job_42abd616ca5050e2c2e2a52e7419c7f6",
+        "status": "failed",
+        "result_class": "publisher_output_invalid",
+        "attempts": 2,
+        "finished_at": "2026-09-11T21:07:36.834Z"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "ENAM",
+      "served_by_colo": "ORD",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.3889
+      },
+      "duration": 0.3889,
+      "changes": 0,
+      "last_row_id": 6278,
+      "changed_db": false,
+      "size_after": 11505664,
+      "rows_read": 6,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  },
+  {
+    "results": [
+      {
+        "id": "rdg_26cef2693230fc247f986ff7d17e352a",
+        "status": "published",
+        "command_generation": 2,
+        "updated_at": "2026-09-11T21:04:42.061Z",
+        "has_reading": 1
+      },
+      {
+        "id": "rdg_8e544ee742bd0140977fcd8e006c740c",
+        "status": "failed",
+        "command_generation": 3,
+        "updated_at": "2026-09-11T21:12:13.227Z",
+        "has_reading": 0
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "ENAM",
+      "served_by_colo": "ORD",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.2421
+      },
+      "duration": 0.2421,
+      "changes": 0,
+      "last_row_id": 6278,
+      "changed_db": false,
+      "size_after": 11505664,
+      "rows_read": 4,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

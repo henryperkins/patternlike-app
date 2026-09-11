@@ -54,6 +54,34 @@ type OperationalFailureClass =
   | "payload_undecryptable"
   | "execution_error";
 
+export type SafeExceptionClass =
+  | "eval_error"
+  | "type_error"
+  | "range_error"
+  | "reference_error"
+  | "syntax_error"
+  | "error"
+  | "non_error";
+
+/** Classify without projecting mutable error names, messages, or stacks. */
+export function safeExceptionClass(error: unknown): SafeExceptionClass {
+  if (error instanceof EvalError) return "eval_error";
+  if (error instanceof TypeError) return "type_error";
+  if (error instanceof RangeError) return "range_error";
+  if (error instanceof ReferenceError) return "reference_error";
+  if (error instanceof SyntaxError) return "syntax_error";
+  return error instanceof Error ? "error" : "non_error";
+}
+
+export type ReadingSchedulerLane =
+  | "failed_replacement"
+  | "stale_published"
+  | "invalidated_orphan"
+  | "expired_lease"
+  | "undispatched_outbox"
+  | "due"
+  | "null_seed";
+
 export type DeletionFailureCheckpoint =
   | "accepted"
   | "exports_fenced"
@@ -78,7 +106,16 @@ export type SafeLogEvent =
     }
   | { event: "generation_retryable_failure"; failure_class: GenerationFailureCode }
   | { event: "generation_failed"; failure_class: OperationalFailureClass }
-  | { event: "generation_threw"; failure_class: "payload_undecryptable" | "execution_error" }
+  | {
+      event: "generation_threw";
+      failure_class: "payload_undecryptable" | "execution_error";
+      error_class: SafeExceptionClass;
+    }
+  | {
+      event: "scheduler_candidate_unprocessable";
+      lane: ReadingSchedulerLane;
+      error_class: SafeExceptionClass;
+    }
   | {
       event: "birth_calc_completed";
       outcome: "success" | "invalid_input" | "upstream_failure" | "timeout";
@@ -353,7 +390,18 @@ export function safeLog(input: SafeLogEvent): string {
       console.error(input.event, { trace_id, checkpoint: input.checkpoint });
       break;
     case "generation_threw":
-      console.error(input.event, { trace_id, failure_class: input.failure_class });
+      console.error(input.event, {
+        trace_id,
+        failure_class: input.failure_class,
+        error_class: input.error_class,
+      });
+      break;
+    case "scheduler_candidate_unprocessable":
+      console.error(input.event, {
+        trace_id,
+        lane: input.lane,
+        error_class: input.error_class,
+      });
       break;
     case "content_release_held_for_fixtures":
       console.warn(input.event, {

@@ -20,9 +20,7 @@ import type { CommandBuildFailure } from "./generation-command.js";
 import type { CommandBuildFailureV2 } from "./generation-command-v2.js";
 import {
   MAX_COMMAND_GENERATION,
-  isAutomaticReplacementFailure,
-  isGenerationFailureCode,
-  type GenerationReplacementReason,
+  automaticReplacementReason,
 } from "./generation-failures.js";
 import { reconcileCurrentFactRepair } from "./reading-invalidation.js";
 import {
@@ -314,19 +312,18 @@ export async function ensureTodayReading(
       }
       return { ok: false, reason: replaced.reason, detail: replaced.detail };
     }
-    if (
-      failedJob.resultClass &&
-      isGenerationFailureCode(failedJob.resultClass) &&
-      isAutomaticReplacementFailure(
-        state.assemblyMode === "constrained_model" ? "v2" : "v1",
-        failedJob.resultClass,
-      )
-    ) {
+    const replacementReason = failedJob.resultClass
+      ? automaticReplacementReason(
+          state.assemblyMode === "constrained_model" ? "v2" : "v1",
+          failedJob.resultClass,
+        )
+      : null;
+    if (replacementReason) {
       const replaced = await replaceFailedCommand(
         env,
         identity.userId,
         state.readingId,
-        failedJob.resultClass as GenerationReplacementReason,
+        replacementReason,
         "scheduler",
         now,
       );

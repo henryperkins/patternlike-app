@@ -1,0 +1,10 @@
+{
+  "timestamp": 1789161133160,
+  "event": "reading_candidate_rejected",
+  "failures": [
+    {
+      "code": "grounding",
+      "detail_code": "unsupported_uncertainty_disclosure"
+    }
+  ]
+}

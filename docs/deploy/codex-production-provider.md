@@ -18,7 +18,7 @@ This source port does not demonstrate production adoption.
 ## Current source transport and pause control (2026-09-06)
 
 The source now runs ordinary text work through isolated `codex app-server`
-turns, shared with mesh JSON authoring. Each attempt verifies CLI `0.153.3`,
+turns, shared with mesh JSON authoring. Each attempt verifies a Codex CLI release,
 ChatGPT authentication, effective configuration, frozen model/effort, and
 provider-reported usage. It creates an ephemeral thread in a private temporary
 directory, disables tools/MCP/skills and execution environments, rejects host
@@ -282,7 +282,12 @@ On the approved host:
 3. Create `/var/lib/patternlike-codex-runner/workspace` as an empty Git
    repository owned by the service account. It contains no application data;
    it is only the Codex working directory.
-4. Install the Codex CLI at a stable absolute path accessible to the account.
+4. Install the latest stable Codex CLI (`npm install @openai/codex@latest`) at a
+   stable absolute path accessible to the account. Text and mesh JSON turns
+   check the effective isolation/protocol contract at runtime rather than
+   requiring an exact CLI version. Record the installed `codex --version` in
+   deployment evidence. Portrait image jobs still have a separate frozen
+   provenance contract; leave portraits disabled for a text-only installation.
 5. Run `codex login` interactively as that account, then run
    `codex login status`. Do not inspect or copy its credential file.
 6. Create `/etc/patternlike-codex-runner.env` as `root:root` mode `0600`. It

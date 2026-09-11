@@ -2,7 +2,7 @@
 
 The existing text queue remains the default. Set `CODEX_RUNNER_PORTRAITS=1` to poll the separate portrait queue whenever the text queue is empty. The runner still executes one claim at a time. Portrait generation must also be enabled separately on the API after its migration and compatible release.
 
-Portrait invocations require Codex CLI **0.153.3** and an existing ChatGPT login. The runner checks the CLI version and the explicit `Logged in using ChatGPT` status before launching an ephemeral app-server thread. A different CLI version fails closed until its native-tool and event contracts are reviewed. The claim selects the orchestration model and `xhigh` reasoning; current backend claims use `gpt-5.6-sol`.
+Install the latest stable Codex CLI for text and mesh JSON work. These turns require an existing ChatGPT login and verify the effective configuration and event contract before sending source content; they do not require an exact CLI version. Portrait image invocations still require CLI **0.153.3** under their separate frozen provenance contract. The claim selects the orchestration model and `xhigh` reasoning; current backend claims use `gpt-5.6-sol`.
 
 Each child receives the existing environment allowlist, excluding OpenAI API keys, the runner bearer, application credentials, and API endpoint overrides. The app-server forces the OpenAI provider and ChatGPT login, uses a read-only shell sandbox, disables shell execution, apps, plugins, hooks, browser/computer use, delegation and memory, and receives only one chapter prompt through stdin. It uses the supported local app-server protocol; there are no direct ChatGPT HTTP calls or alternate image providers.
 
@@ -63,14 +63,14 @@ The account polls visible in-progress work and opens saved models through the pe
 
 ### Fictional provider canary
 
-Use the pinned CLI and the existing ChatGPT login; never pass account content to a local diagnostic. The output directory must be new:
+Use the latest stable CLI and the existing ChatGPT login; never pass account content to a local diagnostic. The receipt records the observed CLI version. The output directory must be new:
 
 ```bash
 node apps/codex-runner/dist/portrait-mesh-canary.js \
   --fictional --image /absolute/fictional-reference.png \
   --source /absolute/complete-fictional-chapter.txt \
   --out /absolute/new-canary-directory \
-  --codex-bin /absolute/pinned-codex-0.153.3
+  --codex-bin /absolute/codex
 ```
 
 The command captures untouched authored JSON, compiled GLB, four rendered views, the independent visual check and a sanitized receipt. Failure exits nonzero and retains available fictional evidence. Production polling does not install those inspection hooks or retain temporary source-bearing output. A passing canary establishes that particular model and check, not a guarantee that every automatically generated model will pass.

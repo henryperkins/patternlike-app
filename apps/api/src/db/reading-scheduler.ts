@@ -210,7 +210,7 @@ export async function findFailedSchedulerCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<FailedSchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded, excludedBudget(12));
+  const excludedIds = excludedValues(excluded, excludedBudget(automaticFailureValues.length + 4));
   const [earliestLocalDate, latestLocalDate] = failureDateBounds(scheduledAt);
   const ownerLocalDates = pinnedLocalDateIndexJson(scheduledAt.getTime());
   const sql = `WITH ranked AS (

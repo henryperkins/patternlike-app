@@ -10,7 +10,7 @@ export async function jsonFixture(mode = "success", outputs: unknown[] = [{ answ
 import fs from 'node:fs/promises'; import path from 'node:path'; import readline from 'node:readline';
 const mode=${JSON.stringify(mode)}, root=${JSON.stringify(root)}, outputs=${JSON.stringify(outputs)};
 const args=process.argv.slice(2); await fs.writeFile(path.join(root,'launched'), 'yes');
-if(args[0]==='--version'){console.log(mode==='version'?'codex-cli 0.153.4':'codex-cli 0.153.3');process.exit(0);}
+if(args[0]==='--version'){console.log(mode==='version'?'unrecognized executable':mode==='newversion'?'codex-cli 0.154.0':'codex-cli 0.153.3');process.exit(0);}
 if(args[0]==='login'){console.log(mode==='auth'?'Logged in using an API key':'Logged in using ChatGPT');process.exit(0);}
 let count=0;try{count=Number(await fs.readFile(path.join(root,'count'),'utf8'));}catch{} await fs.writeFile(path.join(root,'count'),String(count+1));
 await fs.writeFile(path.join(root,'record-'+count+'.json'),JSON.stringify({args,env:process.env}));

@@ -129,6 +129,7 @@ export const V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
 ] as const satisfies readonly V1FailureCode[];
 
 export const V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
+  "execution_error",
   "calc_unavailable",
   "daily_sky_unavailable",
   "publisher_unavailable",
@@ -139,13 +140,13 @@ export const V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
   // under Codex. It is deliberately absent from `queueDisposition`'s retry
   // branches for exactly that reason.
   "publisher_superseded",
-] as const satisfies readonly V5FailureCode[];
+] as const satisfies readonly (V5FailureCode | "execution_error")[];
 
 const V1_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V1FailureCode> = new Set(
   V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
 );
 
-const V5_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V5FailureCode> = new Set(
+const V5_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V5FailureCode | "execution_error"> = new Set(
   V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
 );
 
@@ -199,9 +200,26 @@ export function leaseDisposition(
 
 export function isAutomaticReplacementFailure(
   commandVersion: "v1" | "v2",
-  code: GenerationFailureCode,
+  code: GenerationFailureCode | "execution_error",
 ): boolean {
   return commandVersion === "v1"
     ? V1_AUTOMATIC_REPLACEMENT_FAILURES.has(code as V1FailureCode)
     : V5_AUTOMATIC_REPLACEMENT_FAILURES.has(code as V5FailureCode);
+}
+
+/**
+ * Operational crashes are not provider result codes. Recover V2 execution
+ * outages through the existing publisher-availability replacement reason so
+ * frozen command contracts stay unchanged. The predecessor retains its exact
+ * execution_error result; only the new command records this recovery decision.
+ */
+export function automaticReplacementReason(
+  commandVersion: "v1" | "v2",
+  code: string,
+): GenerationReplacementReason | null {
+  if (code !== "execution_error" && !isGenerationFailureCode(code)) return null;
+  if (!isAutomaticReplacementFailure(commandVersion, code)) return null;
+  return code === "execution_error"
+    ? "publisher_unavailable"
+    : code as GenerationReplacementReason;
 }

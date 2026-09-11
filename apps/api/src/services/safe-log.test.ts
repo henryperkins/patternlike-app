@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { safeLog, type SafeLogEvent } from "./safe-log.js";
+import { safeExceptionClass, safeLog, type SafeLogEvent } from "./safe-log.js";
 
 const SENTINEL = "PRIVATE_SENTINEL_DO_NOT_LOG";
 
@@ -9,6 +9,38 @@ afterEach(() => {
 });
 
 describe("safe logging", () => {
+  it.each([
+    [new EvalError(SENTINEL), "eval_error"],
+    [new TypeError(SENTINEL), "type_error"],
+    [new RangeError(SENTINEL), "range_error"],
+    [new ReferenceError(SENTINEL), "reference_error"],
+    [new SyntaxError(SENTINEL), "syntax_error"],
+    [Object.assign(new Error(SENTINEL), { name: SENTINEL }), "error"],
+    [{ name: SENTINEL, message: SENTINEL }, "non_error"],
+    [SENTINEL, "non_error"],
+  ])("classifies a thrown value without emitting its contents (%#)", (error, expected) => {
+    expect(safeExceptionClass(error)).toBe(expected);
+  });
+
+  it("projects scheduler and queue exception categories without raw exception data", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const event of ["scheduler_candidate_unprocessable", "generation_threw"]) {
+      safeLog({
+        event, lane: "due", failure_class: "execution_error", error_class: "eval_error",
+        error: new EvalError(SENTINEL), user_id: SENTINEL, message: SENTINEL,
+      } as unknown as SafeLogEvent);
+    }
+    expect(error.mock.calls).toEqual([
+      ["scheduler_candidate_unprocessable", {
+        trace_id: expect.any(String), lane: "due", error_class: "eval_error",
+      }],
+      ["generation_threw", {
+        trace_id: expect.any(String), failure_class: "execution_error", error_class: "eval_error",
+      }],
+    ]);
+    expect(JSON.stringify(error.mock.calls)).not.toContain(SENTINEL);
+  });
+
   it("logs Daily validation codes without candidate text or extra failure fields", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     safeLog({

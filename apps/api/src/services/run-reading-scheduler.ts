@@ -15,11 +15,7 @@ import {
   seedUserNextDueAt,
 } from "../db/reading-scheduler.js";
 import { resumePausedV2AfterRollout } from "../db/generation.js";
-import {
-  isAutomaticReplacementFailure,
-  isGenerationFailureCode,
-  type GenerationReplacementReason,
-} from "./generation-failures.js";
+import { automaticReplacementReason } from "./generation-failures.js";
 import {
   dispatch,
   enqueueConstrainedReading,
@@ -34,13 +30,14 @@ import {
 import { resolvePublisherConfiguration } from "./reading-publisher.js";
 import { selectReadingScheduleTarget } from "./reading-schedule.js";
 import { DEFAULT_READING_SCHEDULE_POLICY } from "./reading-schedule.js";
+import { safeExceptionClass, safeLog, type ReadingSchedulerLane } from "./safe-log.js";
 
 export interface SchedulerSummary {
   status: "disabled" | "completed";
   usersExamined: number;
   batchLimit: number;
   repairQuotaExhausted: boolean;
-  /** Candidates whose row could not be processed. One bad row, not an outage. */
+  /** Candidates whose processing threw; repeated skips can indicate an outage. */
   skippedUnprocessable: number;
   repair: {
     failedReplacements: number;
@@ -99,17 +96,23 @@ function emptySummary(status: SchedulerSummary["status"], batchLimit = 100): Sch
  * and the null-seed lane entirely, on every invocation, permanently - because
  * nothing ever advanced the cursor that selected it.
  *
- * Deliberately silent about which row: the candidate carries a user id and this
- * runs outside a request, so there is no safe place to put it.
+ * Log only the closed lane and exception category. The candidate's user id,
+ * raw exception, and any private data embedded in its message stay out of logs.
  */
 async function perCandidate(
   summary: SchedulerSummary,
+  lane: ReadingSchedulerLane,
   body: () => Promise<void>,
 ): Promise<void> {
   try {
     await body();
-  } catch {
+  } catch (error) {
     summary.skippedUnprocessable += 1;
+    safeLog({
+      event: "scheduler_candidate_unprocessable",
+      lane,
+      error_class: safeExceptionClass(error),
+    });
   }
 }
 
@@ -154,14 +157,10 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of failed) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "failed_replacement", async () => {
       const commandVersion = candidate.assemblyMode === "constrained_model" ? "v2" : "v1";
-      if (
-        !isGenerationFailureCode(candidate.resultClass) ||
-        !isAutomaticReplacementFailure(commandVersion, candidate.resultClass)
-      ) {
-        return;
-      }
+      const replacementReason = automaticReplacementReason(commandVersion, candidate.resultClass);
+      if (!replacementReason) return;
       if (!claimUser(candidate.userId)) return;
       const eligibility = await loadSchedulerEligibility(
         env,
@@ -179,7 +178,7 @@ export async function runReadingScheduler(
         env,
         candidate.userId,
         candidate.readingId,
-        candidate.resultClass as GenerationReplacementReason,
+        replacementReason,
         "scheduler",
         scheduledAt,
       );
@@ -196,7 +195,7 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of stale) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "stale_published", async () => {
       const eligibility = await loadSchedulerEligibility(
         env,
         candidate.userId,
@@ -259,7 +258,7 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of orphans) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "invalidated_orphan", async () => {
       const eligibility = await loadSchedulerEligibility(
         env,
         candidate.userId,
@@ -301,7 +300,7 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of expired) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "expired_lease", async () => {
       if (!claimUser(candidate.userId)) return;
       if (
         await dispatch(env, {
@@ -323,7 +322,7 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of undispatched) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "undispatched_outbox", async () => {
       if (!claimUser(candidate.userId)) return;
       if (
         await dispatch(env, {
@@ -341,7 +340,7 @@ export async function runReadingScheduler(
   // New due reservations may use only what repair left behind.
   const due = await findDueSchedulerCandidates(env, scheduledAt, remaining(), seen);
   for (const candidate of due) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "due", async () => {
       if (!claimUser(candidate.userId)) return;
       summary.due.evaluated += 1;
       const target = await selectReadingScheduleTarget(
@@ -379,7 +378,7 @@ export async function runReadingScheduler(
   // does not reserve prose during the same invocation.
   const unseeded = await findNullCursorCandidates(env, remaining(), seen);
   for (const candidate of unseeded) {
-    await perCandidate(summary, async () => {
+    await perCandidate(summary, "null_seed", async () => {
       if (!claimUser(candidate.userId)) return;
       summary.nullSeed.evaluated += 1;
       if (

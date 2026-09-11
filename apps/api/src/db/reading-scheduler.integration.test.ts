@@ -10,6 +10,7 @@ import { linkIdentity } from "./identities.js";
 import {
   D1_MAX_BOUND_PARAMETERS,
   excludedBudget,
+  findFailedSchedulerCandidates,
   findExpiredSchedulerCandidates,
   findStalePublishedCandidates,
   invalidatedOrphanDiscoverySql,
@@ -34,6 +35,7 @@ import {
 } from "../../test/helpers.js";
 import {
   enqueueConstrainedReading,
+  replaceFailedCommand,
   resolveV5TargetDate,
 } from "../services/enqueue.js";
 import { runReadingScheduler } from "../services/run-reading-scheduler.js";
@@ -356,6 +358,99 @@ describe("scheduler eligibility and cursor lifecycle", () => {
 });
 
 describe("bounded ordered repair", () => {
+  it.each(["scheduler", "first_open", "operator"] as const)(
+    "recovers execution_error through %s without exceeding the generation budget",
+    async (entry) => {
+      const account = identity(90);
+      await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+      const envValue = hybridEnv();
+      const reserved = await enqueueConstrainedReading(envValue, account.userId, {
+        entry: "scheduled",
+        reservationReason: "scheduled",
+        targetLocalDate: "2026-08-11",
+        now: SCHEDULED_AT,
+      });
+      if (!reserved.ok) throw new Error("expected initial reservation");
+      let activeJobId = reserved.jobId;
+      for (const generation of [1, 2, 3]) {
+        await env.DB.batch([
+          env.DB.prepare("UPDATE daily_readings SET status = 'failed' WHERE id = ?")
+            .bind(reserved.readingId),
+          env.DB.prepare(
+            "UPDATE jobs SET status = 'failed', result_class = 'execution_error', attempts = 4 WHERE id = ?",
+          ).bind(activeJobId),
+        ]);
+        if (entry === "scheduler") {
+          const summary = await runReadingScheduler(envValue, SCHEDULED_AT);
+          expect(summary.repair.failedReplacements).toBe(generation < 3 ? 1 : 0);
+        } else if (entry === "first_open") {
+          const result = await ensureTodayReading(envValue, account, {
+            now: SCHEDULED_AT,
+            generationMode: "v5",
+            rolloutEntry: "first_open",
+          });
+          expect(result).toMatchObject(generation < 3
+            ? { ok: true, status: "preparing" }
+            : { ok: false, reason: "reading_generation_failed" });
+        } else {
+          const result = await replaceFailedCommand(
+            envValue, account.userId, reserved.readingId,
+            "publisher_unavailable", "operator", SCHEDULED_AT,
+          );
+          expect(result).toMatchObject(generation < 3
+            ? { ok: true, readingId: reserved.readingId }
+            : { ok: false, reason: "budget_exhausted" });
+        }
+        const [reading] = await rows<{
+          status: string; command_generation: number; active_generation_job_id: string;
+        }>("SELECT status, command_generation, active_generation_job_id FROM daily_readings WHERE id = ?", reserved.readingId);
+        expect(reading).toMatchObject({
+          status: generation < 3 ? "pending" : "failed",
+          command_generation: Math.min(generation + 1, 3),
+        });
+        expect(await rows("SELECT id FROM jobs WHERE user_id = ?", account.userId))
+          .toHaveLength(Math.min(generation + 1, 3));
+        expect((await rows<{ status: string; result_class: string; attempts: number }>(
+          "SELECT status, result_class, attempts FROM jobs WHERE id = ?", activeJobId,
+        ))[0]).toEqual({ status: "failed", result_class: "execution_error", attempts: 4 });
+        if (generation < 3) {
+          expect(reading!.active_generation_job_id).not.toBe(activeJobId);
+          activeJobId = reading!.active_generation_job_id;
+          const claim = await claimJob(envValue, activeJobId);
+          expect(claim?.command).toMatchObject({
+            command_generation: generation + 1,
+            command_replacement_reason: "publisher_unavailable",
+            target_local_date: "2026-08-11",
+          });
+        }
+      }
+    },
+  );
+
+  it("logs an unprocessable due candidate without its data and continues the batch", async () => {
+    const broken = identity(91);
+    const healthy = identity(92);
+    await seedSchedulerAccount(broken);
+    await seedSchedulerAccount(healthy);
+    await env.DB.prepare("UPDATE users SET timezone = ? WHERE id = ?")
+      .bind("PRIVATE_ZONE_SENTINEL", broken.userId).run();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const summary = await runReadingScheduler(hybridEnv(), SCHEDULED_AT);
+      expect(summary.skippedUnprocessable).toBe(1);
+      expect(summary.due.reserved).toBe(1);
+      expect(error.mock.calls).toContainEqual([
+        "scheduler_candidate_unprocessable",
+        { trace_id: expect.any(String), lane: "due", error_class: "error" },
+      ]);
+      const logs = JSON.stringify(error.mock.calls);
+      expect(logs).not.toContain("PRIVATE_ZONE_SENTINEL");
+      expect(logs).not.toContain(broken.userId);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("discovers a failed generation after next_due_at already advanced and installs only g2", async () => {
     const account = identity(20);
     await seedSchedulerAccount(account, { nextDueAt: FUTURE });
@@ -1079,13 +1174,37 @@ describe("rollout and reservation convergence", () => {
 });
 
 describe("D1's bound-parameter ceiling", () => {
+  it("keeps failed-candidate discovery within 100 binds with a nearly full seen set", async () => {
+    const prepare = env.DB.prepare.bind(env.DB);
+    const bindCounts: number[] = [];
+    const boundedPrepare = vi.spyOn(env.DB, "prepare").mockImplementation((query) => {
+      const statement = prepare(query);
+      const bind = statement.bind.bind(statement);
+      vi.spyOn(statement, "bind").mockImplementation((...values) => {
+        bindCounts.push(values.length);
+        if (values.length > 100) throw new Error("D1 bound-parameter limit exceeded");
+        return bind(...values);
+      });
+      return statement;
+    });
+    try {
+      await expect(findFailedSchedulerCandidates(
+        hybridEnv(), SCHEDULED_AT, 1,
+        new Set(Array.from({ length: 99 }, (_, index) => identity(index).userId)),
+      )).resolves.toEqual([]);
+      expect(bindCounts).toEqual([100]);
+    } finally {
+      boundedPrepare.mockRestore();
+    }
+  });
+
   it("keeps every lane's exclusion list inside it", () => {
     // The platform limit is asserted nowhere else in this repository, and the
     // miniflare D1 the test pool uses does not enforce it - so a lane that
     // crossed it would pass every integration test and fail only in production,
     // out of the uncaught scheduled(), taking the due and null-seed lanes with
-    // it. The widest lane binds 12 fixed parameters.
-    for (const fixed of [1, 2, 4, 5, 12]) {
+    // it. Failed-candidate discovery is exercised against that limit above.
+    for (const fixed of [1, 2, 4, 5, 13]) {
       expect(excludedBudget(fixed) + fixed).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMETERS);
     }
     // And the cap never goes negative for a lane wider than the ceiling.

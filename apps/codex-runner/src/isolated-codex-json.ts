@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { buildCodexChildEnvironment } from "./codex-environment.js";
-import { CHATGPT_BASE_URL, DISABLED_FEATURES, PORTRAIT_CODEX_CLI_VERSION, PortraitError, inspectCli, isolatedMcpConfiguration, requireCleanHostInstructions } from "./portrait-invocation.js";
+import { CHATGPT_BASE_URL, DISABLED_FEATURES, PortraitError, inspectCli, isolatedMcpConfiguration, requireCleanHostInstructions } from "./portrait-invocation.js";
 
 export interface IsolatedCodexJsonOptions {
   codexBin: string;
@@ -58,7 +58,9 @@ export async function runIsolatedCodexJson(options: IsolatedCodexJsonOptions): P
   if (!isAbsolute(home)) throw new PortraitError("authentication_failed", true);
   await requireCleanHostInstructions(home);
   try {
-    if (await inspectCli(options.codexBin, ["--version"], env, Math.max(1, deadline - Date.now())) !== `codex-cli ${PORTRAIT_CODEX_CLI_VERSION}`
+    // Accept released CLI versions; the effective configuration and protocol checks below
+    // establish compatibility before sending any source content to a model turn.
+    if (!/^codex-cli \d+\.\d+\.\d+$/.test(await inspectCli(options.codexBin, ["--version"], env, Math.max(1, deadline - Date.now())))
       || await inspectCli(options.codexBin, ["login", "status"], env, Math.max(1, deadline - Date.now())) !== "Logged in using ChatGPT") throw new PortraitError("authentication_failed", true);
   } catch (error) {
     if (Date.now() >= deadline) throw new IsolatedCodexJsonError("timeout");

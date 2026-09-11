@@ -4,7 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { PORTRAIT_MESH_COMPILER_VERSION, type CodexPortraitMeshClaim } from "@patternlike/shared";
-import { preparePortraitImage, PORTRAIT_CODEX_CLI_VERSION } from "./portrait-invocation.js";
+import { preparePortraitImage, inspectCli } from "./portrait-invocation.js";
+import { buildCodexChildEnvironment } from "./codex-environment.js";
 import { runPortraitMeshInvocation } from "./portrait-mesh-invocation.js";
 
 /** Explicit local provider probe. Never called by the queue, test suite, or account routes. */
@@ -29,8 +30,12 @@ export async function runPortraitMeshCanary(args: string[]): Promise<number> {
     chapter_index: 0, chapter_id: "chapter-1", lease_token: randomUUID(), model: values.model!, reasoning_effort: "xhigh", prompt_version: "portrait-mesh/v1", timeout_ms: 900000,
     source_text: source, source_text_sha256: hash(source), source_image_sha256: hash(image), document_revision: "fictional-canary/v1", image_base64: prepared.image_base64, compiler_version: PORTRAIT_MESH_COMPILER_VERSION };
   const started = Date.now();
+  const codexBin = values["codex-bin"] ?? process.env.CODEX_BIN ?? "codex";
+  const version = await inspectCli(codexBin, ["--version"], buildCodexChildEnvironment(process.env));
+  const codexCliVersion = /^codex-cli (\d+\.\d+\.\d+)$/.exec(version)?.[1];
+  if (!codexCliVersion) throw new Error("Codex CLI version is unavailable");
   let compiledReceipt: object | null = null;
-  const outcome = await runPortraitMeshInvocation({ claim, codexBin: values["codex-bin"] ?? process.env.CODEX_BIN ?? "codex",
+  const outcome = await runPortraitMeshInvocation({ claim, codexBin,
     onAuthored: async (program, providerRequestId) => writeJson("authored-program.json", { program, provider_request_id: providerRequestId }),
     onInspection: async ({ program, compiled, previews }) => {
       await writeJson("program.json", program);
@@ -42,7 +47,7 @@ export async function runPortraitMeshCanary(args: string[]): Promise<number> {
     onVisualCheck: async (audit, providerRequestId) => writeJson("visual-check.json", { audit, provider_request_id: providerRequestId }),
   });
   const receipt = { schema_version: "portrait-mesh-canary/v1", fictional: true, automatic_authoring: true, manual_model_edits: false,
-    codex_cli_version: PORTRAIT_CODEX_CLI_VERSION, configured_model: claim.model, reasoning_effort: claim.reasoning_effort,
+    codex_cli_version: codexCliVersion, configured_model: claim.model, reasoning_effort: claim.reasoning_effort,
     source_text_sha256: claim.source_text_sha256, source_image_sha256: claim.source_image_sha256, document_revision: claim.document_revision,
     elapsed_ms: Date.now() - started, compiled: compiledReceipt,
     result: outcome.ok ? { ok: true, audit: outcome.completion.audit, provider_request_id: outcome.completion.provider_request_id, audit_request_id: outcome.completion.audit_request_id }

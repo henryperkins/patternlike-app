@@ -5,6 +5,7 @@ import {
   MAX_JOB_ATTEMPTS,
   RETRY_DELAY_SECONDS,
   V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+  automaticReplacementReason,
   isAutomaticReplacementFailure,
   isGenerationFailureCode,
   isGenerationReplacementReason,
@@ -15,6 +16,23 @@ import {
 } from "./generation-failures.js";
 
 describe("generation failure policy", () => {
+  it("maps operational crashes to V2 recovery without changing frozen command vocabularies", () => {
+    expect(isGenerationFailureCode("execution_error")).toBe(false);
+    expect(isGenerationReplacementReason("execution_error")).toBe(false);
+    expect(isV1ReplacementReason("execution_error")).toBe(false);
+    expect(isV5ReplacementReason("execution_error")).toBe(false);
+    for (const version of ["v1", "v2"] as const) {
+      expect(isAutomaticReplacementFailure(version, "execution_error")).toBe(version === "v2");
+      expect(automaticReplacementReason(version, "execution_error"))
+        .toBe(version === "v2" ? "publisher_unavailable" : null);
+      expect(automaticReplacementReason(version, "payload_undecryptable")).toBeNull();
+      expect(automaticReplacementReason(version, "unknown_failure")).toBeNull();
+      expect(automaticReplacementReason(version, "publisher_auth_failed")).toBeNull();
+    }
+    expect(isGenerationFailureCode("payload_undecryptable")).toBe(false);
+    expect(isGenerationReplacementReason("payload_undecryptable")).toBe(false);
+  });
+
   it.each([
     ["v1", "calc_unavailable", 1, "retry_60s"],
     ["v1", "calc_unavailable", 3, "retry_60s"],

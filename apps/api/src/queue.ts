@@ -28,7 +28,7 @@ import {
 } from "./services/generation-failures.js";
 import { isCommandV2 } from "./services/generation-command-v2.js";
 import { readReadingV5Rollout } from "./services/reading-rollout.js";
-import { safeLog } from "./services/safe-log.js";
+import { safeExceptionClass, safeLog } from "./services/safe-log.js";
 import {
   PRIVACY_RETRY_DELAY_SECONDS,
   isPrivacyMessage,
@@ -204,8 +204,12 @@ export async function queue(
           // duplicate and terminal deliveries are also safe to acknowledge.
           message.ack();
         }
-      } catch {
-        safeLog({ event: "generation_threw", failure_class: "execution_error" });
+      } catch (error) {
+        safeLog({
+          event: "generation_threw",
+          failure_class: "execution_error",
+          error_class: safeExceptionClass(error),
+        });
         message.retry({ delaySeconds: LEASE_RETRY_DELAY_SECONDS });
       }
     }
@@ -435,6 +439,7 @@ export async function queue(
       safeLog({
         event: "generation_threw",
         failure_class: loadFailure ? "payload_undecryptable" : "execution_error",
+        error_class: safeExceptionClass(err),
       });
       if (claim) {
         await retryOrFail(

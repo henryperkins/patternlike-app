@@ -28,6 +28,14 @@ test("isolated JSON turns preserve multimodal input/schema and enforce ChatGPT-o
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
 
+test("accepts a newer Codex CLI when the runtime isolation contract passes", async () => {
+  const f = await jsonFixture("newversion");
+  try {
+    const out = await runIsolatedCodexJson(f.options);
+    assert.deepEqual(out.value, { answer: "complete" });
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
 for (const mode of ["tooloverride", "missinglayers", "toolorigin", "version", "auth", "wronghome", "notify", "managedinstructions", "imageenabled", "mcpavailable", "sandbox", "approvalpolicy", "approval", "tool", "imagegen", "malformed", "oversized", "missing", "duplicate", "wrongturn", "failed", "timeout"]) {
   test(`isolated JSON rejects ${mode} without exposing provider content`, async () => {
     const f = await jsonFixture(mode);
