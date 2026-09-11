@@ -300,6 +300,13 @@ describe("Codex provider durable jobs", () => {
         new Date("2026-08-24T00:01:00.000Z"),
       ),
     ).toEqual({ status: "completed" });
+    const acceptedAt = await env.DB.prepare(
+      "SELECT completed_at FROM codex_provider_jobs WHERE id = ?",
+    ).bind(claim.job.id).first();
+    expect(acceptedAt).toEqual({ completed_at: "2026-08-24T00:01:00.000Z" });
+    expect(await env.DB.prepare(
+      "SELECT started_at FROM runtime_health_capture WHERE work_class = 'text'",
+    ).first()).toBeNull();
     expect(
       await completeCodexProviderJob(
         env,
@@ -307,6 +314,9 @@ describe("Codex provider durable jobs", () => {
         new Date("2026-08-24T00:02:00.000Z"),
       ),
     ).toEqual({ status: "adopted" });
+    expect(await env.DB.prepare(
+      "SELECT completed_at FROM codex_provider_jobs WHERE id = ?",
+    ).bind(claim.job.id).first()).toEqual(acceptedAt);
     expect(
       await completeCodexProviderJob(
         env,

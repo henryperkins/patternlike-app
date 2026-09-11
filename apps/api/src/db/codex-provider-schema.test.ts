@@ -267,6 +267,7 @@ describe("the codex_provider_jobs coordinate vocabulary", () => {
       "idx_codex_provider_jobs_owner",
       "idx_codex_provider_jobs_user",
       "idx_codex_provider_response_uploads_created",
+      "idx_runtime_text_state_time",
     ]);
     expect(byName.get("idx_codex_provider_jobs_claimable")).toContain(
       "(available_at, lease_expires_at, created_at, id) WHERE status IN ('pending', 'leased')",
@@ -279,6 +280,9 @@ describe("the codex_provider_jobs coordinate vocabulary", () => {
     );
     expect(byName.get("idx_codex_provider_response_uploads_created")).toContain(
       "(created_at, job_id)",
+    );
+    expect(byName.get("idx_runtime_text_state_time")).toContain(
+      "(status,julianday(completed_at))",
     );
   });
 

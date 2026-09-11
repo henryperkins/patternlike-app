@@ -17,11 +17,9 @@ WHEN NEW.status='complete' AND OLD.status!='complete' AND NEW.completed_at IS NO
 BEGIN
   INSERT OR IGNORE INTO runtime_health_capture VALUES('mesh',NEW.completed_at);
 END;
-CREATE TRIGGER runtime_health_text_capture AFTER UPDATE OF status ON codex_provider_jobs
-WHEN NEW.status='completed' AND OLD.status!='completed' AND NEW.completed_at IS NOT NULL
-BEGIN
-  INSERT OR IGNORE INTO runtime_health_capture VALUES('text',NEW.completed_at);
-END;
+-- Text already has successful completion timestamps. Start its coverage at the
+-- first metric sample: a trigger would change D1's affected-row count and the
+-- incumbent Worker's first-completion result before the compatible deployment.
 
 CREATE INDEX idx_runtime_text_state_time ON codex_provider_jobs(status,julianday(completed_at));
 CREATE INDEX idx_runtime_portrait_state_time ON pattern_portrait_jobs(status,julianday(completed_at));

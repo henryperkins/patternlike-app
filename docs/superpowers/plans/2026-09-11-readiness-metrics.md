@@ -86,4 +86,4 @@
 - [ ] Commit focused changes, run the full existing local gate on the frozen final head, and paste its exact summary in the PR.
 - [ ] Verify migration compatibility and apply 0032 before merge/deployment. Observe actual build, served commit, protected aggregate-route authentication, and retained default-off configuration. Preserve earlier worktrees/stash.
 
-The final two release steps are recorded in the integration PR after this plan is frozen for the local merge gate. They are not claimed complete by this pre-gate document.
+The final two release steps are recorded in [PR 55](https://github.com/henryperkins/patternlike-app/pull/55) after this plan is frozen for the local merge gate. They are not claimed complete by this pre-gate document.

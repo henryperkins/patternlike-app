@@ -31,12 +31,26 @@ async function seedText(count: number, createdAt = "2026-09-09T12:00:00.000Z") {
     .bind(count,`sha256:${"1".repeat(64)}`,`sha256:${"2".repeat(64)}`,`sha256:${"3".repeat(64)}`,createdAt,createdAt,createdAt).run();
 }
 async function succeedText(completedAt: string, ownerId: string | null = null) {
-  await env.DB.prepare(`UPDATE codex_provider_jobs SET status='completed', lease_token_hash=?,lease_expires_at=?,
+  return env.DB.prepare(`UPDATE codex_provider_jobs SET status='completed', lease_token_hash=?,lease_expires_at=?,
     response_hash=?,response_object_key=request_object_key||'/response',response_envelope_hash=?,response_ciphertext_hash=?,
     response_key_id='response-synthetic',response_nonce=request_nonce,response_byte_length=1,provider_request_id='synthetic',input_tokens=0,output_tokens=0,completed_at=?
     WHERE (? IS NULL OR owner_id=?)`)
     .bind(`sha256:${"4".repeat(64)}`,now.toISOString(),`sha256:${"5".repeat(64)}`,`sha256:${"6".repeat(64)}`,`sha256:${"7".repeat(64)}`,completedAt,ownerId,ownerId).run();
 }
+it("starts text coverage at the first sample without changing legacy completion write counts", async () => {
+  await seedText(1, "2026-09-11T11:59:58.000Z");
+  const completion = await succeedText("2026-09-11T11:59:59.500Z");
+  // The incumbent Worker uses this count to distinguish first acceptance from replay.
+  expect(completion.meta.changes).toBe(1);
+  expect(await env.DB.prepare("SELECT started_at FROM runtime_health_capture WHERE work_class='text'").first()).toBeNull();
+  const result = await sampleRuntimeHealth(env, now);
+  expect(result.work_classes[0].completion_latency).toMatchObject({
+    successful_count: 1,
+    p50_ms: 1500,
+    measurement_started_at: "2026-09-11T12:00:00.000Z",
+    coverage: "partial",
+  });
+});
 it("refuses partial counts beyond the materialized ceiling while preserving other classes",async()=>{
   await seedText(10_001);
   const result = await sampleRuntimeHealth(env,now);
