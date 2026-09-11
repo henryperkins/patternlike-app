@@ -1542,7 +1542,8 @@ describe("web application shell", () => {
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Today" })[0]);
     await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
-    expect(screen.queryByRole("heading", { name: /Did this meet you/i }))
+    // Response options settle independently after the reading renders.
+    expect(await screen.findByRole("heading", { name: /Did this meet you/i }))
       .toBeInTheDocument();
 
     // Opened, because the drawer's contents are the part with the most markup
