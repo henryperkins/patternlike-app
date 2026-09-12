@@ -1,0 +1,7 @@
+# Run artifacts contain full prompts and model outputs (fictional inputs, real
+# prose). They stay local by default; retain a run deliberately under output/.
+results/
+# promptfoo's disk cache and local results database, relocated here by
+# scripts/promptfoo.mjs so nothing lands in ~/.promptfoo.
+.cache/
+.promptfoo/

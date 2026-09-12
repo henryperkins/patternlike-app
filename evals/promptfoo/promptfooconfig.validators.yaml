@@ -1,0 +1,21 @@
+# Validators lane: the authored corpus candidates through the echo provider,
+# checked against the corpus labels. No model is called; this runs offline in
+# seconds and is the smoke test for the promptfoo wiring itself.
+description: "Daily validator — authored corpus candidates via echo, checked against corpus expectations (no model calls)"
+
+prompts:
+  - id: file://prompts/authored-candidate.mjs:authoredCandidate
+    label: authored-candidate
+
+providers:
+  # Returns the rendered prompt as the output.
+  - id: echo
+    label: echo
+
+tests: file://tests/daily-validator-cases.mjs
+
+defaultTest:
+  assert:
+    - type: javascript
+      value: file://assertions/expected-verdict.mjs
+      metric: expected_verdict

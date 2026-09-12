@@ -24,3 +24,6 @@ __pycache__
 spec-bundle
 *.zip
 docs
+# Operator-side promptfoo lanes: never part of an image, and their local
+# results database holds full prompts and model outputs.
+evals

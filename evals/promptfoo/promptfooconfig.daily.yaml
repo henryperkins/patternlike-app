@@ -1,0 +1,41 @@
+# Daily lane: fresh Codex output for the six synthetic corpus profiles, scored
+# by the production validator. Every provider call spends a real xhigh turn.
+#
+# Run through scripts/promptfoo.mjs (npm run eval:daily), which adds
+# --no-cache and -j 1 and relocates promptfoo's cache and database into this
+# directory. See README.md for the evidence boundary.
+description: "Daily reading — fresh output through the isolated Codex transport, scored by validateReadingCandidate"
+
+prompts:
+  # The claim for vars.profile, built by the repository's own fresh-evaluation
+  # plan: compiled pin, real packet, real schema. Not a template.
+  - id: file://prompts/daily-claim.mjs:buildDailyClaim
+    label: daily-claim (compiled pin)
+
+providers:
+  - id: file://providers/codex-isolated.mjs
+    label: codex-isolated
+    # Uncomment to pin the binary instead of using CODEX_BIN or PATH:
+    # config:
+    #   codexBin: /absolute/path/to/codex
+
+tests: file://tests/daily-profiles.mjs
+
+defaultTest:
+  assert:
+    # Layer 1: structural, through the Worker's precompiled validator for the
+    # frozen m5 output schema. The schema is sent to the provider verbatim, so
+    # a failure here is a transport or model defect. (promptfoo's own is-json
+    # cannot read the contract's draft 2020-12 metaschema.)
+    - type: javascript
+      value: file://assertions/daily-output-schema.mjs
+      metric: schema
+    # Layer 2: the production hard gate, with qualitative findings as named
+    # scores rather than pass criteria.
+    - type: javascript
+      value: file://assertions/daily-hard-gate.mjs
+      metric: hard_gate
+
+evaluateOptions:
+  # One claim at a time against one ChatGPT login; the runner does the same.
+  maxConcurrency: 1
