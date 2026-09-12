@@ -738,9 +738,37 @@ export function buildCorrectionDocument(
     semantic?: readonly PatternSemanticFindingInput[];
   },
   attempt: number,
+  previous?: PatternCorrectionDocument,
 ): PatternCorrectionDocument {
   const items: PatternCorrectionItem[] = [];
   const authorizedOntologyRuleIds = citedRuleIds(plan);
+
+  if (previous) {
+    if (previous.preserve.plan_hash !== plan.plan_hash) {
+      throw new Error("correction history plan mismatch");
+    }
+    if (previous.schema_version !== "0.7.0" || !Number.isInteger(previous.attempt) ||
+      previous.attempt < 1 || previous.attempt >= attempt) {
+      throw new Error("correction history attempt mismatch");
+    }
+    const assignedAliases = new Set([
+      ...plan.chapters.flatMap((chapter) => chapter.feature_aliases),
+      ...plan.additional_signatures.flatMap((signature) => signature.feature_aliases),
+    ]);
+    // Reproject the retained document: neither extra fields nor prose from an
+    // older artifact may cross the provider boundary on the next rewrite.
+    for (const item of previous.items) {
+      if (!CORRECTION_CODE_SHAPE.test(item.code) ||
+        (item.origin !== "deterministic" && item.origin !== "semantic")) continue;
+      items.push({
+        code: item.code,
+        origin: item.origin,
+        target_key: safeKey(item.target_key),
+        feature_aliases: safeAliases(item.feature_aliases).filter((alias) => assignedAliases.has(alias)),
+        ontology_rule_ids: item.ontology_rule_ids.filter((id) => authorizedOntologyRuleIds.has(id)),
+      });
+    }
+  }
 
   for (const failure of rejection.deterministic ?? []) {
     if (!CORRECTION_CODE_SHAPE.test(failure.code)) continue;
@@ -769,10 +797,22 @@ export function buildCorrectionDocument(
     });
   }
 
+  const seen = new Set<string>();
+  const distinctItems = items.filter((item) => {
+    const identity = JSON.stringify({
+      ...item,
+      feature_aliases: [...new Set(item.feature_aliases)].sort(),
+      ontology_rule_ids: [...new Set(item.ontology_rule_ids)].sort(),
+    });
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+
   return {
     schema_version: "0.7.0",
     attempt,
-    items,
+    items: distinctItems,
     preserve: {
       plan_hash: plan.plan_hash,
       chapter_keys: plan.chapters.map((chapter) => chapter.chapter_key),

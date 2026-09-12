@@ -39,7 +39,7 @@ function pin(): PatternPublisherPin {
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",
-    writer_prompt_version: "1.0.3",
+    writer_prompt_version: "1.0.5",
     writer_max_output_tokens: 8000,
     verifier_model: "gpt-5.6-sol",
     verifier_reasoning: "high",
@@ -413,7 +413,7 @@ describe("Pattern prompt module", () => {
   describe("prompt versions", () => {
     it("re-exports the compiled versions the configuration pins against", () => {
       expect(PATTERN_PLANNER_PROMPT_VERSION).toBe("1.0.1");
-      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.3");
+      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.5");
       expect(PATTERN_VERIFIER_PROMPT_VERSION).toBe("1.0.0-verifier");
     });
 

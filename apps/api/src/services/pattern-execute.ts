@@ -753,6 +753,23 @@ export async function getArtifactAt<T>(
   return { value, plaintextHash };
 }
 
+/** A provider/shape retry shares its writing stage and may have no new correction. */
+async function getWriterCorrectionAt(
+  env: Env,
+  identity: UserIdentity,
+  generationId: string,
+  writerStageGeneration: number,
+  writerAttempt: number,
+): Promise<{ value: PatternCorrectionDocument } | null> {
+  for (let attempt = writerAttempt; attempt > 0; attempt -= 1) {
+    const correction = await getArtifactAt<PatternCorrectionDocument>(
+      env, identity, generationId, "correction_document", writerStageGeneration, attempt,
+    );
+    if (correction) return correction;
+  }
+  return null;
+}
+
 /**
  * Decrypt one administrator-selected artifact identity.
  *
@@ -1367,18 +1384,9 @@ export async function executePatternJob(
         // most recent correction at this writing coordinate instead of
         // silently falling back to the base prompt. The command ceiling is at
         // most three, so this bounded reverse probe reads at most two objects.
-        let correction: { value: PatternCorrectionDocument } | null = null;
-        for (let correctionAttempt = coordinate.attempt; correctionAttempt > 0; correctionAttempt -= 1) {
-          correction = await getArtifactAt<PatternCorrectionDocument>(
-            env,
-            identity,
-            coordinate.generationId,
-            "correction_document",
-            coordinate.stageGeneration,
-            correctionAttempt,
-          );
-          if (correction) break;
-        }
+        const correction = await getWriterCorrectionAt(
+          env, identity, coordinate.generationId, coordinate.stageGeneration, coordinate.attempt,
+        );
         const input = buildWriterInput(
           plan,
           selected.packet,
@@ -1435,6 +1443,9 @@ export async function executePatternJob(
             plan,
             { deterministic: candidate.failures },
             planned.next.writer_attempts,
+            (await getWriterCorrectionAt(
+              env, identity, coordinate.generationId, coordinate.stageGeneration, coordinate.attempt,
+            ))?.value,
           );
           await putArtifact(
             env,
@@ -1616,6 +1627,11 @@ export async function executePatternJob(
             plan,
             { semantic: verdict.findings },
             planned.next.writer_attempts,
+            // Verification advances the stage once; provider retries stay there.
+            (await getWriterCorrectionAt(
+              env, identity, coordinate.generationId, coordinate.stageGeneration - 1,
+              claimed.job.writer_attempts,
+            ))?.value,
           );
           await putArtifact(
             env,
@@ -1693,7 +1709,10 @@ export async function executePatternJob(
               code: failure.code,
               message: failure.targetKey ?? "",
             })),
-          }, planned.next.writer_attempts);
+          }, planned.next.writer_attempts, (await getWriterCorrectionAt(
+            env, identity, coordinate.generationId, coordinate.stageGeneration - 1,
+            claimed.job.writer_attempts,
+          ))?.value);
           await putArtifact(env, identity, claimed.job, "correction_document", correction,
             expiresAt, planned.next.writer_attempts, planned.next.stage_generation);
           if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, transition))) {
