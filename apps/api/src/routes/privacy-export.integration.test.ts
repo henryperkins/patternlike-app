@@ -767,6 +767,11 @@ describe("account export", () => {
       include_journal: false,
       include_patterns: false,
     });
+    // Processed on the live clock. The download route compares the export's
+    // seven-day expiry against Date.now(), so a fixed processing instant makes
+    // this test start failing exactly one week after it was written.
+    const processedAt = new Date();
+    const acceptedAt = new Date(processedAt.getTime() - 60 * 60 * 1000).toISOString();
     await replaceExportCommand(accepted.body, {
       command_version: 1,
       job_type: "export_account",
@@ -777,14 +782,14 @@ describe("account export", () => {
         include_patterns: false,
       },
       accepted_response: accepted.body,
-      accepted_at: "2026-09-06T08:00:00.000Z",
+      accepted_at: acceptedAt,
     });
 
     await expect(processExportMessage(env, {
       kind: "privacy",
       job_id: accepted.body.job_id,
       job_type: "export_account",
-    }, new Date("2026-09-06T09:00:00.000Z"))).resolves.toBe("ack");
+    }, processedAt)).resolves.toBe("ack");
     const download = await SELF.fetch(
       `http://api.test/v1/exports/${accepted.body.resource_id}/download`,
       { headers: { "x-user-id": USER_A } },

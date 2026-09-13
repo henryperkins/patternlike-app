@@ -1,5 +1,9 @@
 {
-  "profile": "patternlike.assembly-id.v1",
+  "profiles": [
+    "patternlike.assembly-id.v1",
+    "patternlike.assembly-id.v2",
+    "patternlike.cycle-id.v1"
+  ],
   "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
   "note": "canonical is the exact UTF-8 byte string; full_digest is SHA-256 of those bytes; rendered_id is the prefix plus the first 32 lowercase hex characters. An implementation that produces different bytes for any input here is not interoperable, even if its digest happens to round-trip.",
   "vectors": [
@@ -254,6 +258,83 @@
       "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[],\"domain_preference\":null,\"effective_accuracy\":\"unknown\",\"facts\":[],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v1\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"unknown\",\"qualified_features\":[],\"suppressed_features\":[{\"feature_class\":\"angle_transits\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"},{\"feature_class\":\"angles\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"},{\"feature_class\":\"houses\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"},{\"feature_class\":\"moon_time_sensitive\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"}],\"window_plus_minus_minutes\":null}}",
       "full_digest": "43b15b9a183bd9b9eb7b51ed362488bbb557d566435df116188a6da650ba0c81",
       "rendered_id": "asm_43b15b9a183bd9b9eb7b51ed362488bb"
+    },
+    {
+      "name": "assembly-identity-daily-v2",
+      "description": "The same day under patternlike.assembly-id.v2: every fact carries its envelope bounds and every exact-pass instant, because the timing paragraph and the DER-02 ranking read them and the cyc_ id deliberately does not bind them. Must differ from assembly-identity-daily: a new profile is a new preimage, never a reinterpretation of the same bytes.",
+      "input": {
+        "identity_profile": "patternlike.assembly-id.v2",
+        "schema_version": "0.3.0",
+        "assembly_policy_id": "daily-reading-deterministic",
+        "assembly_policy_version": "1.4.0",
+        "output_schema": "daily-reading-v3",
+        "local_date": "2026-07-30",
+        "target_timezone": "America/Los_Angeles",
+        "generation_anchor": "2026-07-30T09:00:00Z",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "effective_accuracy": "exact",
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "facts": [
+          {
+            "id": "cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "venus",
+            "target": "moon",
+            "aspect": "trine",
+            "phase": "peak",
+            "orb_deg": 1.1,
+            "first_exact_at": "2026-07-30T22:40:00Z",
+            "pass_count": 1,
+            "start_at": "2026-07-29T18:10:00Z",
+            "end_at": "2026-08-01T03:05:00Z",
+            "pass_exact_ats": [
+              "2026-07-30T22:40:00Z"
+            ]
+          },
+          {
+            "id": "cyc_abababababababababababababababab",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "saturn",
+            "target": "sun",
+            "aspect": "square",
+            "phase": "building",
+            "orb_deg": 0.42,
+            "first_exact_at": "2026-08-02T14:11:07Z",
+            "pass_count": 3,
+            "start_at": "2026-07-19T05:22:10Z",
+            "end_at": "2027-01-26T18:44:02Z",
+            "pass_exact_ats": [
+              "2026-08-02T14:11:07Z",
+              "2026-10-19T03:52:44Z",
+              "2027-01-11T21:07:19Z"
+            ]
+          }
+        ],
+        "release_version": "release-12",
+        "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+        "context": [
+          {
+            "signal_id": "sig_01JAMPLESIGNAL000001",
+            "source_id": "USR-03",
+            "allowed_use": "life_domain_selection",
+            "evidence_lane": "user_and_context",
+            "normalized_hash": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e"
+          }
+        ],
+        "locale": "en-US",
+        "domain_preference": "work",
+        "revision": 1
+      },
+      "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[{\"allowed_use\":\"life_domain_selection\",\"evidence_lane\":\"user_and_context\",\"normalized_hash\":\"5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e\",\"signal_id\":\"sig_01JAMPLESIGNAL000001\",\"source_id\":\"USR-03\"}],\"domain_preference\":\"work\",\"effective_accuracy\":\"exact\",\"facts\":[{\"aspect\":\"trine\",\"body\":\"venus\",\"end_at\":\"2026-08-01T03:05:00Z\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-07-30T22:40:00Z\",\"id\":\"cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\",\"orb_deg\":1.1,\"pass_count\":1,\"pass_exact_ats\":[\"2026-07-30T22:40:00Z\"],\"phase\":\"peak\",\"start_at\":\"2026-07-29T18:10:00Z\",\"target\":\"moon\",\"technique\":\"transit\"},{\"aspect\":\"square\",\"body\":\"saturn\",\"end_at\":\"2027-01-26T18:44:02Z\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-08-02T14:11:07Z\",\"id\":\"cyc_abababababababababababababababab\",\"orb_deg\":0.42,\"pass_count\":3,\"pass_exact_ats\":[\"2026-08-02T14:11:07Z\",\"2026-10-19T03:52:44Z\",\"2027-01-11T21:07:19Z\"],\"phase\":\"building\",\"start_at\":\"2026-07-19T05:22:10Z\",\"target\":\"sun\",\"technique\":\"transit\"}],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v2\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"exact\",\"qualified_features\":[],\"suppressed_features\":[],\"window_plus_minus_minutes\":null}}",
+      "full_digest": "8a732e79b54ee90950d7b187dc3c74e880a5c50e53f0d521a57029be3a5f3541",
+      "rendered_id": "asm_8a732e79b54ee90950d7b187dc3c74e8"
     },
     {
       "name": "cycle-identity-transit",

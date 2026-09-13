@@ -126,6 +126,11 @@ const V5_REPLACEMENT_REASONS: ReadonlySet<V5ReplacementReason> = new Set([
 export const V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
   "calc_unavailable",
   "release_unreadable",
+  // A command frozen under a retired assembly policy can never execute here:
+  // waiting does not make an old pin implementable, and executing it would
+  // publish 1.1.0 prose under a 1.0.0 identity. Replaceable by the scheduler,
+  // never retried in place (`queueDisposition` keeps it terminal).
+  "policy_unsupported",
 ] as const satisfies readonly V1FailureCode[];
 
 export const V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
@@ -140,6 +145,9 @@ export const V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
   // under Codex. It is deliberately absent from `queueDisposition`'s retry
   // branches for exactly that reason.
   "publisher_superseded",
+  // Same reasoning as V1, for the constrained-model selection policy: a command
+  // pinned to a retired selection_policy_version is superseded, not unlucky.
+  "policy_unsupported",
 ] as const satisfies readonly (V5FailureCode | "execution_error")[];
 
 const V1_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V1FailureCode> = new Set(
@@ -208,10 +216,24 @@ export function isAutomaticReplacementFailure(
 }
 
 /**
- * Operational crashes are not provider result codes. Recover V2 execution
- * outages through the existing publisher-availability replacement reason so
- * frozen command contracts stay unchanged. The predecessor retains its exact
- * execution_error result; only the new command records this recovery decision.
+ * Map a replaceable failure onto the reason the NEW command records.
+ *
+ * Two codes are not themselves replacement reasons and are mapped onto existing
+ * ones so the frozen command contracts stay unchanged:
+ *
+ *  - `execution_error` is an operational crash, not a provider result, and
+ *    recovers through the publisher-availability reason.
+ *  - `policy_unsupported` means the frozen pin names an engine policy this
+ *    deployment retired. V1 has a reason for exactly that (`policy_upgraded`).
+ *    V5 has no policy reason, so it takes `publisher_superseded`, which already
+ *    carries the same meaning: replaceable by the scheduler, never retried in
+ *    place, because nothing about waiting makes an old pin executable here.
+ *
+ * In both cases the predecessor retains its exact failure record; only the new
+ * command records the recovery decision. Replacement stays bounded by
+ * MAX_COMMAND_GENERATION and the current-or-preceding-day window, and the
+ * replacement is frozen under current configuration, so it cannot re-fail the
+ * same way.
  */
 export function automaticReplacementReason(
   commandVersion: "v1" | "v2",
@@ -219,7 +241,9 @@ export function automaticReplacementReason(
 ): GenerationReplacementReason | null {
   if (code !== "execution_error" && !isGenerationFailureCode(code)) return null;
   if (!isAutomaticReplacementFailure(commandVersion, code)) return null;
-  return code === "execution_error"
-    ? "publisher_unavailable"
-    : code as GenerationReplacementReason;
+  if (code === "execution_error") return "publisher_unavailable";
+  if (code === "policy_unsupported") {
+    return commandVersion === "v1" ? "policy_upgraded" : "publisher_superseded";
+  }
+  return code as GenerationReplacementReason;
 }

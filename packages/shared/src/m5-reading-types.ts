@@ -233,7 +233,7 @@ export interface ReadingGenerationRequest {
   birth_time_accuracy: BirthTimeAccuracy;
   suppressed_features: SuppressedFeatureClass[];
   domain_preference?: LifeDomain | null;
-  /** Ordered by (lane_rank, fact_id). Never empty: the daily-sky layer guarantees an anchor and a phase. */
+  /** Ordered by lane_rank, then by DER-02 ranking score within the lane. Never empty: the daily-sky layer guarantees an anchor and a phase. */
   facts: RequestFact[];
   context: RequestContext[];
   prior_readings: PriorReadingExcerpt[];

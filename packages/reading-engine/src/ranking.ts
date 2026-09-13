@@ -93,13 +93,113 @@ function round(value: number): number {
 }
 
 /**
- * Closeness of the calculated orb to exact, normalized against the configured
- * orb for that contact. 1 at exact, 0 at the orb boundary.
+ * No scale on the fact means no exactness claim. The middle of the range, not
+ * the top of it: returning 1 would hand the table's largest weight to every
+ * fact whose exactness is simply unknown.
  */
-function exactness(fact: AssemblyFactInput): number {
-  if (fact.orb_deg === null || fact.orb_deg <= 0) return 1;
-  const configured = 3; // configured orb ceiling for launch transit policy
-  return Math.max(0, Math.min(1, 1 - fact.orb_deg / configured));
+const NEUTRAL_EXACTNESS = 0.5;
+
+/**
+ * Closeness to exact, normalized against the contact's own scale.
+ *
+ * Exactness is a ratio, so it needs a denominator, and only some facts carry
+ * one:
+ *
+ *  - A cycle carries an envelope. Its `orb_deg` is the configured envelope
+ *    width rather than today's separation, and the measured angular separation
+ *    never reaches ranking, so the measure is temporal: distance from the
+ *    evaluation instant to the nearest exact pass, normalized against the room
+ *    that pass has on the side the instant actually falls — up to the next
+ *    boundary in that direction, which is the neighbouring pass when there is
+ *    one and the envelope edge otherwise. 1 at every pass, 0 at orb entry and
+ *    at orb exit — for a pass anywhere in the envelope, not only one sitting at
+ *    its centre — and the neutral 0.5 midway between two passes of one
+ *    envelope, never lower inside the passes. Normalizing against half the
+ *    envelope instead would put the zero at `pass ± half`, which for an
+ *    off-centre pass is partway across the envelope: near-maximum at orb entry
+ *    on the short side, and pinned flat at 0 across the long one. Normalizing
+ *    against the envelope edge even when a neighbouring pass sits in between
+ *    would change the denominator the instant the nearest pass changes hands,
+ *    so the score would jump on a day nothing about the contact changed.
+ *  - A natal aspect carries a measured orb but no ceiling to divide it by. The
+ *    ceiling is the calculation contract's orb policy (`defaults`/`by_body`,
+ *    where conjunction and opposition are wider than sextile), which does not
+ *    cross into this package; `orb_deg` is kept on the fact because it is the
+ *    honest measurement, not because ranking can consume it. Inventing a scale
+ *    is what the old hardcoded `configured = 3` did, and it sat below every
+ *    real ceiling, so ordinary orbs scored as though they were near-boundary.
+ *  - Daily-sky facts have no orb concept at all.
+ *
+ * The last two score NEUTRAL_EXACTNESS.
+ *
+ * Value and reason are returned together so the recorded factor cannot
+ * describe a branch the arithmetic did not take.
+ */
+function exactness(
+  fact: AssemblyFactInput,
+  at: string | null,
+): { value: number; reason: string } {
+  if (fact.orb_deg !== null && fact.orb_deg <= 0) {
+    return { value: 1, reason: "orb_zero_is_exact" };
+  }
+  if (fact.orb_deg === null) {
+    return { value: NEUTRAL_EXACTNESS, reason: "no_orb_scale_treated_as_neutral" };
+  }
+  if (at === null || fact.start_at === null || fact.end_at === null) {
+    return { value: NEUTRAL_EXACTNESS, reason: "no_orb_ceiling_treated_as_neutral" };
+  }
+  const passes = fact.pass_exact_ats?.length
+    ? fact.pass_exact_ats
+    : fact.first_exact_at
+      ? [fact.first_exact_at]
+      : [];
+  if (passes.length === 0) {
+    return { value: NEUTRAL_EXACTNESS, reason: "envelope_without_pass_treated_as_neutral" };
+  }
+  const t = Date.parse(at);
+  const start = Date.parse(fact.start_at);
+  const end = Date.parse(fact.end_at);
+  const passTimes = passes.map((pass) => Date.parse(pass));
+  // `Number.isNaN` is passed the (value, index, array) triple by `some`, which
+  // it ignores — but spelling the call out keeps that from reading as a bug.
+  if ([t, start, end, ...passTimes].some((value) => Number.isNaN(value))) {
+    return { value: NEUTRAL_EXACTNESS, reason: "unparseable_envelope_treated_as_neutral" };
+  }
+  if (end <= start) {
+    return { value: NEUTRAL_EXACTNESS, reason: "degenerate_envelope_treated_as_neutral" };
+  }
+  // Sorted and deduplicated, so "the neighbouring pass" is well defined.
+  const sorted = [...new Set(passTimes)].sort((a, b) => a - b);
+  // First strictly-closer wins, so a tie keeps the earlier pass and the result
+  // does not depend on iteration luck.
+  let nearestIndex = 0;
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (Math.abs(t - sorted[index]!) < Math.abs(t - sorted[nearestIndex]!)) {
+      nearestIndex = index;
+    }
+  }
+  const nearest = sorted[nearestIndex]!;
+  const distance = Math.abs(t - nearest);
+  // Per side: the pass's room to the next boundary in the direction the
+  // instant lies — the neighbouring pass if there is one that way, otherwise
+  // the envelope edge. Between two passes the instant is by construction no
+  // further than half the gap from the nearer one, so the value never falls
+  // below 0.5 there and the two sides agree exactly at the midpoint.
+  const room =
+    t >= nearest
+      ? (sorted[nearestIndex + 1] ?? end) - nearest
+      : nearest - (sorted[nearestIndex - 1] ?? start);
+  if (room <= 0) {
+    // The pass sits on the very boundary, so the instant is at or past it.
+    return {
+      value: distance === 0 ? 1 : 0,
+      reason: "temporal_distance_to_nearest_pass",
+    };
+  }
+  return {
+    value: Math.max(0, Math.min(1, 1 - distance / room)),
+    reason: "temporal_distance_to_nearest_pass",
+  };
 }
 
 export function scoreFact(
@@ -108,6 +208,8 @@ export function scoreFact(
     domainPreference: LifeDomain | null;
     matchingCycleObject: CycleObject | null;
     seenRecently: boolean;
+    /** The evaluation instant exactness is measured at; null treats it as unavailable. */
+    at: string | null;
   },
 ): ScoredFact {
   const factors: RankingFactor[] = [];
@@ -124,12 +226,8 @@ export function scoreFact(
     factors.push({ factor, weight: contribution, reason });
   };
 
-  add(
-    "exactness",
-    exactness(fact),
-    WEIGHTS.exactness,
-    fact.orb_deg === null ? "orb_unavailable_treated_as_exact" : `orb_${fact.orb_deg}`,
-  );
+  const exact = exactness(fact, options.at);
+  add("exactness", exact.value, WEIGHTS.exactness, exact.reason);
   add(
     "body_importance",
     BODY_IMPORTANCE[fact.body ?? ""] ?? 0.25,

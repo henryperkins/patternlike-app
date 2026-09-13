@@ -95,6 +95,12 @@ describe("generation failure policy", () => {
     ["v1", "calc_unavailable", true],
     ["v1", "release_unreadable", true],
     ["v1", "daily_sky_unavailable", false],
+    // Same class as publisher_superseded below: the frozen pin names an engine
+    // policy this deployment retired, so waiting cannot help but re-freezing
+    // under current configuration can. Bounded by MAX_COMMAND_GENERATION, and
+    // it cannot loop because every pin supportedCommand checks is a deployment
+    // constant the replacement necessarily satisfies.
+    ["v1", "policy_unsupported", true],
     ["v2", "calc_unavailable", true],
     ["v2", "daily_sky_unavailable", true],
     ["v2", "publisher_unavailable", true],
@@ -108,13 +114,25 @@ describe("generation failure policy", () => {
     ["v2", "ai_synthesis_consent_required", false],
     ["v2", "context_ineligible", false],
     ["v2", "generation_input_id_mismatch", false],
-    ["v2", "policy_unsupported", false],
+    ["v2", "policy_unsupported", true],
     // Replaceable by the scheduler, which is a different question from
     // retryable: the day still deserves a reading, frozen under a command this
     // deployment can actually execute.
     ["v2", "publisher_superseded", true],
   ] as const)("allows automatic replacement for %s %s only when approved", (version, code, expected) => {
     expect(isAutomaticReplacementFailure(version, code)).toBe(expected);
+  });
+
+  it("maps a retired policy pin onto each version's own replacement reason", () => {
+    // policy_unsupported is a failure code, never a replacement reason: it is
+    // absent from both closed reason vocabularies, so it has to be mapped or
+    // the new command would record a reason nothing can read back.
+    expect(isGenerationReplacementReason("policy_unsupported")).toBe(false);
+    expect(automaticReplacementReason("v1", "policy_unsupported")).toBe("policy_upgraded");
+    expect(automaticReplacementReason("v2", "policy_unsupported")).toBe("publisher_superseded");
+    // Retired pin, not an outage: it must still never retry in place.
+    expect(queueDisposition("v1", "policy_unsupported", 1)).toBe("terminal");
+    expect(queueDisposition("v2", "policy_unsupported", 1)).toBe("terminal");
   });
 
   it("admits the superseded code to every closed vocabulary that must carry it", () => {

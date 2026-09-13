@@ -15,37 +15,37 @@
     {
       "package": "contracts/m3",
       "schema_version": "0.3.0",
-      "manifest_sha256": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
+      "manifest_sha256": "9b5b3125b8562d0d54dd865a333a24ef9b3a0a1ee0566f75a6604adf42e8e449",
       "relationship": "deterministic_reading_predecessor",
-      "note": "Reading detail may return the frozen M3 success envelope. M8 adds library metadata and does not supersede stored M3 reading artifacts."
+      "note": "RE-PINNED 2026-09-13: contracts/m3 gained the additive patternlike.assembly-id.v2 amendment recorded in its own SCHEMA_MANIFEST.json amendments array; the digest above is the post-amendment value. Reading detail may return the frozen M3 success envelope. M8 adds library metadata and does not supersede stored M3 reading artifacts."
     },
     {
       "package": "contracts/m4",
       "schema_version": "0.4.0",
-      "manifest_sha256": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
+      "manifest_sha256": "a4af3f552ee58862b3063b8ed7c1679be0de6c28a735b992a92819ff8fd968fb",
       "relationship": "consumer_pattern_and_context_predecessor",
-      "note": "M8 leaves M4 Pattern, Time Travel, and context contracts frozen."
+      "note": "RE-PINNED 2026-09-13: M4 recorded the re-pinned M3 predecessor; its own body is unchanged from its freeze. M8 leaves M4 Pattern, Time Travel, and context contracts frozen."
     },
     {
       "package": "contracts/m5",
       "schema_version": "0.5.0",
-      "manifest_sha256": "838ed53bdcd560725f9e92c719dc4a583e0833bca17c70c2261b7c1fc4879e24",
+      "manifest_sha256": "6a9ef5ddcd81916f6cf7cd2b00ad43998d2b1bf42a08b60839eb60c89683ff56",
       "relationship": "constrained_model_reading_predecessor",
-      "note": "Reading detail may return the frozen M5 success envelope. M8 adds library metadata and does not supersede stored M5 reading artifacts. RE-PINNED 2026-08-27: contracts/m5 gained the amendment recorded in its own SCHEMA_MANIFEST.json amendments array, widening publisherProvider from const \"openai\" to the exact enum [\"openai\", \"codex\"] so Codex-generated daily readings can be described truthfully while historical OpenAI evidence stays readable. The digest above is the post-amendment value; every instance that validated under the const still validates, and no $id, required field, or schema_version moved."
+      "note": "RE-PINNED 2026-09-13: contracts/m5 gained the amendment recorded in its own SCHEMA_MANIFEST.json amendments array, restating the facts-array ordering description (within-lane DER-02 ranking) and adding no required field, enum, or $id. On the same date M5 also re-pinned its contracts/m3 predecessor after M3's additive assembly-identity v2 amendment; M5's own schemas are otherwise unchanged. The digest above is the post-amendment value."
     },
     {
       "package": "contracts/m6",
       "schema_version": "0.6.0",
-      "manifest_sha256": "f331457d0cd0738ac4a053654f563eddd84a5a93f34d01cc1965cb664d4d7c78",
+      "manifest_sha256": "bd31414bc259ffe7d4e4286ed247d10e20f05b4fb7d70ee5f5db6128503f9f96",
       "relationship": "privacy_and_export_structure_predecessor",
-      "note": "M8 preserves the portable account sections and privacy records carried forward through M7."
+      "note": "RE-PINNED 2026-09-13: M6 recorded the re-pinned M5 predecessor above; its own body is unchanged from its freeze."
     },
     {
       "package": "contracts/m7",
       "schema_version": "0.7.0",
-      "manifest_sha256": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
+      "manifest_sha256": "431417483e03c1109c13369f77a0b76e9f2389cd89c25a3d4324c0fb929a0889",
       "relationship": "openapi_common_and_account_export_predecessor",
-      "note": "M8 copies the complete M7 API/common/export families, then adds consumer place, consent, reading-library, Save, export metadata, and birth-budget amendments."
+      "note": "RE-PINNED 2026-09-13: M7 recorded the re-pinned M5 predecessor above; its own body is unchanged from its freeze."
     }
   ],
   "supersedes": [

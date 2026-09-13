@@ -15,9 +15,21 @@ Frozen M0 through M9 contracts and their manifest digests remain unchanged.
 Replacement preserves the reading ID and local date and advances command
 generation only through the existing three-generation cap. Consent,
 ownership, rollout, and automatic local-day eligibility checks still apply.
-Legacy V1 policy, undecryptable payloads, and configuration failures are not
-newly admitted. This recovery policy does not fix an underlying execution
-defect; a persistent defect can exhaust the same bounded replacement budget.
+Undecryptable payloads and configuration failures are not newly admitted.
+This recovery policy does not fix an underlying execution defect; a persistent
+defect can exhaust the same bounded replacement budget.
+
+A retired policy pin is admitted for both command versions since 2026-09-13.
+A command frozen by the previous Worker under an `assembly_policy_version`,
+`selection_policy_version`, or identity profile this deployment no longer
+registers fails `policy_unsupported`; waiting cannot make it executable, so the
+scheduler and first-open recovery replace it through the same bounded path.
+`automaticReplacementReason` maps that code onto `policy_upgraded` (V1) and
+`publisher_superseded` (V2). `replaceFailedCommand` admits a scheduler-actor
+replacement only when the requested reason equals what that mapping derives
+from the terminal job's own `result_class`, so the scheduler can never apply
+`policy_upgraded` to a day that failed for any other reason. The predecessor
+keeps its exact `policy_unsupported` record.
 
 After fixing the underlying execution defect, an operator can use
 `POST /internal/readings/replace` with `user_id`, `reading_id`,

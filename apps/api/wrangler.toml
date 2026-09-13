@@ -219,7 +219,13 @@ OPENAI_CREDENTIAL_SOURCE = "worker"
 OPENAI_GATEWAY_KEY_ALIAS = ""
 
 CHECK_IN_RETENTION_MONTHS = "13"
-TIME_TRAVEL_RECEIPT_EPOCH = "1"
+# 2 (2026-09-13): the DER-02 exactness factor was rewritten, and /v1/cycles
+# ranks its results through scoreFact, so the same lookup answers differently
+# than it did under epoch 1. persistScanReceipt's fail-closed check compares the
+# CALCULATION vintage (container digest, ephemeris) and cannot see a Worker-side
+# ranking change, so this one has to be bumped by hand or cached receipts keep
+# serving pre-change ranking beside post-change misses under one identity.
+TIME_TRAVEL_RECEIPT_EPOCH = "2"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
 # M7 Pattern generation. There is no rollout, allowlist, or cohort: every
 # authenticated account with an active chart, a confirmed locale, its own
@@ -429,7 +435,13 @@ OPENAI_CREDENTIAL_SOURCE = "worker"
 OPENAI_GATEWAY_KEY_ALIAS = ""
 
 CHECK_IN_RETENTION_MONTHS = "13"
-TIME_TRAVEL_RECEIPT_EPOCH = "1"
+# 2 (2026-09-13): the DER-02 exactness factor was rewritten, and /v1/cycles
+# ranks its results through scoreFact, so the same lookup answers differently
+# than it did under epoch 1. persistScanReceipt's fail-closed check compares the
+# CALCULATION vintage (container digest, ephemeris) and cannot see a Worker-side
+# ranking change, so this one has to be bumped by hand or cached receipts keep
+# serving pre-change ranking beside post-change misses under one identity.
+TIME_TRAVEL_RECEIPT_EPOCH = "2"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
 # Pattern generation has no cohort rollout or account allowlist.
 # `PATTERN_AI_ROLLOUT` and the internal-account allowlist were both

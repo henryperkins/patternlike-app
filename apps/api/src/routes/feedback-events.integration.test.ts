@@ -117,13 +117,13 @@ async function copyFeedbackEvents(
   await env.DB.batch(statements);
 }
 
-function prepareFeedbackContext(context: ConstrainedContextLoad, anchor: Date, selectionVersion = "1.2.0") {
+function prepareFeedbackContext(context: ConstrainedContextLoad, anchor: Date, selectionVersion = "1.4.0") {
   const calculation = {
     policy_id: "feedback-fixture", policy_version: "1.0.0", orb_policy_id: null, orb_policy_version: null,
     request_digest: HASH, response_digest: HASH, container_digest: HASH, ephemeris_data_version: "swisseph-2.10.03",
   };
   return prepareConstrainedReadingInput({
-    schema_version: "0.5.0", prompt_version: selectionVersion === "1.2.0" ? "1.0.4" : "1.0.3",
+    schema_version: "0.5.0", prompt_version: selectionVersion === "1.4.0" ? "1.0.4" : "1.0.3",
     output_schema: "daily-reading-v5", selection_policy_version: selectionVersion, validation_policy_version: "1.0.0",
     context_max_bytes: 98304, target_local_date: "2028-03-21", target_timezone: "Etc/UTC", locale: "en-US",
     generation_anchor: anchor.toISOString(), revision: 1, domain_preference: null,
@@ -455,7 +455,7 @@ describe("exact-edition categorical feedback", () => {
           event.grant.consent_version += 1;
         }
       });
-      const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.2.0", anchor });
+const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.4.0", anchor });
       expect(loaded.signals.map((signal) => signal.signal_id)).toEqual([eligible.receipt.id]);
       expect(prepareFeedbackContext(loaded, anchor).selected_context.map((pin) => pin.signal_id)).toEqual([eligible.receipt.id]);
       expect(await loadReadingFeedbackEventExports(env, IDENTITY_A, anchor)).toHaveLength(21);
@@ -476,13 +476,13 @@ describe("exact-edition categorical feedback", () => {
 
     expect((await loadRetainedReadingFeedbackEvents(env, IDENTITY_A, anchor)).map((event) => event.receipt.id))
       .toEqual(ids.slice(0, 100));
-    const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.2.0", anchor });
+    const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.4.0", anchor });
     const prepared = prepareFeedbackContext(loaded, anchor);
     expect(prepared.selected_context.map((pin) => pin.signal_id)).toEqual(ids.slice(0, 20));
     expect(JSON.stringify(prepared.request)).not.toContain("rfe_bounded_");
 
-    const incumbent = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.1.0", anchor });
-    const oldPacket = prepareFeedbackContext(incumbent, anchor, "1.1.0");
+    const incumbent = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.3.0", anchor });
+    const oldPacket = prepareFeedbackContext(incumbent, anchor, "1.3.0");
     expect(incumbent.signals.map((signal) => signal.signal_id)).toEqual(legacyIds);
     expect([...new Set(oldPacket.selected_context.map((pin) => pin.signal_id))]).toEqual(legacyIds);
     expect(prepared.selected_facts).toEqual(oldPacket.selected_facts);

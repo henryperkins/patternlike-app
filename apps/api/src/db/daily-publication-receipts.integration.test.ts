@@ -71,6 +71,7 @@ async function receipts(readingId?: string) {
     worker_version_id: string;
     release_git_sha: string;
     published_at: string;
+    qualitative_findings_json: string;
   }>(
     readingId
       ? "SELECT * FROM daily_publication_receipts WHERE reading_id = ?"
@@ -212,6 +213,7 @@ describe("Daily publication receipts", () => {
       "provider_completed_at",
       "provider_job_id",
       "published_at",
+      "qualitative_findings_json",
       "reading_id",
       "reasoning_effort",
       "receipt_id",
@@ -333,6 +335,7 @@ async function publicationInput(): Promise<PublicationInput> {
       inputTokens: job.inputTokens!, outputTokens: job.outputTokens!,
       providerCompletedAt: job.completedAt!, workerVersionId: env.CF_VERSION_METADATA.id,
       releaseGitSha: env.RELEASE_GIT_SHA,
+      qualitativeFindings: [],
     },
   };
 }

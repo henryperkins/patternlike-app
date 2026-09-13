@@ -233,7 +233,8 @@
           ]
         },
         "identity_profile": {
-          "const": "patternlike.assembly-id.v1"
+          "enum": ["patternlike.assembly-id.v1", "patternlike.assembly-id.v2"],
+          "description": "The preimage profile assembly_id was computed under. Widened from the v1 const to this exact enum on 2026-09-13 (see SCHEMA_MANIFEST.json amendments): a command frozen under v2 carries the cycle envelope inside its identity. Every v1 command remains a valid document; it is executable only while the Worker registers its profile and assembly_policy_version, and otherwise fails policy_unsupported and is replaced."
         },
         "output_schema": {
           "$ref": "common.schema.json#/$defs/outputSchemaName"

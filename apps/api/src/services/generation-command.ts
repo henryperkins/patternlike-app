@@ -1,5 +1,6 @@
 import {
   ASSEMBLY_POLICY_ID,
+  ASSEMBLY_IDENTITY_PROFILE,
   ASSEMBLY_POLICY_VERSION,
   SCHEMA_VERSION as ENGINE_SCHEMA_VERSION,
   assembleReading,
@@ -101,7 +102,13 @@ export interface GenerateDailyReadingCommandV1 {
   generation_anchor: string;
   locale: string;
   domain_preference: string | null;
-  identity_profile: "patternlike.assembly-id.v1";
+  /**
+   * The preimage profile `assembly_id` was computed under. Stored commands
+   * may carry either value; only the profile the engine currently builds
+   * (ASSEMBLY_IDENTITY_PROFILE) is executable, and the rest fail
+   * `policy_unsupported` at the executor's guard.
+   */
+  identity_profile: "patternlike.assembly-id.v1" | "patternlike.assembly-id.v2";
   output_schema: "daily-reading-v3";
   assembly_policy_id: string;
   assembly_policy_version: string;
@@ -460,7 +467,7 @@ export function buildAssemblyInput(args: {
   domainPreference: AssemblyInput["domain_preference"];
 }): AssemblyInput {
   return {
-    identity_profile: "patternlike.assembly-id.v1",
+    identity_profile: ASSEMBLY_IDENTITY_PROFILE,
     schema_version: ENGINE_SCHEMA_VERSION,
     output_schema: "daily-reading-v3",
     assembly_policy_id: ASSEMBLY_POLICY_ID,
@@ -645,7 +652,7 @@ export async function buildGenerationCommand(
     generation_anchor: assemblyInput.generation_anchor,
     locale: preferences.locale,
     domain_preference: null,
-    identity_profile: "patternlike.assembly-id.v1",
+    identity_profile: assemblyInput.identity_profile,
     output_schema: "daily-reading-v3",
     assembly_policy_id: ASSEMBLY_POLICY_ID,
     assembly_policy_version: ASSEMBLY_POLICY_VERSION,

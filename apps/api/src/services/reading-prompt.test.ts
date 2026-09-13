@@ -27,7 +27,7 @@ const PIN: PublisherConfigPin = {
   reasoning_effort: "high",
   prompt_version: READING_PROMPT_VERSION,
   output_schema: "daily-reading-v5",
-  selection_policy_version: "1.1.0",
+  selection_policy_version: "1.3.0",
   validation_policy_version: "1.1.1",
   max_output_tokens: OPENAI_READING_MAX_OUTPUT_TOKENS,
   context_max_bytes: READING_CONTEXT_MAX_BYTES,
@@ -38,7 +38,7 @@ function hostileRequest(): ReadingGenerationRequest {
   return {
     schema_version: "0.5.0",
     prompt_version: READING_PROMPT_VERSION,
-    selection_policy_version: "1.1.0",
+    selection_policy_version: "1.3.0",
     output_schema: "daily-reading-v5",
     local_date: "2026-07-30",
     locale: "en-US",
@@ -94,7 +94,7 @@ function hostileRequest(): ReadingGenerationRequest {
 describe("provider request body", () => {
   it("keeps the incumbent prompt bytes and gives categorical feedback its own bounded instructions", () => {
     const incumbent = buildResponsesRequest(hostileRequest(), PIN);
-    const categorical = buildResponsesRequest(hostileRequest(), { ...PIN, prompt_version: "1.0.4", selection_policy_version: "1.2.0" });
+    const categorical = buildResponsesRequest(hostileRequest(), { ...PIN, prompt_version: "1.0.4", selection_policy_version: "1.4.0" });
     expect(incumbent.instructions).toBe(READING_SYSTEM_POLICY);
     expect(categorical.instructions).toContain("A repetitive signal may guide repetition control only");
     expect(categorical.instructions).toContain("not reader notes");

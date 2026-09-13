@@ -349,6 +349,7 @@ export function assembleReading(input: AssemblyInput): AssemblyOutcome {
         domainPreference: input.domain_preference,
         matchingCycleObject: cycleObject,
         seenRecently: false,
+        at: midpoint,
       }),
     );
   }

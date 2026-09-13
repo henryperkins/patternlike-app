@@ -25,6 +25,7 @@ import {
   type DailySkyFact,
   type FactAttributes,
   type LaneRank,
+  type LifeDomain,
   type M5AllowedUse,
   type M5FactClass,
   type PriorReadingExcerpt,
@@ -39,6 +40,7 @@ import {
 import { partitionContext, factSuppressionReason } from "./eligibility.js";
 import { localDayMidpoint, projectUncertainty } from "./identity.js";
 import { computePhase } from "./phase.js";
+import { compareScored, scoreFact } from "./ranking.js";
 import { jcsCanonicalize } from "./jcs.js";
 import {
   GENERATION_INPUT_IDENTITY_PROFILE,
@@ -388,6 +390,161 @@ function projectNatalFact(fact: ConstrainedNatalFactInput): ConstrainedFact {
 }
 
 // ---------------------------------------------------------------------------
+// Within-lane ranking
+// ---------------------------------------------------------------------------
+
+/**
+ * Project one constrained fact into the DER-02 ranking preimage.
+ *
+ * The measured angular separation is not carried on cycles (the packet's
+ * `degrees` are the configured envelope), so exactness uses the deterministic
+ * temporal proxy over the cycle's own envelope. Daily-sky and natal facts score
+ * exactness neutrally. Every input is a pure function of the frozen corpus and
+ * the midpoint, so enqueue and execute rank identically and
+ * `generation_input_id` stays reproducible.
+ */
+export function toAssemblyFact(fact: ConstrainedFact, midpoint: string): AssemblyFactInput {  const base: AssemblyFactInput = {
+    id: fact.fact_id,
+    fact_class: fact.fact_class,
+    technique: null,
+    body: null,
+    target: null,
+    aspect: null,
+    phase: null,
+    orb_deg: null,
+    first_exact_at: null,
+    pass_count: null,
+    start_at: null,
+    end_at: null,
+    pass_exact_ats: null,
+  };
+  switch (fact.support.kind) {
+    case "cycle": {
+      const cycle = fact.support.value;
+      return {
+        ...base,
+        fact_class: "cycle_instance",
+        technique: cycle.technique,
+        body: cycle.body,
+        target: cycle.target,
+        aspect: cycle.aspect,
+        phase: computePhase(cycle, midpoint),
+        orb_deg: cycle.orb_deg,
+        first_exact_at: cycle.passes[0]?.exact_at ?? cycle.exact_at,
+        pass_count: cycle.pass_count,
+        start_at: cycle.start_at,
+        end_at: cycle.end_at,
+        pass_exact_ats: cycle.passes.map((pass) => pass.exact_at),
+      };
+    }
+    case "daily_sky": {
+      const sky = fact.support.value;
+      switch (sky.kind) {
+        case "transit_natal_contact": {
+          const detail = sky.detail as Extract<
+            DailySkyFact["detail"],
+            { transiting_body: CelestialBody }
+          >;
+          return {
+            ...base,
+            fact_class: sky.kind,
+            technique: "transit",
+            body: detail.transiting_body,
+            target: detail.natal_target,
+            aspect: detail.aspect,
+            first_exact_at: sky.effective_at,
+            pass_count: 1,
+          };
+        }
+        case "house_placement": {
+          const detail = sky.detail as Extract<
+            DailySkyFact["detail"],
+            { body: CelestialBody }
+          >;
+          return { ...base, fact_class: sky.kind, body: detail.body, first_exact_at: sky.effective_at, pass_count: 1 };
+        }
+        case "anchor_position": {
+          const detail = sky.detail as Extract<
+            DailySkyFact["detail"],
+            { body: CelestialBody }
+          >;
+          return { ...base, fact_class: sky.kind, body: detail.body, first_exact_at: sky.effective_at, pass_count: 1 };
+        }
+        case "lunar_phase":
+          return {
+            ...base,
+            fact_class: sky.kind,
+            body: "moon",
+            target: "sun",
+            first_exact_at: sky.effective_at,
+            pass_count: 1,
+          };
+        case "sign_ingress": {
+          const detail = sky.detail as Extract<
+            DailySkyFact["detail"],
+            { body: CelestialBody }
+          >;
+          return { ...base, fact_class: sky.kind, body: detail.body, first_exact_at: sky.effective_at, pass_count: 1 };
+        }
+        case "collective_exact_aspect": {
+          const detail = sky.detail as Extract<
+            DailySkyFact["detail"],
+            { other_body: CelestialBody }
+          >;
+          return {
+            ...base,
+            fact_class: sky.kind,
+            body: detail.body,
+            target: detail.other_body,
+            aspect: detail.aspect,
+            first_exact_at: sky.effective_at,
+            pass_count: 1,
+          };
+        }
+      }
+      break;
+    }
+    case "natal": {
+      const natal = fact.support.value;
+      return {
+        ...base,
+        fact_class: natal.fact_class,
+        body: natal.body,
+        target: natal.target,
+        aspect: natal.aspect,
+        orb_deg: natal.fact_class === "natal_aspect" ? natal.degree_deg : null,
+      };
+    }
+  }
+  return base;
+}
+
+/**
+ * Order the surviving facts by lane, then by DER-02 score within the lane.
+ *
+ * Lane rank is the reading-priority contract and never moves; within a lane
+ * the packet now carries the product's reviewed ranking rather than an
+ * arbitrary hash-prefix order. The tie-break chain in `compareScored` is
+ * total, so two runs over the same corpus cannot disagree.
+ */
+function rankFacts(facts: readonly ConstrainedFact[], midpoint: string, domainPreference: LifeDomain | null): ConstrainedFact[] {
+  const scored = facts.map((fact) => ({
+    fact,
+    scored: scoreFact(toAssemblyFact(fact, midpoint), {
+      domainPreference,
+      matchingCycleObject: null,
+      seenRecently: false,
+      at: midpoint,
+    }),
+  }));
+  scored.sort((a, b) => {
+    if (a.fact.lane_rank !== b.fact.lane_rank) return a.fact.lane_rank - b.fact.lane_rank;
+    return compareScored(a.scored, b.scored);
+  });
+  return scored.map((entry) => entry.fact);
+}
+
+// ---------------------------------------------------------------------------
 // Suppression
 // ---------------------------------------------------------------------------
 
@@ -420,6 +577,9 @@ function suppressionReason(
       orb_deg: null,
       first_exact_at: null,
       pass_count: null,
+      start_at: null,
+      end_at: null,
+      pass_exact_ats: null,
     };
     const reason = factSuppressionReason(probe, suppressed);
     // A collective fact about the sky's own Moon is not a claim about the
@@ -827,15 +987,9 @@ export function prepareConstrainedReadingInput(
     );
   }
 
-  facts.sort((a, b) =>
-    a.lane_rank !== b.lane_rank
-      ? a.lane_rank - b.lane_rank
-      : a.fact_id < b.fact_id
-        ? -1
-        : a.fact_id > b.fact_id
-          ? 1
-          : 0,
-  );
+  const ranked = rankFacts(facts, midpoint, input.domain_preference);
+  facts.length = 0;
+  facts.push(...ranked);
 
   const suppressedFeatures = uniqueSorted(
     uncertainty.suppressed_features.map((f) => f.feature_class),

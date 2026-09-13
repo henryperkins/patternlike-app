@@ -6,6 +6,7 @@ import m0Common from "../../../../contracts/m0/common.schema.json";
 import m3Common from "../../../../contracts/m3/common.schema.json";
 import m3AssemblyIdentity from "../../../../contracts/m3/assembly-identity.schema.json";
 import m3GenerationCommand from "../../../../contracts/m3/generation-command.schema.json";
+import { ASSEMBLY_POLICY_VERSION } from "@patternlike/reading-engine";
 import worker from "../index.js";
 import {
   IDENTITY_A,
@@ -1615,8 +1616,11 @@ describe("command replacement", () => {
       `UPDATE daily_readings SET status = 'failed' WHERE id = ?`,
       enqueued.readingId,
     );
+    // A real terminal job always carries its result class (`retryOrFail`
+    // writes it), and the scheduler-actor admission reads it back.
     await rows(
-      `UPDATE jobs SET status = 'failed', claim_token = NULL WHERE id = ?`,
+      `UPDATE jobs SET status = 'failed', claim_token = NULL,
+                       result_class = 'calc_unavailable' WHERE id = ?`,
       claim!.jobId,
     );
     return enqueued;
@@ -1694,6 +1698,50 @@ describe("command replacement", () => {
     ).toBe(true);
   });
 
+  it("lets the scheduler re-freeze a command whose policy pin was retired, and only for that reason", async () => {
+    // This is what a policy bump does to every command the previous Worker
+    // froze: the execute path fails it `policy_unsupported`, and the only
+    // recovery is a new command under current configuration. The reason the
+    // scheduler records is derived from that result class — an unrelated
+    // automatic reason is refused, so the admission is bound to the job's own
+    // failure rather than to the reason vocabulary.
+    const failed = await failTheDay();
+    await rows(
+      `UPDATE jobs SET result_class = 'policy_unsupported' WHERE id = ?`,
+      failed.jobId,
+    );
+    expect(
+      await replaceFailedCommand(env, USER_A, failed.readingId, "calc_unavailable", "scheduler"),
+    ).toMatchObject({ ok: false, reason: "not_replaceable" });
+
+    const replaced = await replaceFailedCommand(
+      env,
+      USER_A,
+      failed.readingId,
+      "policy_upgraded",
+      "scheduler",
+    );
+    expect(replaced).toMatchObject({ ok: true });
+    if (!replaced.ok) throw new Error(`replacement failed: ${replaced.reason}`);
+    expect((await readings())[0]).toMatchObject({ status: "pending", command_generation: 2 });
+
+    const claim = await claimJob(env, replaced.jobId);
+    expect(claim).not.toBeNull();
+    expect(claim!.command).toMatchObject({
+      command_generation: 2,
+      replaces_job_id: failed.jobId,
+      command_replacement_reason: "policy_upgraded",
+      assembly_policy_version: ASSEMBLY_POLICY_VERSION,
+    });
+    // The predecessor keeps its exact failure record.
+    expect(
+      await rows<{ status: string; result_class: string }>(
+        `SELECT status, result_class FROM jobs WHERE id = ?`,
+        failed.jobId,
+      ),
+    ).toEqual([{ status: "failed", result_class: "policy_unsupported" }]);
+  });
+
   it("stops after two automatic attempts and leaves the day visibly failed", async () => {
     const failed = await failTheDay();
 
@@ -1709,7 +1757,7 @@ describe("command replacement", () => {
       expect((await readings())[0]!.command_generation).toBe(generation);
       await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, failed.readingId);
       await rows(
-        `UPDATE jobs SET status = 'failed' WHERE id = ?`,
+        `UPDATE jobs SET status = 'failed', result_class = 'calc_unavailable' WHERE id = ?`,
         replaced.ok ? replaced.jobId : "",
       );
     }
@@ -1761,7 +1809,10 @@ describe("command replacement", () => {
     });
     if (!seeded.ok) throw new Error(`v2 enqueue failed: ${seeded.reason}`);
     await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
-    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, seeded.jobId);
+    await rows(
+      `UPDATE jobs SET status = 'failed', result_class = 'publisher_unavailable' WHERE id = ?`,
+      seeded.jobId,
+    );
 
     expect(
       await replaceFailedCommand(
@@ -1783,7 +1834,10 @@ describe("command replacement", () => {
       `SELECT active_generation_job_id FROM daily_readings WHERE id = ?`,
       seeded.readingId,
     );
-    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, active!.active_generation_job_id);
+    await rows(
+      `UPDATE jobs SET status = 'failed', result_class = 'publisher_unavailable' WHERE id = ?`,
+      active!.active_generation_job_id,
+    );
 
     await expect(
       replaceFailedCommand(v5Env, USER_A, seeded.readingId, "release_unreadable", "scheduler"),
@@ -1804,7 +1858,10 @@ describe("command replacement", () => {
     expect((await readings())[0]).toMatchObject({ command_generation: 3, status: "pending" });
     if (!replaced.ok) throw new Error(`V2 g3 replacement failed: ${replaced.reason}`);
     await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
-    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, replaced.jobId);
+    await rows(
+      `UPDATE jobs SET status = 'failed', result_class = 'publisher_unavailable' WHERE id = ?`,
+      replaced.jobId,
+    );
 
     await expect(
       replaceFailedCommand(v5Env, USER_A, seeded.readingId, "publisher_unavailable", "scheduler"),

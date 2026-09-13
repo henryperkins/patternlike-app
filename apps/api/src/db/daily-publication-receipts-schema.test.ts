@@ -4,7 +4,8 @@ import { buildDailyPublicationReceiptInsert, type DailyPublicationReceiptInput }
 
 const columns = ["receipt_id", "reading_id", "job_id", "command_generation", "provider", "provider_job_id",
   "stage_generation", "stage_attempt", "model", "reasoning_effort", "prompt_version", "request_hash",
-  "response_hash", "input_tokens", "output_tokens", "provider_completed_at", "worker_version_id", "release_git_sha", "published_at"];
+  "response_hash", "input_tokens", "output_tokens", "provider_completed_at", "worker_version_id", "release_git_sha", "published_at",
+  "qualitative_findings_json"];
 
 function receipt(effort: "high" | "xhigh"): DailyPublicationReceiptInput {
   return {
@@ -14,6 +15,7 @@ function receipt(effort: "high" | "xhigh"): DailyPublicationReceiptInput {
     requestHash: `sha256:${"a".repeat(64)}`, responseHash: `sha256:${"b".repeat(64)}`,
     inputTokens: 42, outputTokens: 10, providerCompletedAt: "2026-09-07T00:00:00Z",
     workerVersionId: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", releaseGitSha: "a".repeat(40),
+    qualitativeFindings: [],
   };
 }
 
@@ -51,5 +53,15 @@ describe.each(["fresh", "populated 0028 upgrade"])("0029 %s", (lane) => {
     expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
     expect((await db.prepare("PRAGMA quick_check").all()).results).toEqual([{ quick_check: "ok" }]);
     expect((await db.prepare("SELECT * FROM assertion_probe").all()).results).toEqual([]);
+  });
+
+  it("stores deduplicated sorted finding tokens and nothing else", async () => {
+    await buildDailyPublicationReceiptInsert({ DB: db }, {
+      ...receipt("high"), readingId: "reading_findings",
+      qualitativeFindings: ["hype_vocabulary", "exclamation", "hype_vocabulary"],
+    }, "2026-09-07T00:00:01Z").run();
+    const row = await db.prepare("SELECT qualitative_findings_json FROM daily_publication_receipts WHERE reading_id = ?")
+      .bind("reading_findings").first<{ qualitative_findings_json: string }>();
+    expect(JSON.parse(row!.qualitative_findings_json)).toEqual(["exclamation", "hype_vocabulary"]);
   });
 });

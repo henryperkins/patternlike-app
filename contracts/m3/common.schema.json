@@ -81,6 +81,7 @@
       "type": "string",
       "enum": [
         "patternlike.assembly-id.v1",
+        "patternlike.assembly-id.v2",
         "patternlike.cycle-id.v1"
       ],
       "description": "Domain separation tag inside a hash preimage. Versions the exact set of canonical bytes so a preimage change cannot silently reuse an id."

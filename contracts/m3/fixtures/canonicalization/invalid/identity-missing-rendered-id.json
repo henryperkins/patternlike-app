@@ -1,5 +1,9 @@
 {
-  "profile": "patternlike.assembly-id.v1",
+  "profiles": [
+    "patternlike.assembly-id.v1",
+    "patternlike.assembly-id.v2",
+    "patternlike.cycle-id.v1"
+  ],
   "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
   "note": "canonical is the exact UTF-8 byte string; full_digest is SHA-256 of those bytes; rendered_id is the prefix plus the first 32 lowercase hex characters. An implementation that produces different bytes for any input here is not interoperable, even if its digest happens to round-trip.",
   "vectors": [

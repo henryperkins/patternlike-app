@@ -53,6 +53,7 @@ import {
 } from "./generation-command-v2.js";
 import { leaseDisposition, type V5FailureCode } from "./generation-failures.js";
 import { currentAiConsentMatches } from "./reading-current-owner.js";
+import { qualitativeFindings } from "./reading-quality.js";
 import { createCodexReadingPublisher } from "./codex-reading-publisher.js";
 import { resolveReleaseAttestation } from "./release-attestation.js";
 import {
@@ -886,6 +887,7 @@ export async function generateDailyReadingV5(
       providerCompletedAt: publisher.exchange.provider_completed_at,
       workerVersionId: attestation.workerVersionId,
       releaseGitSha: attestation.releaseGitSha,
+      qualitativeFindings: qualitativeFindings(prepared, publisher.candidate),
     },
   });
   if (!published.ok) {

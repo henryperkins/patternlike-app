@@ -15,9 +15,9 @@
     {
       "package": "contracts/m5",
       "schema_version": "0.5.0",
-      "manifest_sha256": "838ed53bdcd560725f9e92c719dc4a583e0833bca17c70c2261b7c1fc4879e24",
+      "manifest_sha256": "6a9ef5ddcd81916f6cf7cd2b00ad43998d2b1bf42a08b60839eb60c89683ff56",
       "relationship": "successor",
-      "note": "M6 adds privacy and context surfaces without rewriting the constrained reading publisher contract. RE-PINNED 2026-08-27: contracts/m5 gained the amendment recorded in its own SCHEMA_MANIFEST.json amendments array, widening publisherProvider from const \"openai\" to the exact enum [\"openai\", \"codex\"] so Codex-generated daily readings can be described truthfully while historical OpenAI evidence stays readable. The digest above is the post-amendment value; every instance that validated under the const still validates, and no $id, required field, or schema_version moved."
+      "note": "RE-PINNED 2026-09-13: contracts/m5 gained the amendment recorded in its own SCHEMA_MANIFEST.json amendments array, restating the facts-array ordering description (within-lane DER-02 ranking) and adding no required field, enum, or $id. On the same date M5 also re-pinned its contracts/m3 predecessor after M3's additive assembly-identity v2 amendment; M5's own schemas are otherwise unchanged. The digest above is the post-amendment value; every instance that validated under the prior description still validates."
     }
   ],
   "schemas": [
@@ -34,12 +34,16 @@
     {
       "file": "export-status.schema.json",
       "id": "https://patternlike.app/contracts/m6/export-status.schema.json",
-      "defines": ["exportStatus"]
+      "defines": [
+        "exportStatus"
+      ]
     },
     {
       "file": "deletion-status.schema.json",
       "id": "https://patternlike.app/contracts/m6/deletion-status.schema.json",
-      "defines": ["deletionStatus"]
+      "defines": [
+        "deletionStatus"
+      ]
     },
     {
       "file": "account-export.schema.json",

@@ -15,9 +15,9 @@
     {
       "package": "contracts/m3",
       "schema_version": "0.3.0",
-      "manifest_sha256": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
+      "manifest_sha256": "9b5b3125b8562d0d54dd865a333a24ef9b3a0a1ee0566f75a6604adf42e8e449",
       "relationship": "successor",
-      "note": "Recorded forward-only. No file under contracts/m3 changes — including its manifest, fixtures, OpenAPI, and golden vectors. M3 froze itself against contracts/m0 with a hash check and a git check; M5 gives contracts/m3 exactly the same standing, because a manual promise to leave a directory alone is not a check. The digest is over the file with newlines normalised to LF, which is what git stores: there is no .gitattributes, so a raw-byte digest would record whichever platform generated it and fail on the other."
+      "note": "Recorded forward-only; RE-PINNED 2026-09-13 when contracts/m3 gained the additive patternlike.assembly-id.v2 amendment recorded in its own SCHEMA_MANIFEST.json amendments array (a second assembly-identity preimage carrying the cycle envelope; the v1 preimage, its fixtures, OpenAPI, and golden vectors are unchanged). M3 froze itself against contracts/m0 with a hash check and a git check; M5 gives contracts/m3 exactly the same standing, because a manual promise to leave a directory alone is not a check — which is why an amendment moves this digest deliberately instead of slipping past it. The digest is over the file with newlines normalised to LF, which is what git stores: there is no .gitattributes, so a raw-byte digest would record whichever platform generated it and fail on the other."
     }
   ],
   "why_a_package_and_not_an_amendment": [
@@ -382,6 +382,16 @@
         "fixtures/valid/generation-command.codex-xhigh.json",
         "fixtures/invalid/generation-command.unapproved-reasoning.json"
       ]
+    },
+    {
+      "date": "2026-09-13",
+      "kind": "description_restatement",
+      "summary": "reading-generation-request.schema.json restates the `facts` ordering: within each lane_rank, facts are ordered by DER-02 ranking score (descending, total tie-break on exact-pass instant then fact_id) instead of by hash-prefix fact_id.",
+      "detail": "The constrained packet previously sorted facts by (lane_rank, fact_id), and fact_id is a truncated hash of fact content, so ordering within a lane was arbitrary with respect to meaning while the model had to choose about six prose units from about sixty-nine facts. The product's reviewed DER-02 ranking (packages/reading-engine/src/ranking.ts) is now applied inside each lane, with the exactness factor corrected to normalize temporal distance to the nearest exact pass against the cycle's own envelope rather than a hardcoded 3-degree ceiling. The ordering was stated in a `description` only, so no instance changes classification and no fixture moves: this is an amendment, not a schema_version bump. No required field, enum, or $id changed. The change is versioned on the wire by selection_policy_version (1.1.0/1.2.0 to 1.3.0/1.4.0), and frozen in-flight commands pinned to the old versions fail `policy_unsupported` and are replaced through the bounded scheduler path rather than executed under new semantics.",
+      "files": [
+        "reading-generation-request.schema.json"
+      ],
+      "implemented_by": "packages/reading-engine/src/constrained-input.ts (rankFacts orders each lane by scoreFact); packages/reading-engine/src/ranking.ts (exactness temporal proxy); packages/reading-engine/src/constrained-types.ts (SELECTION_POLICY_VERSION 1.3.0, CATEGORIZED_FEEDBACK_SELECTION_VERSION 1.4.0); apps/api/src/services/reading-feedback-policy.ts (new supported tuples)."
     }
   ]
 }

@@ -74,7 +74,7 @@ export function evaluateFixture(
   if (!fixture) throw new UnknownFixtureError(fixtureId);
 
   const input: AssemblyInput = {
-    identity_profile: "patternlike.assembly-id.v1",
+    identity_profile: "patternlike.assembly-id.v2",
     schema_version: "0.3.0",
     output_schema: "daily-reading-v3",
     assembly_policy_id: "daily-reading-deterministic",

@@ -27,6 +27,7 @@ const expectedTail = [
   "0031_reading_feedback_events.sql",
   "0032_runtime_health.sql",
   "0033_adaptive_portrait_artwork.sql",
+  "0034_daily_reading_quality_observations.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==

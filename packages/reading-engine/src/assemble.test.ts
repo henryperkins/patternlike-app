@@ -31,7 +31,7 @@ const catalogue = new Map<string, AssemblyFixture>(
 function inputFrom(fixtureId: string, overrides: Partial<AssemblyInput> = {}): AssemblyInput {
   const f = catalogue.get(fixtureId)!;
   return {
-    identity_profile: "patternlike.assembly-id.v1",
+    identity_profile: "patternlike.assembly-id.v2",
     schema_version: "0.3.0",
     output_schema: "daily-reading-v3",
     assembly_policy_id: "daily-reading-deterministic",
@@ -177,6 +177,76 @@ test("unknown birth time suppresses an angle theme rather than filtering it late
   // corrected chart would reuse this id.
   assert.equal(outcome.identity.effective_accuracy, "unknown");
   assert.deepEqual(outcome.identity.facts, []);
+});
+
+test("the identity preimage carries exactly the frozen v2 fact keys, and no more", () => {
+  // contracts/m3 is frozen and $defs/assemblyFactInputV2 is
+  // additionalProperties: false. The contract fixtures are static bytes, so
+  // validate_schemas.py keeps passing when the RUNTIME projection widens —
+  // every assembly_id would move under an unchanged identity_profile and no
+  // gate would say so. Read the closed key list out of the schema itself and
+  // hold the live output to it.
+  const schema = read("assembly-identity.schema.json");
+  const frozenKeys = Object.keys(schema.$defs.assemblyFactInputV2.properties).sort();
+  assert.equal(schema.$defs.assemblyFactInputV2.additionalProperties, false);
+  assert.equal(
+    schema.$defs.assemblyIdentityInputV2.properties.identity_profile.const,
+    "patternlike.assembly-id.v2",
+  );
+
+  const outcome = assembleReading(inputFrom("saturn-square-sun-building"));
+  assert.equal(outcome.identity.identity_profile, "patternlike.assembly-id.v2");
+  assert.ok(outcome.identity.facts.length > 0, "fixture must exercise at least one fact");
+  for (const fact of outcome.identity.facts) {
+    assert.deepEqual(
+      Object.keys(fact).sort(),
+      frozenKeys,
+      "assembly identity fact shape drifted from the frozen m3 contract",
+    );
+  }
+  // And the v1 shape is exactly the v2 shape minus the envelope, so nothing
+  // else moved between the profiles.
+  const v1Keys = Object.keys(schema.$defs.assemblyFactInput.properties).sort();
+  assert.deepEqual(
+    frozenKeys.filter((key) => !["start_at", "end_at", "pass_exact_ats"].includes(key)),
+    v1Keys,
+  );
+});
+
+test("a refined envelope changes the identity even when the cycle id does not", () => {
+  // The cyc_ id deliberately excludes pass timestamps and envelope bounds
+  // (contracts/m3/cycle-identity.schema.json: refinement may move them), and
+  // both the timing paragraph and the DER-02 exactness factor read them. Two
+  // inputs that differ only there must not share an assembly_id: same bytes
+  // would mean one id for two readings.
+  const base = inputFrom("saturn-square-sun-building");
+  // inputFrom hands out the catalogue's own cycle objects, so clone before
+  // shifting or both inputs move together.
+  const shifted = inputFrom("saturn-square-sun-building", {
+    cycles: structuredClone(catalogue.get("saturn-square-sun-building")!.cycles),
+  });
+  const cycle = shifted.cycles.find((c) => c.body === "saturn")!;
+  assert.ok(cycle, "fixture carries the Saturn cycle");
+  cycle.start_at = new Date(Date.parse(cycle.start_at) - 3 * 86_400_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const a = assembleReading(base);
+  const b = assembleReading(shifted);
+  assert.equal(
+    a.identity.facts.find((f) => f.id === cycle.id)?.id,
+    b.identity.facts.find((f) => f.id === cycle.id)?.id,
+    "the cycle id is unchanged by the shift",
+  );
+  assert.notEqual(a.identity_canonical, b.identity_canonical);
+  assert.notEqual(
+    renderAssemblyId(createHash("sha256").update(a.identity_canonical, "utf8").digest("hex")),
+    renderAssemblyId(createHash("sha256").update(b.identity_canonical, "utf8").digest("hex")),
+  );
+});
+
+test("the engine refuses to build an identity under a profile it does not implement", () => {
+  const input = inputFrom("saturn-square-sun-building", {
+    identity_profile: "patternlike.assembly-id.v1" as never,
+  });
+  assert.throws(() => assembleReading(input), /identity_profile patternlike.assembly-id.v1/);
 });
 
 test("identical inputs reproduce identical canonical bytes and assembly id", () => {

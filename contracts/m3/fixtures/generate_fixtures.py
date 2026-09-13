@@ -217,6 +217,44 @@ IDENTITY_UNKNOWN = identity(
 )
 _, _, ASM_UNKNOWN = assembly_id(IDENTITY_UNKNOWN)
 
+
+# patternlike.assembly-id.v2: the v1 fact plus the cycle envelope. The instants
+# match fixtures/assembly/saturn-square-sun-building.json so the two documents
+# describe one physical encounter.
+def with_envelope(fact: dict, start_at: str, end_at: str, passes: list[str]) -> dict:
+    out = copy.deepcopy(fact)
+    out["start_at"] = start_at
+    out["end_at"] = end_at
+    out["pass_exact_ats"] = passes
+    return out
+
+
+FACT_PRIMARY_V2 = with_envelope(
+    FACT_PRIMARY,
+    "2026-07-19T05:22:10Z",
+    "2027-01-26T18:44:02Z",
+    ["2026-08-02T14:11:07Z", "2026-10-19T03:52:44Z", "2027-01-11T21:07:19Z"],
+)
+FACT_SUPPORT_V2 = with_envelope(
+    FACT_SUPPORT,
+    "2026-07-29T18:10:00Z",
+    "2026-08-01T03:05:00Z",
+    ["2026-07-30T22:40:00Z"],
+)
+
+
+def identity_v2(**over) -> dict:
+    base = identity(
+        identity_profile="patternlike.assembly-id.v2",
+        facts=[copy.deepcopy(FACT_SUPPORT_V2), copy.deepcopy(FACT_PRIMARY_V2)],
+    )
+    base.update(over)
+    return base
+
+
+IDENTITY_DAILY_V2 = identity_v2()
+_, _, ASM_DAILY_V2 = assembly_id(IDENTITY_DAILY_V2)
+
 CYCLE_IDENTITY = {
     "identity_profile": "patternlike.cycle-id.v1",
     "chart_fingerprint": FP,
@@ -271,6 +309,21 @@ write(I + "assembly-identity.carries-reading-key.json", bad)
 bad = copy.deepcopy(IDENTITY_DAILY)
 bad["effective_accuracy"] = "unknown"
 write(I + "assembly-identity.accuracy-mismatch.json", bad)
+
+# v2: the same day with the envelope on every fact
+write(V + "assembly-identity.daily-v2.json", IDENTITY_DAILY_V2)
+
+# v2 names the envelope on every fact; a v1-shaped fact under the v2 profile
+# is rejected by `required`, and no oneOf member is left to admit it.
+bad = copy.deepcopy(IDENTITY_DAILY_V2)
+bad["facts"] = [copy.deepcopy(FACT_SUPPORT), copy.deepcopy(FACT_PRIMARY)]
+write(I + "assembly-identity.v2-missing-envelope.json", bad)
+
+# v1 stays closed: the envelope keys under the v1 profile are additional
+# properties, so the frozen bytes cannot silently absorb the new preimage.
+bad = copy.deepcopy(IDENTITY_DAILY)
+bad["facts"] = [copy.deepcopy(FACT_SUPPORT_V2), copy.deepcopy(FACT_PRIMARY_V2)]
+write(I + "assembly-identity.v1-carries-envelope.json", bad)
 
 # --------------------------------------------------------------------------
 # reading-assembly
@@ -708,6 +761,13 @@ reissue["revision_reason"] = "safety_correction"
 reissue["supersedes_reading_id"] = PRED
 reissue["reading_key"] = f"user:{USER}:{DATE}:{RELEASE}:r2"
 write(V + "generation-command.reissue.json", reissue)
+
+# A command frozen under the v2 identity profile names the profile its
+# assembly_id was computed under.
+cmd_v2 = copy.deepcopy(COMMAND)
+cmd_v2["identity_profile"] = "patternlike.assembly-id.v2"
+cmd_v2["assembly_id"] = ASM_DAILY_V2
+write(V + "generation-command.identity-v2.json", cmd_v2)
 
 bad = copy.deepcopy(COMMAND)
 del bad["release_bundle_hash"]
@@ -1295,7 +1355,11 @@ def vector(name, description, obj, prefix="asm_"):
 reordered = {k: IDENTITY_DAILY[k] for k in reversed(list(IDENTITY_DAILY.keys()))}
 
 vectors = {
-    "profile": "patternlike.assembly-id.v1",
+    "profiles": [
+        "patternlike.assembly-id.v1",
+        "patternlike.assembly-id.v2",
+        "patternlike.cycle-id.v1",
+    ],
     "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
     "note": "canonical is the exact UTF-8 byte string; full_digest is SHA-256 of those bytes; rendered_id is the prefix plus the first 32 lowercase hex characters. An implementation that produces different bytes for any input here is not interoperable, even if its digest happens to round-trip.",
     "vectors": [
@@ -1338,6 +1402,11 @@ vectors = {
             IDENTITY_UNKNOWN,
         ),
         vector(
+            "assembly-identity-daily-v2",
+            "The same day under patternlike.assembly-id.v2: every fact carries its envelope bounds and every exact-pass instant, because the timing paragraph and the DER-02 ranking read them and the cyc_ id deliberately does not bind them. Must differ from assembly-identity-daily: a new profile is a new preimage, never a reinterpretation of the same bytes.",
+            IDENTITY_DAILY_V2,
+        ),
+        vector(
             "cycle-identity-transit",
             "The cycle identity preimage. Pass timestamps are absent by design.",
             CYCLE_IDENTITY,
@@ -1365,10 +1434,12 @@ write(
 
 print()
 print("assembly_id daily       :", ASM_DAILY)
+print("assembly_id daily v2    :", ASM_DAILY_V2)
 print("assembly_id zero-facts  :", ASM_ZERO)
 print("assembly_id unknown-time:", ASM_UNKNOWN)
 print("cycle_id                :", CYC_REAL)
 assert ASM_ZERO != ASM_UNKNOWN, "uncertainty change must change the id"
+assert ASM_DAILY != ASM_DAILY_V2, "a new identity profile must change the id"
 v = {x["name"]: x for x in vectors["vectors"]}
 assert (
     v["assembly-identity-daily"]["canonical"]

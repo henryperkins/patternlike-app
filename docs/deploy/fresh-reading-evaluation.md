@@ -1,7 +1,7 @@
 # Fresh Daily reading evaluation
 
 [The harness](../../scripts/pattern-release/fresh-reading-evaluation.mjs) generates
-fresh Codex output for six fixed fictional profiles using the actual Daily
+fresh Codex output for eight fixed fictional profiles using the actual Daily
 preparation, prompt, request conversion, and candidate validator. It calls the
 existing isolated Codex transport directly. It does not call a production
 Worker, read account data, create a durable generation job, publish a reading,
@@ -15,8 +15,10 @@ production success rate.
 
 ## Frozen inputs and fresh output
 
-The six profiles cover exact, approximate, and unknown birth time; a day with no
-cycles; a day with collective material only; and injected user text. They come
+The eight profiles cover exact, approximate, and unknown birth time; a day with no
+cycles; a day with collective material only; injected user text; and the two
+realistic full-packet profiles (a 71-fact exact-birth-time packet and its
+unknown-birth-time counterpart). They come
 from the synthetic
 [evaluation corpus](../../apps/api/test/fixtures/reading-evaluation-corpus.json).
 There are no real birth details, production account records, or D1 reads.
@@ -55,8 +57,8 @@ node scripts/pattern-release/fresh-reading-evaluation.mjs run /tmp/daily-evaluat
 ```
 
 The final argument is repetitions: one by default, an integer from one through
-three. Every repetition attempts all six profiles once, with no correction loop
-or retry. The normal budget is six invocations and the maximum is eighteen.
+three. Every repetition attempts all eight profiles once, with no correction loop
+or retry. The normal budget is eight invocations and the maximum is twenty-four.
 The existing runner applies its current timeout and output byte limit. A token
 field recorded in the request pin does not establish an additional token ceiling
 in the Codex JSON transport. Actual returned token usage is recorded per sample.

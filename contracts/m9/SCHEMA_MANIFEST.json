@@ -8,22 +8,24 @@
     {
       "package": "contracts/m7",
       "schema_version": "0.7.0",
-      "manifest_sha256": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
+      "manifest_sha256": "431417483e03c1109c13369f77a0b76e9f2389cd89c25a3d4324c0fb929a0889",
       "relationship": "frozen_pattern_reader_and_generation_predecessor",
-      "note": "M9 leaves every M7 file unchanged, retains the M7 public Pattern document, and succeeds only the Pattern state and generation control shapes that need regeneration metadata. Existing M7 replay events remain valid."
+      "note": "RE-PINNED 2026-09-13: M7 recorded the re-pinned M4 and M5 predecessors (M3's additive assembly-identity v2 amendment and M5's description restatement); its own body is unchanged from its freeze."
     },
     {
       "package": "contracts/m8",
       "schema_version": "0.8.0",
-      "manifest_sha256": "9e81e38c3c417728f5230de9e36f13f774d15b3d3a33717a6593be2df4ddc136",
+      "manifest_sha256": "a9f54c15c249130aff3e48e9b4e23fd7f01ad93d28456905a09a7b6670ddba90",
       "relationship": "current_consumer_api_predecessor",
-      "note": "M9 is a narrow Pattern overlay on the complete M8 consumer API. M8 place, consent, reading history, Save, export, and birth-budget contracts remain unchanged."
+      "note": "RE-PINNED 2026-09-13: M8 recorded the re-pinned M3, M4, M5, M6, and M7 predecessors; its own body is unchanged from its freeze."
     }
   ],
   "supersedes": [
     {
       "family": "pattern-state",
-      "documents": ["m7:pattern-state.schema.json#/$defs/patternStateDocument"],
+      "documents": [
+        "m7:pattern-state.schema.json#/$defs/patternStateDocument"
+      ],
       "note": "New state responses use M9 and add the closed regeneration block. Stored or historical M7 states remain valid under M7."
     },
     {
@@ -40,32 +42,56 @@
     {
       "file": "common.schema.json",
       "id": "https://patternlike.app/contracts/m9/common.schema.json",
-      "defines": ["claimId", "contentHash", "generationId", "generationReason", "generationState", "patternId", "patternState", "publicStage", "replayEventId", "schemaVersion"]
+      "defines": [
+        "claimId",
+        "contentHash",
+        "generationId",
+        "generationReason",
+        "generationState",
+        "patternId",
+        "patternState",
+        "publicStage",
+        "replayEventId",
+        "schemaVersion"
+      ]
     },
     {
       "file": "pattern-generation-accepted.schema.json",
       "id": "https://patternlike.app/contracts/m9/pattern-generation-accepted.schema.json",
-      "defines": ["patternGenerationAccepted"]
+      "defines": [
+        "patternGenerationAccepted"
+      ]
     },
     {
       "file": "pattern-generation-request.schema.json",
       "id": "https://patternlike.app/contracts/m9/pattern-generation-request.schema.json",
-      "defines": ["patternGenerationRequest"]
+      "defines": [
+        "patternGenerationRequest"
+      ]
     },
     {
       "file": "pattern-generation-status.schema.json",
       "id": "https://patternlike.app/contracts/m9/pattern-generation-status.schema.json",
-      "defines": ["patternGenerationStatus"]
+      "defines": [
+        "patternGenerationStatus"
+      ]
     },
     {
       "file": "pattern-regeneration-replay-event.schema.json",
       "id": "https://patternlike.app/contracts/m9/pattern-regeneration-replay-event.schema.json",
-      "defines": ["patternRegenerationReplayEvent"]
+      "defines": [
+        "patternRegenerationReplayEvent"
+      ]
     },
     {
       "file": "pattern-state.schema.json",
       "id": "https://patternlike.app/contracts/m9/pattern-state.schema.json",
-      "defines": ["chart", "pattern", "patternStateDocument", "regeneration"]
+      "defines": [
+        "chart",
+        "pattern",
+        "patternStateDocument",
+        "regeneration"
+      ]
     }
   ],
   "openapi": [
@@ -78,7 +104,17 @@
   "compatibility": {
     "json_schema": "draft/2020-12",
     "wire_format": "snake_case",
-    "frozen_unchanged_packages": ["contracts/m0", "contracts/m1", "contracts/m2", "contracts/m3", "contracts/m4", "contracts/m5", "contracts/m6", "contracts/m7", "contracts/m8"]
+    "frozen_unchanged_packages": [
+      "contracts/m0",
+      "contracts/m1",
+      "contracts/m2",
+      "contracts/m3",
+      "contracts/m4",
+      "contracts/m5",
+      "contracts/m6",
+      "contracts/m7",
+      "contracts/m8"
+    ]
   },
   "amendments": []
 }

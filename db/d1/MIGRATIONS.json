@@ -166,6 +166,11 @@
       "id": "0033_adaptive_portrait_artwork",
       "file": "0033_adaptive_portrait_artwork.sql",
       "description": "Freeze portrait chapter_count (3 through 6) and v1/v2 protocol with matching explicit consent. Rebuild the complete seven-table portrait reference closure with foreign keys enforced; preserve all v1 identities, grants, encrypted-source bindings, asset inventory, leases, completed_at, indexes and lifecycle/runtime-health triggers. Existing policy 1.1.0 grants are not promoted; explicit automation policy 2.0.0 is admitted."
+    },
+    {
+      "id": "0034_daily_reading_quality_observations",
+      "file": "0034_daily_reading_quality_observations.sql",
+      "description": "Daily reading quality observations beside each publication receipt. Adds one column to daily_publication_receipts: a JSON array of closed lowercase quality-finding tokens computed from the candidate against the frozen packet. Content-free by construction: no prose, no user id, no chart facts. Existing rows keep the empty default; nothing is rewritten."
     }
   ],
   "notes": [

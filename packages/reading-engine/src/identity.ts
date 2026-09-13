@@ -13,20 +13,32 @@
  *  3. Identical versioned inputs produce an identical id, while an uncertainty
  *     or engine-policy change that can alter output necessarily produces a
  *     different one. That is reproducibility without pretending code version is
- *     not part of the input.
+ *     not part of the input. The preimage therefore has to carry everything the
+ *     assembler reads: `patternlike.assembly-id.v2` added the cycle envelope,
+ *     which the timing paragraph renders and the DER-02 ranking reads, and
+ *     which the `cyc_` id deliberately does not bind.
  */
 
 import { jcsCanonicalize } from "./jcs.js";
 import type {
   AssemblyContextInput,
   AssemblyFactInput,
-  AssemblyIdentityInputV1,
+  AssemblyIdentityFactInput,
+  AssemblyIdentityInputV2,
   AssemblyInput,
   AssemblyUncertaintyInput,
   NormalizedContextSignal,
   NormalizedCycle,
 } from "./types.js";
 import { computePhase } from "./phase.js";
+
+/**
+ * The identity profile this engine builds. A frozen command naming any other
+ * profile was hashed over a different preimage shape and must not execute
+ * here: the executor fails it `policy_unsupported`, the same replaceable
+ * failure a retired `ASSEMBLY_POLICY_VERSION` produces.
+ */
+export const ASSEMBLY_IDENTITY_PROFILE = "patternlike.assembly-id.v2" as const;
 
 export class IdentityConsistencyError extends Error {
   readonly code = "identity_inconsistent";
@@ -42,6 +54,34 @@ function compareFacts(a: AssemblyFactInput, b: AssemblyFactInput): number {
   const bt = b.first_exact_at ?? "";
   if (at !== bt) return at < bt ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * Narrow a ranking fact to the frozen v2 identity preimage.
+ *
+ * Field by field on purpose. A spread would carry whatever `AssemblyFactInput`
+ * gains next into the assembly_id hash, and nothing downstream would notice:
+ * the contract fixtures are static bytes, so `test:contracts` keeps passing
+ * while live ids move. The envelope fields are copied, not shared, so a caller
+ * mutating its cycle after assembly cannot reach into the identity. See
+ * `AssemblyIdentityFactInput`.
+ */
+function projectIdentityFact(fact: AssemblyFactInput): AssemblyIdentityFactInput {
+  return {
+    id: fact.id,
+    fact_class: fact.fact_class,
+    technique: fact.technique,
+    body: fact.body,
+    target: fact.target,
+    aspect: fact.aspect,
+    phase: fact.phase,
+    orb_deg: fact.orb_deg,
+    first_exact_at: fact.first_exact_at,
+    pass_count: fact.pass_count,
+    start_at: fact.start_at,
+    end_at: fact.end_at,
+    pass_exact_ats: fact.pass_exact_ats === null ? null : [...fact.pass_exact_ats],
+  };
 }
 
 /** Total order on context: (source_id, signal_id). */
@@ -103,6 +143,9 @@ export function projectCycle(cycle: NormalizedCycle, localDayMidpoint: string): 
     orb_deg: cycle.orb_deg,
     first_exact_at: cycle.passes[0]?.exact_at ?? cycle.exact_at,
     pass_count: cycle.pass_count,
+    start_at: cycle.start_at,
+    end_at: cycle.end_at,
+    pass_exact_ats: cycle.passes.map((pass) => pass.exact_at),
   };
 }
 
@@ -141,8 +184,15 @@ export function buildAssemblyIdentity(
   input: AssemblyInput,
   eligibleFacts: AssemblyFactInput[],
   eligibleContext: AssemblyContextInput[],
-): AssemblyIdentityInputV1 {
+): AssemblyIdentityInputV2 {
   const uncertainty = projectUncertainty(input.chart.uncertainty);
+
+  if (input.identity_profile !== ASSEMBLY_IDENTITY_PROFILE) {
+    throw new IdentityConsistencyError(
+      `identity_profile ${String(input.identity_profile)} is not the profile this engine builds ` +
+        `(${ASSEMBLY_IDENTITY_PROFILE})`,
+    );
+  }
 
   // Two disagreeing copies of one decision is how an unknown-time chart
   // acquires an exact-time reading.
@@ -165,7 +215,7 @@ export function buildAssemblyIdentity(
     chart_fingerprint: input.chart.fingerprint,
     effective_accuracy: input.chart.effective_accuracy,
     uncertainty,
-    facts: [...eligibleFacts].sort(compareFacts),
+    facts: [...eligibleFacts].sort(compareFacts).map(projectIdentityFact),
     release_version: input.release.release.version,
     release_bundle_hash: input.release.release.bundle_hash,
     context: [...eligibleContext].sort(compareContext),
@@ -182,7 +232,7 @@ export function buildAssemblyIdentity(
  * WebCrypto, and the engine's whole value is that it is synchronous and pure.
  * The caller hashes these bytes and calls finalizeReading().
  */
-export function canonicalizeIdentity(identity: AssemblyIdentityInputV1): string {
+export function canonicalizeIdentity(identity: AssemblyIdentityInputV2): string {
   return jcsCanonicalize(identity);
 }
 

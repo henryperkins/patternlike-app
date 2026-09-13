@@ -130,8 +130,10 @@ FIXTURE_SCHEMA = {
         + "geocoder-consent.schema.json#/$defs/geocoderConsentResponse",
     },
     "m3": {
-        "assembly-identity": M3_BASE
-        + "assembly-identity.schema.json#/$defs/assemblyIdentityInputV1",
+        # The root is a oneOf over the v1 and v2 profiles (2026-09-13 amendment),
+        # so a fixture under either profile validates and a fact shaped for the
+        # other profile is rejected by both members.
+        "assembly-identity": M3_BASE + "assembly-identity.schema.json",
         "reading-assembly": M3_BASE + "reading-assembly.schema.json#/$defs/assemblyRequest",
         "reading-evidence": M3_BASE + "reading-evidence.schema.json#/$defs/readingEvidenceGraph",
         "generation-command": M3_BASE
@@ -2610,17 +2612,17 @@ M8_M5_OPENAPI_READING_RESPONSE_REF = (
 )
 M8_PREDECESSOR_HASHES = {
     "contracts/m0": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
-    "contracts/m3": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
-    "contracts/m4": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
-    "contracts/m5": "838ed53bdcd560725f9e92c719dc4a583e0833bca17c70c2261b7c1fc4879e24",
-    "contracts/m6": "f331457d0cd0738ac4a053654f563eddd84a5a93f34d01cc1965cb664d4d7c78",
-    "contracts/m7": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
+    "contracts/m3": "9b5b3125b8562d0d54dd865a333a24ef9b3a0a1ee0566f75a6604adf42e8e449",
+    "contracts/m4": "a4af3f552ee58862b3063b8ed7c1679be0de6c28a735b992a92819ff8fd968fb",
+    "contracts/m5": "6a9ef5ddcd81916f6cf7cd2b00ad43998d2b1bf42a08b60839eb60c89683ff56",
+    "contracts/m6": "bd31414bc259ffe7d4e4286ed247d10e20f05b4fb7d70ee5f5db6128503f9f96",
+    "contracts/m7": "431417483e03c1109c13369f77a0b76e9f2389cd89c25a3d4324c0fb929a0889",
 }
 
 M9_SCHEMA_VERSION = "0.9.0"
 M9_PREDECESSOR_HASHES = {
-    "contracts/m7": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
-    "contracts/m8": "9e81e38c3c417728f5230de9e36f13f774d15b3d3a33717a6593be2df4ddc136",
+    "contracts/m7": "431417483e03c1109c13369f77a0b76e9f2389cd89c25a3d4324c0fb929a0889",
+    "contracts/m8": "a9f54c15c249130aff3e48e9b4e23fd7f01ad93d28456905a09a7b6670ddba90",
 }
 M9_REQUIRED_VALID_FIXTURES = {
     "pattern-generation-accepted.source-update.json",

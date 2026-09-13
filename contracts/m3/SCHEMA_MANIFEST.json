@@ -25,6 +25,13 @@
         "rendering": "'asm_' + lowercaseHex(digest)[0:32]",
         "preimage": "assembly-identity.schema.json#/$defs/assemblyIdentityInputV1"
       },
+      "patternlike.assembly-id.v2": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "'asm_' + lowercaseHex(digest)[0:32]",
+        "preimage": "assembly-identity.schema.json#/$defs/assemblyIdentityInputV2",
+        "note": "ADDED additively 2026-09-13 — see amendments. The v1 preimage with the cycle envelope (start_at, end_at, pass_exact_ats) on every fact. v1 is unchanged and its vectors still hold; a document under either profile is valid, and which one the Worker builds is a deployment constant (packages/reading-engine ASSEMBLY_IDENTITY_PROFILE)."
+      },
       "patternlike.cycle-id.v1": {
         "scheme": "RFC 8785 JSON Canonicalization Scheme",
         "hash": "SHA-256",
@@ -135,8 +142,10 @@
       "id": "https://patternlike.app/contracts/m3/assembly-identity.schema.json",
       "defines": [
         "assemblyIdentityInputV1",
+        "assemblyIdentityInputV2",
         "assemblyUncertaintyInput",
         "assemblyFactInput",
+        "assemblyFactInputV2",
         "assemblyContextInput"
       ]
     },
@@ -398,6 +407,24 @@
         "openapi/openapi.yaml"
       ],
       "implemented_by": "apps/api/src/routes/timing.ts (GET /v1/timing)"
+    },
+    {
+      "date": "2026-09-13",
+      "kind": "additive_schema",
+      "summary": "assembly-identity.schema.json gains the patternlike.assembly-id.v2 profile, whose facts carry the cycle envelope (start_at, end_at, pass_exact_ats) that the timing paragraph renders and the DER-02 ranking reads.",
+      "detail": "The v1 fact preimage is closed over ten keys and excludes the cycle envelope, yet assembleReading has always rendered start_at and end_at into the timing paragraph, and since the DER-02 exactness rewrite (packages/reading-engine ASSEMBLY_POLICY_VERSION 1.1.0) scoreFact also reads start_at, end_at, and every exact-pass instant to decide which cycle is the primary theme. The cyc_ id deliberately excludes pass timestamps and envelope bounds (cycle-identity.schema.json: refinement may move them), so two inputs that differ only in a refined envelope produced byte-identical v1 canonical preimages and one assembly_id for two different readings — the property assembly_id exists to rule out. v2 is a second, separately named preimage (assemblyIdentityInputV2 over assemblyFactInputV2) rather than a widening of v1, because identity_profile is the domain-separation tag whose documented rule is that a preimage shape change takes a new profile value and never a reinterpretation of the same bytes. v1 documents, fixtures, and golden vectors are unchanged and still validate; the schema root oneOf gains the v2 member, common.schema.json#/$defs/identityProfile gains the value, and generation-command.schema.json#/properties/identity_profile widens from the v1 const to the exact two-value enum so a frozen command names the profile its assembly_id was computed under. Every previously valid instance still validates and no existing $id, required field, or enum member changed. A frozen v1-profile command remains a valid document; it fails policy_unsupported at execution (its assembly_policy_version is retired, and the executor also refuses any profile but the one the engine builds) and is replaced through the bounded scheduler path.",
+      "files": [
+        "assembly-identity.schema.json",
+        "common.schema.json",
+        "generation-command.schema.json",
+        "fixtures/valid/assembly-identity.daily-v2.json",
+        "fixtures/valid/generation-command.identity-v2.json",
+        "fixtures/invalid/assembly-identity.v2-missing-envelope.json",
+        "fixtures/invalid/assembly-identity.v1-carries-envelope.json",
+        "fixtures/canonicalization/jcs-golden-vectors.json",
+        "fixtures/generate_fixtures.py"
+      ],
+      "implemented_by": "packages/reading-engine/src/identity.ts (ASSEMBLY_IDENTITY_PROFILE, projectIdentityFact, buildAssemblyIdentity); packages/reading-engine/src/types.ts (AssemblyIdentityInputV2, AssemblyIdentityFactInput); apps/api/src/services/generation-command.ts (buildAssemblyInput pins the v2 profile into the frozen command); apps/api/src/services/generate-daily-reading.ts (a frozen command naming another profile fails policy_unsupported)"
     }
   ]
 }

@@ -5,10 +5,10 @@
   "status": "narrow_successor",
   "predecessor": {
     "package": "contracts/m8",
-    "manifest_sha256": "9e81e38c3c417728f5230de9e36f13f774d15b3d3a33717a6593be2df4ddc136"
+    "manifest_sha256": "a9f54c15c249130aff3e48e9b4e23fd7f01ad93d28456905a09a7b6670ddba90"
   },
   "supersedes": ["m8:geocoder-consent.schema.json"],
   "schemas": ["geocoder-consent.schema.json"],
   "openapi": ["openapi/openapi.yaml"],
-  "note": "Only the live geocoder consent changes to Geoapify. M0-M9 remain byte-for-byte unchanged. Place search and resolution retain M8 0.8.0. Historical Google grants remain audit records and do not authorize Geoapify."
+  "note": "Only the live geocoder consent changes to Geoapify. M0-M9 remain byte-for-byte unchanged apart from the 2026-09-13 M5 description-restatement amendment: M8 repinned the re-pinned M5 manifest, which changed only a facts-array ordering description and added no required field, enum, or $id, and the re-pinned M3 manifest, which gained the additive assembly-identity v2 profile on the same date. Place search and resolution retain M8 0.8.0. Historical Google grants remain audit records and do not authorize Geoapify."
 }

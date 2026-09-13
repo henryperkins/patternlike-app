@@ -16,6 +16,7 @@
 
 export { assembleReading, finalizeReading, resolveLocale, renderTimingTemplate, AssemblyError, ASSEMBLY_POLICY_ID } from "./assemble.js";
 export {
+  ASSEMBLY_IDENTITY_PROFILE,
   buildAssemblyIdentity,
   canonicalizeIdentity,
   localDayMidpoint,
@@ -97,5 +98,16 @@ export const SCHEMA_VERSION = "0.3.0" as const;
  * that can alter output for otherwise identical inputs. This value enters the
  * assembly identity preimage: two builds that would produce different prose
  * must not be able to produce the same assembly_id.
+ *
+ * 1.1.0 (2026-09-13): the DER-02 `exactness` factor was rewritten from an orb
+ * ratio against a hardcoded 3-degree ceiling to a temporal proxy over the
+ * contact's own envelope. `scoreFact` also orders the deterministic assembler
+ * (assemble.ts), so this changes which cycle becomes primary_theme for
+ * otherwise identical inputs. Commands frozen under 1.0.0 fail
+ * `policy_unsupported` at the SUPPORTED_POLICIES guard and are replaced through
+ * the bounded scheduler path; they are never executed under 1.1.0 semantics.
+ * The identity preimage moved to `patternlike.assembly-id.v2` in the same
+ * change (see ASSEMBLY_IDENTITY_PROFILE), so the envelope those factors read
+ * is inside the hash rather than beside it.
  */
-export const ASSEMBLY_POLICY_VERSION = "1.0.0" as const;
+export const ASSEMBLY_POLICY_VERSION = "1.1.0" as const;

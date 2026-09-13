@@ -14,7 +14,7 @@
  * enum drift silently — the compiler cannot tell you that one of them gained a
  * member — so the copies are retired rather than kept in step by hand.
  */
-import type { EvidenceLane, LifeDomain } from "@patternlike/shared";
+import type { EvidenceLane, LifeDomain, M5FactClass } from "@patternlike/shared";
 
 export type { EvidenceLane, LifeDomain };
 
@@ -238,7 +238,7 @@ export interface VerifiedBundle {
 // ---------------------------------------------------------------------------
 
 export interface AssemblyInput {
-  identity_profile: "patternlike.assembly-id.v1";
+  identity_profile: "patternlike.assembly-id.v2";
   schema_version: "0.3.0";
   output_schema: "daily-reading-v3";
   assembly_policy_id: "daily-reading-deterministic";
@@ -267,15 +267,30 @@ export interface AssemblyInput {
 
 export interface AssemblyFactInput {
   id: string;
-  fact_class: FactClass;
+  /**
+   * The shared ranking preimage admits both the M3 editorial vocabulary and
+   * the M5 packet vocabulary: the same DER-02 factors now order facts inside
+   * a constrained packet as well as in deterministic assembly.
+   */
+  fact_class: FactClass | M5FactClass;
   technique: string | null;
   body: string | null;
   target: string | null;
   aspect: AspectType | null;
   phase: CyclePhase | null;
+  /** The configured envelope width for a cycle, a measured orb for a natal aspect. */
   orb_deg: number | null;
   first_exact_at: string | null;
   pass_count: number | null;
+  /**
+   * Cycle envelope bounds and every exact-pass instant. Optional: ranking's
+   * exactness factor uses them to normalize temporal distance to the nearest
+   * pass against the contact's own envelope. Facts without them (natal, most
+   * daily sky) score exactness neutrally.
+   */
+  start_at: string | null;
+  end_at: string | null;
+  pass_exact_ats: string[] | null;
 }
 
 export interface AssemblyContextInput {
@@ -286,8 +301,45 @@ export interface AssemblyContextInput {
   normalized_hash?: string;
 }
 
-export interface AssemblyIdentityInputV1 {
-  identity_profile: "patternlike.assembly-id.v1";
+/**
+ * The fact shape of the assembly-identity preimage under
+ * `patternlike.assembly-id.v2`, frozen by
+ * contracts/m3/assembly-identity.schema.json ($defs/assemblyFactInputV2: an
+ * `additionalProperties: false` object over exactly these thirteen keys).
+ *
+ * v2 is the v1 fact plus the cycle envelope. The envelope has to be in the hash
+ * because output depends on it: the timing paragraph renders `start_at` and
+ * `end_at`, the DER-02 exactness factor reads every exact-pass instant, and the
+ * `cyc_` id deliberately excludes pass timestamps (refinement may move them) —
+ * so under v1 two inputs that differed only in a refined envelope produced one
+ * assembly_id for two different readings.
+ *
+ * Deliberately NOT `AssemblyFactInput`. That type is the *ranking* preimage and
+ * is allowed to grow. Anything it grows would otherwise flow straight into the
+ * assembly_id hash and change every id under an unchanged `identity_profile`,
+ * which is the one thing the schema forbids by name: "Changing the preimage
+ * shape requires a new profile value, never a silent reinterpretation of the
+ * same bytes." Two separate types is what makes that impossible to do by
+ * accident; growing this one means a v3 profile.
+ */
+export interface AssemblyIdentityFactInput {
+  id: string;
+  fact_class: FactClass | M5FactClass;
+  technique: string | null;
+  body: string | null;
+  target: string | null;
+  aspect: AspectType | null;
+  phase: CyclePhase | null;
+  orb_deg: number | null;
+  first_exact_at: string | null;
+  pass_count: number | null;
+  start_at: string | null;
+  end_at: string | null;
+  pass_exact_ats: string[] | null;
+}
+
+export interface AssemblyIdentityInputV2 {
+  identity_profile: "patternlike.assembly-id.v2";
   schema_version: "0.3.0";
   assembly_policy_id: "daily-reading-deterministic";
   assembly_policy_version: string;
@@ -298,7 +350,7 @@ export interface AssemblyIdentityInputV1 {
   chart_fingerprint: string;
   effective_accuracy: BirthTimeAccuracy;
   uncertainty: AssemblyUncertaintyInput;
-  facts: AssemblyFactInput[];
+  facts: AssemblyIdentityFactInput[];
   release_version: string;
   release_bundle_hash: string;
   context: AssemblyContextInput[];
@@ -408,7 +460,7 @@ export interface Rejection {
 }
 
 export interface AssemblyOutcome {
-  identity: AssemblyIdentityInputV1;
+  identity: AssemblyIdentityInputV2;
   /** RFC 8785 canonical UTF-8 bytes of `identity`. The caller SHA-256s this. */
   identity_canonical: string;
   reading: DailyReading;

@@ -12,7 +12,7 @@ import { currentCategoricalFeedbackMatches } from "./reading-feedback-admission.
 
 const CREATED = new Date("2026-09-09T12:00:00.000Z");
 const DEADLINE = new Date("2026-09-09T13:00:00.000Z");
-const POLICY = "1.2.0";
+const POLICY = "1.4.0";
 
 async function context(now: Date, selectionVersion = POLICY) {
   return loadConstrainedContext(env, IDENTITY_A, "2026-09-10", { selectionVersion, anchor: now });
@@ -61,7 +61,7 @@ describe("current categorical feedback authorization", () => {
     expect(await currentCategoricalFeedbackMatches(env, USER_A, [pin], POLICY, before)).toBe(true);
     expect((await context(DEADLINE)).signals.some((signal) => signal.signal_id === pin.signal_id)).toBe(false);
     expect(await currentCategoricalFeedbackMatches(env, USER_A, [pin], POLICY, DEADLINE)).toBe(false);
-    expect(await context(before, "1.1.0")).toEqual(await context(DEADLINE, "1.1.0"));
+    expect(await context(before, "1.3.0")).toEqual(await context(DEADLINE, "1.3.0"));
   });
 
   it.each(["expired-policy", "usr-12-v2"])("rejects a changed current consent policy %s", async (policy) => {

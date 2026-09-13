@@ -30,8 +30,7 @@ import {
 import {
   MAX_COMMAND_GENERATION,
   type CommandReplacementReason,
-  isAutomaticReplacementFailure,
-  isGenerationFailureCode,
+  automaticReplacementReason,
   isV1ReplacementReason,
   isV5ReplacementReason,
   type GenerationReplacementReason,
@@ -226,11 +225,13 @@ export type ReplaceEnqueueOutcome =
 /**
  * Re-freeze a terminally failed day against working dependencies.
  *
- * Scoped three ways, and each bound is deliberate. Only infrastructural reasons
- * may be applied by `actor: "scheduler"` — deciding that a reading should be
- * re-frozen with less context, under a new policy vintage, or because someone
- * diagnosed a defect are all judgements about a specific person or a specific
- * editorial decision, so they stay operator-only. The budget is
+ * Scoped three ways, and each bound is deliberate. `actor: "scheduler"` may
+ * apply only the reason `automaticReplacementReason` derives from the terminal
+ * job's own result class, so an automated caller cannot make a judgement —
+ * re-freezing with less context, or because someone diagnosed a defect, stays
+ * operator-only. `policy_upgraded` reaches the scheduler only as the image of a
+ * `policy_unsupported` failure: a pin this deployment retired is a fact about
+ * the deployment, not a decision about the reader. The budget is
  * `command_generation < MAX_COMMAND_GENERATION`, giving at most two automatic
  * attempts with the launch policy, because each
  * replacement re-freezes a NEW command and a wider budget turns a persistent
@@ -260,7 +261,10 @@ export async function replaceFailedCommand(
             command_generation, active_generation_job_id, assembly_mode,
             (SELECT status FROM daily_readings predecessor
              WHERE predecessor.id = daily_readings.supersedes_reading_id
-               AND predecessor.user_id = daily_readings.user_id) AS predecessor_status
+               AND predecessor.user_id = daily_readings.user_id) AS predecessor_status,
+            (SELECT result_class FROM jobs
+             WHERE jobs.id = daily_readings.active_generation_job_id
+               AND jobs.user_id = daily_readings.user_id) AS active_job_result_class
      FROM daily_readings WHERE id = ? AND user_id = ?`,
   )
     .bind(readingId, userId)
@@ -275,6 +279,7 @@ export async function replaceFailedCommand(
       active_generation_job_id: string | null;
       assembly_mode: "deterministic" | "constrained_model";
       predecessor_status: string | null;
+      active_job_result_class: string | null;
     }>();
   if (!reservation || reservation.status !== "failed" || !reservation.active_generation_job_id) {
     return {
@@ -285,11 +290,20 @@ export async function replaceFailedCommand(
   }
 
   const commandVersion = reservation.assembly_mode === "constrained_model" ? "v2" : "v1";
+  // The scheduler may record exactly one reason: the one the closed mapping
+  // derives from the terminal job's own result class. Checking the reason
+  // against the failure-code vocabulary instead would reject every mapped
+  // reason (`policy_upgraded` is a replacement reason, never a failure code,
+  // so a V1 day that failed `policy_unsupported` could never recover) and
+  // would accept any automatic reason for any failure.
+  const automaticReason =
+    reservation.active_job_result_class === null
+      ? null
+      : automaticReplacementReason(commandVersion, reservation.active_job_result_class);
   if (
     (commandVersion === "v1" && !isV1ReplacementReason(reason)) ||
     (commandVersion === "v2" && !isV5ReplacementReason(reason)) ||
-    (actor === "scheduler" &&
-      (!isGenerationFailureCode(reason) || !isAutomaticReplacementFailure(commandVersion, reason))) ||
+    (actor === "scheduler" && (automaticReason === null || automaticReason !== reason)) ||
     (actor === "first_open" &&
       (commandVersion !== "v2" ||
         (reason !== "consent_regranted" && reason !== "publisher_superseded")))

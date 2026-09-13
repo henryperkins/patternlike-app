@@ -6,9 +6,9 @@ import { join } from "node:path";
 import { REPO_ROOT } from "./candidates.mjs";
 import { prepareFreshReadingEvaluation, runFreshReadingEvaluation } from "./fresh-reading-evaluation.mjs";
 
-test("fresh evaluation prepares every synthetic shape with the real prompt and frozen validator inputs", async () => {
+test("fresh evaluation prepares every synthetic profile with the real prompt and frozen validator inputs", async () => {
   const plan = await prepareFreshReadingEvaluation();
-  assert.equal(plan.cases.length, 6);
+  assert.equal(plan.cases.length, 8);
   assert.equal(plan.pin.prompt_version, "1.0.3");
   assert.equal(new Set(plan.cases.map((entry) => entry.shape)).size, 6);
   for (const entry of plan.cases) {
@@ -27,9 +27,9 @@ test("rejected fresh output is retained and a test double cannot become fresh-pr
     const report = await runFreshReadingEvaluation({ destination: join(root, "run"), codexBin: "not-executed",
       invoke: async () => { calls += 1; return { ok: true, output: '{"invented":"private provider marker"}',
         providerRequestId: `synthetic-${calls}`, inputTokens: 17, outputTokens: 9 }; } });
-    assert.equal(calls, 6); assert.equal(report.execution_kind, "test_double");
+    assert.equal(calls, 8); assert.equal(report.execution_kind, "test_double");
     assert.equal(report.provider_samples_observed, false); assert.equal(report.accepted, 0);
-    assert.equal(report.rejected, 6); assert.equal(report.passed, false);
+    assert.equal(report.rejected, 8); assert.equal(report.passed, false);
     assert.equal(report.independent_review.status, "unverified");
     assert(!JSON.stringify(report).includes("private provider marker"));
     assert.equal(report.samples.every((sample) => sample.output_sha256?.length === 64), true);
@@ -45,7 +45,7 @@ test("fatal transport failure stops remaining calls, retains the failure and lea
     let calls = 0;
     const report = await runFreshReadingEvaluation({ destination: join(root, "run"), codexBin: "not-executed",
       invoke: async () => { calls += 1; return { ok: false, code: "publisher_auth_failed", safeDetailCode: "authentication_failed", fatal: true }; } });
-    assert.equal(calls, 1); assert.equal(report.not_attempted, 5);
+    assert.equal(calls, 1); assert.equal(report.not_attempted, 7);
     assert.equal(report.transport_failures, 1); assert.equal(report.passed, false);
     assert.equal(report.provider_samples_observed, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -70,7 +70,7 @@ test("edits after application import cannot be attributed to cached code or invo
     assert.equal(calls, 0);
     assert.equal(report.loaded_source_comparison.ok, false);
     assert(report.loaded_source_comparison.added.includes(marker));
-    assert.equal(report.not_attempted, 6);
+    assert.equal(report.not_attempted, 8);
     assert.equal(report.passed, false);
   } finally { rmSync(path, { force: true }); rmSync(root, { recursive: true, force: true }); }
 });

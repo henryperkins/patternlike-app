@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://patternlike.app/contracts/m3/assembly-identity.schema.json",
-  "title": "Assembly Identity Preimage (patternlike.assembly-id.v1)",
-  "description": "The exact, closed object whose RFC 8785 canonical bytes are hashed to produce assembly_id. This document is the hash preimage, not a wire message: it lives only in the trusted plane, and the value derived from it is what crosses the assembly boundary in place of M0's reading_key. Spec section 10 forbids stable direct identifiers at the model boundary; a required reading_key embedding the user id violated that, and a comment cannot enforce a prohibition. Canonicalization: JSON Canonicalization Scheme (RFC 8785) over validated I-JSON, with every array put into its contractual total order BEFORE canonicalization because JCS deliberately preserves array order.",
+  "title": "Assembly Identity Preimage (patternlike.assembly-id.v1, patternlike.assembly-id.v2)",
+  "description": "The exact, closed object whose RFC 8785 canonical bytes are hashed to produce assembly_id. This document is the hash preimage, not a wire message: it lives only in the trusted plane, and the value derived from it is what crosses the assembly boundary in place of M0's reading_key. Spec section 10 forbids stable direct identifiers at the model boundary; a required reading_key embedding the user id violated that, and a comment cannot enforce a prohibition. Canonicalization: JSON Canonicalization Scheme (RFC 8785) over validated I-JSON, with every array put into its contractual total order BEFORE canonicalization because JCS deliberately preserves array order. Two profiles: patternlike.assembly-id.v1 is the launch preimage and stays byte-frozen; patternlike.assembly-id.v2 (2026-09-13 amendment) is the same document with the cycle envelope on every fact, because the timing paragraph renders start_at/end_at and the DER-02 exactness factor reads every exact-pass instant, while the cyc_ id deliberately excludes pass timestamps — so under v1 two inputs differing only in a refined envelope produced one assembly_id for two different readings. A new profile value, never a reinterpretation of the same bytes.",
   "$defs": {
     "assemblyUncertaintyInput": {
       "type": "object",
@@ -103,6 +103,85 @@
           ]
         },
         "pass_count": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "assemblyFactInputV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fact_class", "start_at", "end_at", "pass_exact_ats"],
+      "description": "One normalized calculated fact under patternlike.assembly-id.v2: the v1 fact plus the cycle envelope. start_at, end_at, and every exact-pass instant enter the preimage because the timing paragraph renders the first two and the DER-02 exactness factor reads all three, while the cyc_ id deliberately excludes pass timestamps (refinement may move them) — so without them two inputs that differ only in a refined envelope share one assembly_id. Null on a fact that carries no envelope. Ordered by (first_exact_at, id) with a total tie-break on id. No storage row id, no user linkage, no free-form text.",
+      "properties": {
+        "id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "fact_class": { "$ref": "common.schema.json#/$defs/factClass" },
+        "technique": { "type": ["string", "null"] },
+        "body": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+            }
+          ]
+        },
+        "target": { "type": ["string", "null"] },
+        "aspect": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+            }
+          ]
+        },
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            }
+          ]
+        },
+        "orb_deg": { "type": ["number", "null"], "minimum": 0, "maximum": 12 },
+        "first_exact_at": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ]
+        },
+        "pass_count": { "type": ["integer", "null"], "minimum": 1 },
+        "start_at": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ],
+          "description": "Envelope entry (orb ingress), exactly as scanned."
+        },
+        "end_at": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ],
+          "description": "Envelope exit (orb egress), exactly as scanned."
+        },
+        "pass_exact_ats": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "array",
+              "minItems": 0,
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+              }
+            }
+          ],
+          "description": "Every exact-pass instant in pass order, exactly as scanned. first_exact_at is its first element when present."
+        }
       }
     },
     "assemblyContextInput": {
@@ -215,12 +294,103 @@
         "revision": { "$ref": "common.schema.json#/$defs/readingRevision" }
       },
       "$comment": "effective_accuracy must equal uncertainty.accuracy — two disagreeing copies of the same decision is how an unknown-time chart acquires an exact-time reading. JSON Schema 2020-12 cannot compare two sibling values, so this one rule is enforced in code (assertIdentityConsistent in packages/reading-engine) and pinned by the invalid fixture assembly-identity.accuracy-mismatch.json. Nothing else in this document relies on out-of-band enforcement."
+    },
+    "assemblyIdentityInputV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_profile",
+        "schema_version",
+        "assembly_policy_id",
+        "assembly_policy_version",
+        "output_schema",
+        "local_date",
+        "target_timezone",
+        "generation_anchor",
+        "chart_fingerprint",
+        "effective_accuracy",
+        "uncertainty",
+        "facts",
+        "release_version",
+        "release_bundle_hash",
+        "context",
+        "locale",
+        "domain_preference",
+        "revision"
+      ],
+      "properties": {
+        "identity_profile": {
+          "const": "patternlike.assembly-id.v2",
+          "description": "Domain separation. v2 is v1 with the cycle envelope on every fact (assemblyFactInputV2); it exists because changing the preimage shape requires a new profile value, never a silent reinterpretation of the same bytes."
+        },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "assembly_policy_id": {
+          "$ref": "common.schema.json#/$defs/assemblyPolicyId"
+        },
+        "assembly_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion",
+          "description": "Bumps for any ranking, selection, rendering, fallback, or validation change that can alter output for otherwise identical inputs. Pretending code version is not an input is how two different readings acquire one id."
+        },
+        "output_schema": {
+          "$ref": "common.schema.json#/$defs/outputSchemaName"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "target_timezone": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone",
+          "description": "Included because it changes locale-formatted timing dates even when every UTC cycle timestamp is identical."
+        },
+        "generation_anchor": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Written into the command before its first attempt and never recomputed from a clock. This is what makes a retry reproduce the same id."
+        },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "uncertainty": { "$ref": "#/$defs/assemblyUncertaintyInput" },
+        "facts": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/assemblyFactInputV2" },
+          "description": "May be empty. Most days have no cycle inside orb, and that day still has an identity and a reviewed fallback reading."
+        },
+        "release_version": { "type": "string", "minLength": 1 },
+        "release_bundle_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/assemblyContextInput" }
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        },
+        "revision": { "$ref": "common.schema.json#/$defs/readingRevision" }
+      },
+      "$comment": "Same out-of-band rule as v1: effective_accuracy must equal uncertainty.accuracy, enforced by buildAssemblyIdentity in packages/reading-engine (IdentityConsistencyError). The v2 fact shape is held to this schema's closed key list by packages/reading-engine/src/assemble.test.ts, which reads the property names out of assemblyFactInputV2 rather than repeating them."
     }
   },
   "oneOf": [
     {
       "title": "AssemblyIdentityInputV1",
       "$ref": "#/$defs/assemblyIdentityInputV1"
+    },
+    {
+      "title": "AssemblyIdentityInputV2",
+      "$ref": "#/$defs/assemblyIdentityInputV2"
     }
   ]
 }

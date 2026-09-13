@@ -236,7 +236,7 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/requestFact" },
-          "description": "Ordered by (lane_rank, fact_id). Never empty: the calculated daily-sky layer guarantees at least an anchor and a phase, so a zero-cycle day is still a factual day."
+          "description": "Ordered by lane_rank, then by DER-02 ranking score within the lane (descending, with a total tie-break on exact-pass instant and fact_id). Never empty: the calculated daily-sky layer guarantees at least an anchor and a phase, so a zero-cycle day is still a factual day."
         },
         "context": {
           "type": "array",

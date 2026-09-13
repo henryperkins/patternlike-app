@@ -6,6 +6,9 @@ import {
 } from "@patternlike/reading-engine";
 import type { ReadingGenerationOutput } from "@patternlike/shared";
 import corpusJson from "../../test/fixtures/reading-evaluation-corpus.json";
+import { qualitativeFindings } from "./reading-quality.js";
+
+export { qualitativeFindings };
 
 /**
  * Shared preparation and scoring for offline corpus revalidation and fresh
@@ -142,63 +145,11 @@ export function evaluateCase(
   };
 }
 
-const HYPE = /\b(?:amazing|incredible|unlock|manifest|destiny|magical|epic|game[- ]chang\w+)\b/i;
-
 /**
- * Aggregate quality signals, deliberately separate from the hard gates.
- *
- * A reading that repeats yesterday's framing is worse; it is not wrong. Folding
- * these into publication would mean an honest unavailable state instead of a
- * slightly dull reading, which is the wrong trade for the reader. They are
- * scored, reported, and allowed to regress a threshold — not to reject a
- * candidate.
+ * Aggregate quality signals live in reading-quality.ts so the production
+ * publication path can observe them without importing the offline corpus
+ * fixture. Re-exported above for the evaluation callers.
  */
-export function qualitativeFindings(
-  prepared: PreparedConstrainedReadingInput,
-  candidate: ReadingGenerationOutput,
-): string[] {
-  const findings: string[] = [];
-  const units = [
-    candidate.lead,
-    ...candidate.paragraphs,
-    candidate.reflection_prompt,
-    ...(candidate.uncertainty_note ? [candidate.uncertainty_note] : []),
-  ];
-  const allText = [candidate.headline, ...units.map((unit) => unit.text)].join(" ");
-
-  // Usefulness: the reflection has to be a question the reader can sit with,
-  // not a restatement of the lead.
-  if (!candidate.reflection_prompt.text.trim().endsWith("?")) {
-    findings.push("reflection_is_not_a_question");
-  }
-  if (candidate.lead.text.trim().split(/\s+/).length < 12) {
-    findings.push("lead_too_thin");
-  }
-
-  // Personalization: context was compiled and permitted, and nothing used it.
-  if (
-    prepared.request.context.length > 0 &&
-    units.every((unit) => unit.context_refs.length === 0)
-  ) {
-    findings.push("context_supplied_but_unused");
-  }
-
-  // Repetition: the reader saw these words recently.
-  for (const prior of prepared.request.prior_readings) {
-    if (prior.headline.trim().toLowerCase() === candidate.headline.trim().toLowerCase()) {
-      findings.push("headline_repeats_a_recent_reading");
-    }
-    if (prior.lead.trim().toLowerCase() === candidate.lead.text.trim().toLowerCase()) {
-      findings.push("lead_repeats_a_recent_reading");
-    }
-  }
-
-  // Tone: the product's voice is calm, precise, and non-mystifying.
-  if (/!/.test(allText)) findings.push("exclamation");
-  if (HYPE.test(allText)) findings.push("hype_vocabulary");
-
-  return [...new Set(findings)];
-}
 
 export interface CorpusReport {
   corpus_version: string;

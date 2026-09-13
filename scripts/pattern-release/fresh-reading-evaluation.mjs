@@ -128,7 +128,7 @@ async function main() {
     await write(path, { schema_version: "fresh-reading-evaluation-plan.v1", provider_invoked: false, pin: plan.pin,
       source_snapshot_sha256: loadedSource.files_sha256,
       corpus_version: plan.corpus_version, cases: plan.cases.map(({ id, shape, claim }) => ({ id, shape, invocation_sha256: sha256Hex(canonicalJson(claim.invocation)) })) });
-    process.stdout.write("Prepared six fictional profiles; no provider invoked.\n");
+    process.stdout.write("Prepared eight fictional profiles; no provider invoked.\n");
   } else {
     const controller = new AbortController();
     const stop = () => controller.abort();

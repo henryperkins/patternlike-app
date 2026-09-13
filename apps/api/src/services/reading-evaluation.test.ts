@@ -16,6 +16,7 @@ import {
 import {
   SELECTION_POLICY_VERSION,
   VALIDATION_POLICY_VERSION,
+  type ConstrainedNatalFactInput,
 } from "@patternlike/reading-engine";
 
 /**
@@ -51,7 +52,7 @@ describe("the evaluation corpus", () => {
       validation_policy_version: VALIDATION_POLICY_VERSION,
       evaluation_policy_version: EVALUATION_POLICY_VERSION,
     });
-    expect(corpus.corpus_version).toBe("1.1.1");
+    expect(corpus.corpus_version).toBe("1.2.0");
     expect(corpus.base.prompt_version).toBe("1.0.3");
   });
 
@@ -105,6 +106,42 @@ describe("the evaluation corpus", () => {
       expect(corpus.cases.some((entry) => entry.profile === profile
         && entry.id.endsWith(".accept.relational") && entry.expect === "accept"), profile).toBe(true);
     }
+  });
+
+  it("keeps the two full-packet profiles one chart, differing only by suppression", () => {
+    // The pair exists to model ONE chart read two ways: exact birth time, then
+    // the same chart with time-sensitive facts omitted. They share a
+    // chart.fingerprint and each body keeps one fact_id across both, so a body
+    // that appears in both must appear identically. A generator that derived
+    // sign and degree from a post-filter array index broke exactly this: the
+    // dropped Moon and angles re-indexed every later body, so Mercury sat in a
+    // different sign in each profile under an unchanged fact_id.
+    const positions = (profileId: string) => {
+      // `overrides` is Record<string, unknown> because the corpus is read as
+      // JSON; the compiler in prepareProfile is what actually validates it.
+      const facts = (corpus.profiles[profileId]!.overrides.natal_facts ??
+        []) as ConstrainedNatalFactInput[];
+      return new Map(
+        facts
+          .filter((fact) => fact.fact_class === "natal_position")
+          .map((fact) => [fact.body, fact] as const),
+      );
+    };
+    const exact = positions("exact_full_packet");
+    const unknown = positions("unknown_full_packet");
+
+    expect(unknown.size).toBeGreaterThan(0);
+    for (const [body, fact] of unknown) {
+      expect(exact.get(body), `${body} is absent from the exact-time profile`).toBeDefined();
+      expect(fact, `${body} differs between the two readings of one chart`).toEqual(
+        exact.get(body),
+      );
+    }
+
+    // The difference between them is suppression, and only of time-sensitive
+    // placements: the Moon and the two angles a birth time is needed to place.
+    const suppressed = [...exact.keys()].filter((body) => !unknown.has(body)).sort();
+    expect(suppressed).toEqual(["ascendant", "midheaven", "moon"]);
   });
 
   it("compiles every profile through the real constrained-input compiler", () => {

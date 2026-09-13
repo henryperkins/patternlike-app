@@ -153,12 +153,16 @@ function projectCycles(cycles: readonly NormalizedCycle[], referenceAt: string):
         aspect: cycle.aspect,
         phase,
         orb_deg: cycle.orb_deg,
-        first_exact_at: cycle.exact_at,
+        first_exact_at: cycle.passes[0]?.exact_at ?? cycle.exact_at,
         pass_count: cycle.pass_count,
+        start_at: cycle.start_at,
+        end_at: cycle.end_at,
+        pass_exact_ats: cycle.passes.map((pass) => pass.exact_at),
       }, {
         domainPreference: null,
         matchingCycleObject: null,
         seenRecently: false,
+        at: referenceAt,
       }),
     };
   });

@@ -50,9 +50,15 @@ import type {
  * `generation_input_id`.
  */
 export const SELECTION_POLICY_ID = "constrained-context-selection" as const;
-export const SELECTION_POLICY_VERSION = "1.1.0" as const;
-/** Opt-in categorical feedback projection; incumbent pins retain 1.1.0. */
-export const CATEGORIZED_FEEDBACK_SELECTION_VERSION = "1.2.0" as const;
+/**
+ * 1.3.0: facts are ordered within each lane by DER-02 score (with the
+ * corrected exactness factor) instead of by hash-prefix `fact_id`. Frozen
+ * commands pinned to 1.1.0/1.2.0 fail `policy_unsupported` and are replaced
+ * through the bounded scheduler path rather than executed under new semantics.
+ */
+export const SELECTION_POLICY_VERSION = "1.3.0" as const;
+/** Opt-in categorical feedback projection over the 1.3.0 selection policy. */
+export const CATEGORIZED_FEEDBACK_SELECTION_VERSION = "1.4.0" as const;
 
 /**
  * Bump for ANY change to what a candidate must satisfy. Stored in v5 evidence,

@@ -40,6 +40,11 @@ export interface DailyPublicationReceiptInput {
   workerVersionId: string;
   /** The commit that version was built from. */
   releaseGitSha: string;
+  /**
+   * Closed lowercase quality-finding tokens (see reading-quality.ts), sorted
+   * and deduplicated. Content-free: never candidate prose, never reader text.
+   */
+  qualitativeFindings: string[];
 }
 
 /**
@@ -61,8 +66,9 @@ export function buildDailyPublicationReceiptInsert(
        provider, provider_job_id, stage_generation, stage_attempt,
        model, reasoning_effort, prompt_version,
        request_hash, response_hash, input_tokens, output_tokens,
-       provider_completed_at, worker_version_id, release_git_sha, published_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       provider_completed_at, worker_version_id, release_git_sha, published_at,
+       qualitative_findings_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     newId("dpr"),
     receipt.readingId,
@@ -83,6 +89,7 @@ export function buildDailyPublicationReceiptInsert(
     receipt.workerVersionId,
     receipt.releaseGitSha,
     now,
+    JSON.stringify([...new Set(receipt.qualitativeFindings)].sort()),
   );
 }
 

@@ -1,4 +1,5 @@
 import {
+  ASSEMBLY_IDENTITY_PROFILE,
   ASSEMBLY_POLICY_ID,
   ASSEMBLY_POLICY_VERSION,
   assembleReading,
@@ -304,6 +305,16 @@ export async function generateDailyReading(
     return fail(
       "policy_unsupported",
       `no registered implementation for ${command.assembly_policy_id}@${command.assembly_policy_version}`,
+    );
+  }
+  // The frozen assembly_id was hashed over a specific preimage shape. Rebuilding
+  // the identity under another profile could only produce assembly_id_mismatch,
+  // which is terminal and not replaceable; naming the real cause here keeps the
+  // day on the bounded replacement path instead.
+  if (command.identity_profile !== ASSEMBLY_IDENTITY_PROFILE) {
+    return fail(
+      "policy_unsupported",
+      `no registered implementation for identity profile ${command.identity_profile}`,
     );
   }
 

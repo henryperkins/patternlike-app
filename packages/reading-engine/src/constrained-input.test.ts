@@ -30,13 +30,16 @@ import {
 import {
   ConstrainedInputError,
   prepareConstrainedReadingInput,
+  toAssemblyFact,
   utf8ByteLength,
 } from "./constrained-input.js";
+import { compareScored, scoreFact } from "./ranking.js";
+import { localDayMidpoint } from "./identity.js";
 import type { NormalizedCycle } from "./types.js";
 
 test("categorical feedback keeps exact private targets in frozen pins and aliases the provider projection", () => {
   const input = baseInput({
-    selection_policy_version: "1.2.0", prompt_version: "1.0.4",
+    selection_policy_version: "1.4.0", prompt_version: "1.0.4",
     context_sources: [source("USR-12", ["repetition_control"])],
     context_signals: [signal("rfe_private", "USR-12", ["repetition_control"], "2026-07-29T10:00:00Z", {
       category: "reading_feedback", content: { kind: "structured", value: {
@@ -53,7 +56,7 @@ test("categorical feedback keeps exact private targets in frozen pins and aliase
   assert.equal(packet.includes("rfe_private"), false);
   assert.match(packet, /target_ref/);
   assert.equal(JSON.stringify(prepared.selected_context).includes("rdg_private"), true);
-  const incumbent = prepareConstrainedReadingInput({ ...input, selection_policy_version: "1.1.0", prompt_version: "1.0.3" });
+  const incumbent = prepareConstrainedReadingInput({ ...input, selection_policy_version: "1.3.0", prompt_version: "1.0.3" });
   assert.deepEqual(prepared.selected_facts, incumbent.selected_facts);
   assert.notEqual(prepared.identity_canonical, incumbent.identity_canonical);
 });
@@ -354,7 +357,7 @@ test("every eligible calculated fact is included before any context budgeting", 
   );
 });
 
-test("facts are ordered by (lane_rank, fact_id) and lanes follow reading priority", () => {
+test("facts are ordered by lane_rank then DER-02 score, and lanes follow reading priority", () => {
   const prepared = prepareConstrainedReadingInput(
     baseInput({ daily_sky_facts: [SUN_ANCHOR, MOON_ANCHOR, LUNAR_PHASE_FACT, CONTACT_FACT, HOUSE_FACT] }),
   );
@@ -367,7 +370,33 @@ test("facts are ordered by (lane_rank, fact_id) and lanes follow reading priorit
   assert.equal(byId.get(SUN_ANCHOR.fact_id)?.lane_rank, 3);
   assert.equal(byId.get(prepared.request.facts.at(-1)!.fact_id)?.lane_rank, 4);
 
-  const ordered = [...prepared.request.facts].sort((a, b) =>
+  // Lane rank never decreases across the packet.
+  for (let i = 1; i < prepared.request.facts.length; i += 1) {
+    assert.ok(prepared.request.facts[i - 1]!.lane_rank <= prepared.request.facts[i]!.lane_rank);
+  }
+
+  // Within a lane the packet order is the DER-02 order, not hash-prefix order.
+  const byLane = new Map<number, typeof prepared.selected_facts>();
+  for (const fact of prepared.selected_facts) {
+    const lane = byLane.get(fact.lane_rank) ?? [];
+    lane.push(fact);
+    byLane.set(fact.lane_rank, lane);
+  }
+  for (const lane of byLane.values()) {
+    const midpoint = localDayMidpoint("2026-07-30T05:00:00Z", "2026-07-31T05:00:00Z");
+    const ranked = [...lane].sort((a, b) =>
+      compareScored(
+        scoreFact(toAssemblyFact(a, midpoint), { domainPreference: null, matchingCycleObject: null, seenRecently: false, at: midpoint }),
+        scoreFact(toAssemblyFact(b, midpoint), { domainPreference: null, matchingCycleObject: null, seenRecently: false, at: midpoint }),
+      ),
+    );
+    assert.deepEqual(lane.map((f) => f.fact_id), ranked.map((f) => f.fact_id));
+  }
+
+  // The packet is no longer hash-prefix ordered inside a lane: the ranked
+  // order differs from (lane_rank, fact_id) on this fixture, which is the
+  // point of the selection-policy change.
+  const hashOrdered = [...prepared.request.facts].sort((a, b) =>
     a.lane_rank !== b.lane_rank
       ? a.lane_rank - b.lane_rank
       : a.fact_id < b.fact_id
@@ -376,7 +405,7 @@ test("facts are ordered by (lane_rank, fact_id) and lanes follow reading priorit
           ? 1
           : 0,
   );
-  assert.deepEqual(ALL_FACT_IDS(prepared), ordered.map((f) => f.fact_id));
+  assert.notDeepEqual(ALL_FACT_IDS(prepared), hashOrdered.map((f) => f.fact_id));
 });
 
 test("internal support keeps calculation roles and a detached source record off the provider wire", () => {
