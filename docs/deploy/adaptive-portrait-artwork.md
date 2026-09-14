@@ -3,6 +3,12 @@
 Selected by the owner on September 11, 2026. This document describes the local
 implementation and the required deployment order; it is not a deployment receipt.
 
+**Production status (2026-09-11):** `0033_adaptive_portrait_artwork.sql` is
+applied (78 commands, 19:59 UTC). Committed
+`PATTERN_ADAPTIVE_PORTRAITS_ENABLED` remains `"0"` in both Wrangler blocks.
+The sequence below is the required order for a *future* adaptive enablement,
+not a pending apply. Confirm `d1_migrations` rather than this paragraph.
+
 V2 reserves the accepted Pattern's three-to-six-chapter count and creates one
 image job per chapter. Explicit automation consent also permits one mesh job per
 chapter. A ready result contains exactly that complete ordered set. The existing
