@@ -63,6 +63,27 @@ On a fresh local database, run the seed command afterward. It idempotently
 creates the local `users` row with its crypto subject and wrapped DEK. It does
 not create an `identities` row or grant account-processing consent.
 
+### Regenerated Worker artifacts
+
+Two families under `apps/api/src/generated/` are build output. Hand-editing
+them fails the next API test or build, and a schema change without
+regeneration leaves the Worker validating against stale bytes.
+
+| After you edit | Run |
+| --- | --- |
+| Any file under `contracts/` | `npm run generate:validators -w @patternlike/api` |
+| Any file listed in `apps/api/pattern-creation-sources.json` | `npm run generate:pattern-source -w @patternlike/api` |
+
+`pretest` and `prebuild` run the matching `check:*` scripts, so a stale file
+fails every API lane before a test runs. Never add a runtime `new Ajv`,
+`addSchema`, or `compile` call in `apps/api/src` — compiling at startup
+exceeds the Worker CPU budget, and compiling at request time is forbidden
+dynamic code generation. See `CLAUDE.md` (“Generated Worker validators”).
+
+`evals/promptfoo/` is optional operator tooling **outside** the npm
+workspaces. It never joins `ci:local`. A Daily run there is exploration
+evidence, not merge approval. See [`evals/promptfoo/README.md`](evals/promptfoo/README.md).
+
 ### Birth → chart (local)
 
 ```bash
@@ -351,6 +372,44 @@ new user-owned table missing from that list — or from
 `services/deletion-manifest.ts` — leaks rows between suites or fails
 deletion tests.
 
+### Reader connections and categorical feedback
+
+Published Daily paragraphs can name the exact Pattern chapter or Timing pass
+they rest on. Support is written at publication into
+`reader_relationship_supports` (migration `0030`); older readings simply have
+none — there is no backfill. A browser-held relationship id confers no
+access; destination opens recompute the source-bound graph.
+
+| Surface | Behavior |
+| --- | --- |
+| `GET /v1/readings/:id/relationship-source` | Discover the stored source hash for a paragraph (`revision`, `paragraph_id`). |
+| `GET /v1/readings/:id/relationships` | Bounded graph for that exact edition (`revision`, `content_hash`, `paragraph_id`). |
+| `GET /v1/readings/:id/relationship-target` | Recompute the graph before opening a destination (`relationship_id` included). |
+| `GET /v1/timing/cycles/:id` | Timing-pass destination (`cycle_hash`, `pass_index`, `local_date`, `time_zone`). |
+
+Duplicate, missing, or unknown query keys are `400 invalid_reader_relationship_query`. Responses are `Cache-Control: private, no-store`. Support is non-portable (like `reading_sources`) and is on the Pattern creation-source manifest, so changing how it is derived changes `PATTERN_CREATION_SOURCE_HASH`.
+
+Categorical feedback is a separate surface from the older resonance
+`GET`/`POST /v1/readings/:id/feedback` rows. `GET .../feedback-options` returns
+an opaque grant-state tag that `POST .../feedback-events` must echo; a changed
+tag is `409 feedback_use_changed` with nothing written. Same-key/same-body
+replay returns the original receipt without renewing USR-12. Events are
+encrypted, portable on export, and cascade from `daily_readings`. Contracts:
+[`reader-relationships-v1`](contracts/reader-relationships-v1/),
+[`reading-feedback-v1`](contracts/reading-feedback-v1/).
+
+## Time Travel
+
+Time Travel never writes `cycle_instances` or `cycle_passes`. Its only durable
+state is `cycle_scan_receipts`. `TIME_TRAVEL_RECEIPT_EPOCH` is a required
+positive integer (`"2"` in both Wrangler blocks since 2026-09-13). Bump it
+before any calculation-container, ephemeris, ranking, or defect change that
+can alter `/v1/cycles` results — including Worker-side `scoreFact` changes,
+which the vintage check cannot see. An unchanged epoch keeps serving its
+cache by design. `TIME_TRAVEL_DAILY_SCAN_LIMIT` is pinned to `"32"`; any
+other value is a configuration error. Life-event timeline is a separate
+USR-09 consent (`["time_travel"]`), not USR-06.
+
 ## Pattern portraits
 
 The account's `#pattern` surface opens the observatory by default for published
@@ -434,9 +493,14 @@ The Worker exposes the declared source SHA and Cloudflare version metadata
 independently at `/v1/meta`; a correctly shaped value is still a declaration to
 reconcile, not proof of what produced or serves a bundle. Constrained-model
 Daily publication writes a success-only, content-free receipt that binds its
-provider/job exchange to those release coordinates. The additive receipt
-migration must be applied before a compatible Worker; checking out this source
-does not apply it. Deterministic Daily publication requires no such receipt.
+provider/job exchange to those release coordinates, including a sorted JSON
+array of closed quality-finding tokens (`qualitative_findings_json`; never
+prose). Deterministic Daily publication supplies `null` and requires zero
+receipts. Migrations `0029` (the table) and `0034` (the findings column) are
+applied in production; confirm `d1_migrations` rather than inferring from
+checkout. See
+[`docs/reviews/2026-09-13-migration-0034-apply.md`](docs/reviews/2026-09-13-migration-0034-apply.md)
+and [`docs/deploy/release-attestation.md`](docs/deploy/release-attestation.md).
 
 Treat each release layer as separate evidence: repository source support does
 not prove a migration was applied; an applied migration does not prove a Worker
@@ -455,12 +519,23 @@ by D1.
 
 | App | Serves | Config | Deploy |
 | --- | --- | --- | --- |
-| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` |
+| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` **after restoring the two load-bearing lines** | `fly deploy` from the repository root |
 
 > **Do not** run `fly deploy` from inside an app directory and do not pass
 > `--build-context`. The calc Dockerfile expects root-level workspace files.
 > `fly.web.toml` is the retired PWA deployment; using it would resurrect the
 > superseded `patternlike-app` service.
+>
+> **`fly.toml` on `main` is currently unsafe to deploy as checked in.** Fly
+> Launch clobbered it twice — most recently PR #58 / commit `0ffb851`
+> (2026-09-11) — rewriting `app` to `'patternlike-app'` and `primary_region`
+> to `'ams'` while keeping the calc Dockerfile and deleting the warning
+> comments. A bare `fly deploy` from that file aims the calc image at the
+> retired PWA app in a region with none of its machines. Restore
+> `app = 'patternlike-calc'` and `primary_region = 'iad'` (and keep the
+> `[[http_service.checks]]` `/health` block) **before** deploying. Passing
+> `-a patternlike-calc` is not enough: the region still comes from the file.
+> Treat any “New files from Fly.io Launch” PR as a revert candidate.
 
 ### Calc service auth
 

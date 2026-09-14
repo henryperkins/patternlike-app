@@ -64,9 +64,17 @@ or package deployment override is introduced by this port.
 
 ## Migration before compatible runtime
 
-`0029_daily_publication_receipts.sql` follows current migration 0028. It is
-forward-only and additive, adds one table and two named indexes, and rewrites
-no prior rows. It is **not applied by source changes**. Both deterministic and
+**Production status.** `0029_daily_publication_receipts.sql` applied
+2026-09-07; `0034_daily_reading_quality_observations.sql` applied 2026-09-13
+and adds `qualitative_findings_json` (a JSON array of closed lowercase
+quality-finding tokens from `qualitativeFindings`; never prose). Confirm
+`d1_migrations` rather than this paragraph. See
+[`docs/reviews/2026-09-13-migration-0034-apply.md`](../reviews/2026-09-13-migration-0034-apply.md).
+
+The original 0029 sequence is retained below as the template for later
+additive receipt columns. `0029` follows migration 0028. It is forward-only
+and additive, adds one table and two named indexes, and rewrites no prior
+rows. It is **not applied by source changes**. Both deterministic and
 model-backed publication batches read this table, so apply it before the
 compatible Worker. Preserve Save-aware deletion on any rollback.
 
@@ -100,6 +108,13 @@ receipt coordinate and final job result. Constrained-model reservations require
 one receipt; deterministic V1 explicitly supplies `null` and requires zero.
 Missing schema, bad constraints, conflicts, and stale claims cannot commit a
 partial publication. Duplicate delivery preserves the first receipt.
+
+Constrained-model receipts also store `qualitative_findings_json`: a sorted,
+deduplicated JSON array of closed tokens (`reflection_is_not_a_question`,
+`lead_too_thin`, `context_supplied_but_unused`,
+`headline_repeats_a_recent_reading`, `lead_repeats_a_recent_reading`,
+`exclamation`, `hype_vocabulary`). Findings never reject publication; they
+are scored beside the receipt. Deterministic V1 still writes no receipt.
 
 Receipts retain only the technical column allowlist: no user id, crypto
 subject, prose, chart facts, local date, locale, consent, or provider request
