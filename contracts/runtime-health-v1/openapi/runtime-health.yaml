@@ -65,6 +65,58 @@ paths:
           description: Generation not found.
         default:
           description: Observation unavailable.
+  /admin/pattern-generations/{generation_id}/candidate-revalidation:
+    get:
+      operationId: revalidateRetainedPatternCandidate
+      security:
+        - cloudflareAccess: []
+      description: >-
+        Existing pattern_generation_auditor authorization and exactly one supported
+        purpose are required. A durable access audit must complete before any key or
+        artifact read. Only a terminal candidate_invalid generation and its exact
+        final completed writer coordinate are eligible; no latest-attempt fallback.
+        Replays the retained response against the frozen plan, fact packet, ontology,
+        and validation policy 1.0.0. Returns hashes, closed codes, numeric JSON Pointer
+        paths and optional counts, never candidate prose, aliases, object keys or
+        exception details. This is not semantic approval and does not regenerate,
+        publish, change the failed generation or alter the accepted document.
+        No-store on every response. No request body.
+      parameters:
+        - in: path
+          name: generation_id
+          required: true
+          schema:
+            type: string
+            pattern: '^pgen_[a-f0-9]{32}$'
+        - in: query
+          name: purpose
+          required: true
+          description: Exactly one value; repeated parameters are rejected.
+          schema:
+            enum: [quality_review, safety_investigation, incident_response, retention_audit]
+      responses:
+        '200':
+          description: Exact retained candidate replay completed; ok is deterministic validation only, not semantic or publication approval.
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/runtime-health-v1/pattern-candidate-revalidation.schema.json
+        '400':
+          description: invalid_generation_id or invalid_admin_purpose; an exact identifier and a single supported purpose are required.
+        '401':
+          description: Existing Cloudflare Access auditor assertion required; reader, runner, service credentials and an admin session cookie alone are insufficient.
+        '404':
+          description: not_found; generation absent. The not-found access decision is audited before response.
+        '409':
+          description: generation_not_revalidatable, integrity_conflict or unsupported_validation_policy. No alternate candidate is selected and no artifacts are returned.
+        '410':
+          description: artifact_unavailable; required retained material or keys are absent, erased or expired. No reconstruction or regeneration is attempted.
+        '503':
+          description: admin_auth_not_configured, revalidation_audit_unavailable or revalidation_unavailable. Authentication, audit or revalidation unavailable; no result released.
 components:
   securitySchemes:
     cloudflareAccess:

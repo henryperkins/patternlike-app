@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Portable OCI image: Swiss Ephemeris calculation service
 # Deployable to Cloudflare Containers and Fly Machines (same image).
 #
@@ -9,7 +11,8 @@ WORKDIR /repo
 COPY package.json package-lock.json* ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/calc-stub/package.json apps/calc-stub/
-RUN npm install --workspace=@patternlike/calc-stub --include-workspace-root=false 2>/dev/null \
+RUN --mount=type=cache,target=/root/.npm \
+  npm install --workspace=@patternlike/calc-stub --include-workspace-root=false 2>/dev/null \
   || (cd apps/calc-stub && npm install)
 
 FROM node:22-bookworm-slim

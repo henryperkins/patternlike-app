@@ -10,6 +10,7 @@
  */
 import type { DailySkyFact, ZodiacSignName } from "@patternlike/shared";
 import type { ConstrainedFact, PreparedConstrainedReadingInput } from "./constrained-types.js";
+import type { BirthTimeAccuracy, SuppressedFeatureClass } from "./types.js";
 import {
   BODY_TERMS,
   PERSONALIZATION_RULES,
@@ -357,6 +358,34 @@ function uncertaintyDisclosure(text: string, prepared: PreparedConstrainedReadin
     (!text.includes("angles") || suppressed.has("angles")) &&
     (!text.includes("angle transits") || suppressed.has("angle_transits")) &&
     (!text.includes("moon") || suppressed.has("moon_time_sensitive"));
+}
+
+/**
+ * Can a mandatory uncertainty disclosure be expressed at all for this packet?
+ *
+ * `uncertaintyDisclosure` accepts exactly two shapes. The first is the fixed
+ * approximate-time sentence, available only when the time is `approximate`.
+ * The second is one of three suppression sentences, and every one of them
+ * requires at least one feature phrase — `scope` is built from `feature` with
+ * no empty alternative — which is then checked against `suppressed_features`.
+ * So when nothing is suppressed and the time is not approximate, no accepted
+ * sentence exists; and omitting the note is not an escape, because
+ * `uncertainty_note_required` then fails `required_note_missing`.
+ *
+ * That combination is reachable in production rather than theoretical:
+ * calc-stub's `buildUncertainty()` qualifies `birthplace` and `birth_instant`
+ * at every accuracy, not only for approximate births, and a surviving
+ * qualification forces the note. Callers use this to refuse before paying a
+ * provider for a candidate that cannot pass.
+ *
+ * This must stay in step with `uncertaintyDisclosure`. The cross-check in
+ * `candidate-validation.test.ts` drives the real grammar and fails if it drifts.
+ */
+export function uncertaintyDisclosureRepresentable(
+  birthTimeAccuracy: BirthTimeAccuracy,
+  suppressedFeatures: readonly SuppressedFeatureClass[],
+): boolean {
+  return birthTimeAccuracy === "approximate" || suppressedFeatures.length > 0;
 }
 
 export function validateFactSupport(

@@ -586,6 +586,12 @@ export interface SeedChartOptions {
   profileVersion?: number;
   positions?: LongitudePosition[];
   suppressedFeatures?: Array<{ feature_class: string; feature_id?: string; reason: string }>;
+  /**
+   * Survives WITH a qualification rather than being suppressed. calc-stub
+   * qualifies `birthplace` and `birth_instant` at every accuracy, so this is
+   * reachable alongside an empty `suppressedFeatures`.
+   */
+  qualifiedFeatures?: Array<{ feature_id: string; qualification: string }>;
 }
 
 /**
@@ -611,7 +617,7 @@ export async function seedChart(
     accuracy,
     window: null,
     suppressed_features: suppressed,
-    qualified_features: [],
+    qualified_features: options.qualifiedFeatures ?? [],
     user_facing_summary: null,
   };
 

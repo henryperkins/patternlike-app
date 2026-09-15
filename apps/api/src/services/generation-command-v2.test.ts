@@ -296,6 +296,56 @@ describe("V2 command", () => {
     expect(built).toMatchObject({ ok: false, reason: "ai_synthesis_consent_required" });
   });
 
+  it("refuses a chart whose mandatory disclosure the grammar cannot express, before any provider call", async () => {
+    // The production shape behind rdg_8e544ee…: an exact birth time, nothing
+    // suppressed, and two surviving location qualifications. calc-stub emits
+    // these whenever the birthplace resolves below high confidence or the civil
+    // time is ambiguous, at EVERY accuracy — so the note is mandatory while the
+    // accepted disclosure forms, built only from suppressed_features and the
+    // approximate-time sentence, have nothing to say. Left unguarded this costs
+    // two provider calls per attempt and automatically replaces the command
+    // until the generation cap is spent, which is how one reader reached
+    // command_generation 3 with no reading.
+    await rows("DELETE FROM chart_snapshots WHERE user_id = ?", USER_A);
+    await rows("DELETE FROM birth_profiles WHERE user_id = ?", USER_A);
+    await seedChart(IDENTITY_A, {
+      accuracy: "exact",
+      suppressedFeatures: [],
+      qualifiedFeatures: [
+        { feature_id: "birthplace", qualification: "technique_specific" },
+        { feature_id: "birth_instant", qualification: "technique_specific" },
+      ],
+    });
+    const built = await build();
+    expect(built).toMatchObject({ ok: false, reason: "context_ineligible" });
+    if (built.ok) throw new Error("expected refusal");
+    expect(built.detail).toMatch(/uncertainty disclosure/i);
+  });
+
+  it("still builds when the same qualifications ride a chart that can disclose", async () => {
+    // The guard must be exactly as wide as the gap. An unknown birth time
+    // suppresses four feature classes, so a suppression sentence is available
+    // and the identical qualifications are no longer fatal.
+    await rows("DELETE FROM chart_snapshots WHERE user_id = ?", USER_A);
+    await rows("DELETE FROM birth_profiles WHERE user_id = ?", USER_A);
+    await seedChart(IDENTITY_A, {
+      accuracy: "unknown",
+      suppressedFeatures: [
+        { feature_class: "houses", reason: "unknown_birth_time" },
+        { feature_class: "angles", reason: "unknown_birth_time" },
+        { feature_class: "angle_transits", reason: "unknown_birth_time" },
+        { feature_class: "moon_time_sensitive", reason: "unknown_birth_time" },
+      ],
+      qualifiedFeatures: [
+        { feature_id: "birthplace", qualification: "technique_specific" },
+        { feature_id: "birth_instant", qualification: "technique_specific" },
+      ],
+    });
+    const built = await build();
+    if (!built.ok) throw new Error(built.detail);
+    expect(built.command.chart.uncertainty.qualified_features).toHaveLength(2);
+  });
+
   it("refuses while the publisher is not configured", async () => {
     const built = await buildGenerationCommandV2(env, IDENTITY_A, {
       readingId: "rdg_v2_test_0003",

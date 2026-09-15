@@ -1095,3 +1095,86 @@ test("a changed selection policy version changes the identity", () => {
   );
   assert.notEqual(a.identity_canonical, b.identity_canonical);
 });
+
+// ---------------------------------------------------------------------------
+// Unrepresentable mandatory disclosure
+//
+// `claim-support.ts` accepts exactly two disclosure shapes: the fixed
+// approximate-time sentence, and a suppression sentence naming a feature class
+// that is actually present in `suppressed_features`. calc-stub's
+// `buildUncertainty()` emits location qualifications (`birthplace`,
+// `birth_instant` / `technique_specific`) at EVERY accuracy, and a surviving
+// qualification forces the note. A chart that carries only qualifications
+// therefore demands a note no accepted sentence can express, and every
+// candidate is rejected `unsupported_uncertainty_disclosure` -- after the
+// provider has already been paid, and with `publisher_output_invalid`
+// automatically replacing the command until the generation cap is spent.
+// Refuse before the call instead.
+// ---------------------------------------------------------------------------
+
+type Uncertainty = ConstrainedReadingInput["chart"]["uncertainty"];
+
+const LOCATION_QUALIFIED = [
+  { feature_id: "birthplace", qualification: "technique_specific" },
+  { feature_id: "birth_instant", qualification: "technique_specific" },
+] as unknown as Uncertainty["qualified_features"];
+
+const UNKNOWN_TIME_SUPPRESSED = [
+  { feature_class: "houses", feature_id: null, reason: "unknown_birth_time" },
+  { feature_class: "angles", feature_id: null, reason: "unknown_birth_time" },
+  { feature_class: "angle_transits", feature_id: null, reason: "unknown_birth_time" },
+  { feature_class: "moon_time_sensitive", feature_id: null, reason: "unknown_birth_time" },
+] as unknown as Uncertainty["suppressed_features"];
+
+function chartWith(
+  accuracy: ConstrainedReadingInput["chart"]["effective_accuracy"],
+  suppressed: Uncertainty["suppressed_features"],
+  qualified: Uncertainty["qualified_features"],
+): Partial<ConstrainedReadingInput> {
+  return {
+    chart: {
+      ...baseInput().chart,
+      effective_accuracy: accuracy,
+      uncertainty: {
+        accuracy,
+        window_plus_minus_minutes: accuracy === "approximate" ? 30 : null,
+        suppressed_features: suppressed,
+        qualified_features: qualified,
+      },
+    },
+  };
+}
+
+test("an exact chart whose only uncertainty is a location qualification fails closed before the provider call", () => {
+  assert.throws(
+    () =>
+      prepareConstrainedReadingInput(
+        baseInput(chartWith("exact", [] as unknown as Uncertainty["suppressed_features"], LOCATION_QUALIFIED)),
+      ),
+    (error: unknown) =>
+      error instanceof ConstrainedInputError &&
+      /uncertainty disclosure/i.test(error.message),
+  );
+});
+
+test("a representable mandatory disclosure still prepares", () => {
+  // Approximate time: the fixed approximate sentence is always available.
+  assert.ok(
+    prepareConstrainedReadingInput(
+      baseInput(chartWith("approximate", [] as unknown as Uncertainty["suppressed_features"], LOCATION_QUALIFIED)),
+    ).request.composition.uncertainty_note_required,
+  );
+  // Unknown time: a suppression sentence can name an actually suppressed class.
+  assert.ok(
+    prepareConstrainedReadingInput(
+      baseInput(chartWith("unknown", UNKNOWN_TIME_SUPPRESSED, LOCATION_QUALIFIED)),
+    ).request.composition.uncertainty_note_required,
+  );
+  // No uncertainty at all: no note is required, so nothing has to be expressible.
+  assert.equal(
+    prepareConstrainedReadingInput(
+      baseInput(chartWith("exact", [] as unknown as Uncertainty["suppressed_features"], [] as unknown as Uncertainty["qualified_features"])),
+    ).request.composition.uncertainty_note_required,
+    false,
+  );
+});

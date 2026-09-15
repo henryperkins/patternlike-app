@@ -1,0 +1,38 @@
+{
+  "schema_version": "pattern-candidate-revalidation/v1",
+  "generation_id": "pgen_11111111111111111111111111111111",
+  "provider_job_id": "cpjob_22222222222222222222222222222222",
+  "stage_generation": 3,
+  "stage_attempt": 2,
+  "hashes": {
+    "provider_response": "opaque-storage-object-key",
+    "provider_request": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "writer_request": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "validated_plan": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "fact_packet": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "frozen_plan": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "ontology_bundle": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "validation_policy_version": "1.0.0",
+  "ok": false,
+  "failures": [
+    {
+      "code": "chapter_word_count",
+      "path": "/chapters/0",
+      "actual_count": 612
+    },
+    {
+      "code": "unassigned_alias",
+      "path": "/chapters/1/sections/0/feature_aliases/0"
+    },
+    {
+      "code": "missing_planned_alias",
+      "path": "/plan/chapters/1/feature_aliases/2"
+    },
+    {
+      "code": "total_word_count",
+      "path": "",
+      "actual_count": 4561
+    }
+  ]
+}

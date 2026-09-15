@@ -6,6 +6,11 @@ import { loadUserIdentity } from "../db/users.js";
 import { readVerifiedOntologyRelease } from "../db/pattern-ontology.js";
 import { getArtifactById } from "../services/pattern-execute.js";
 import { readPatternDiagnostics } from "../services/pattern-diagnostics.js";
+import {
+  loadPatternCandidateRevalidationTarget,
+  PatternCandidateRevalidationError,
+  revalidatePatternCandidate,
+} from "../services/pattern-candidate-revalidation.js";
 
 export const adminPatternRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -103,6 +108,51 @@ adminPatternRoutes.get("/pattern-generations/:generation_id/diagnostics", async 
   await recordAccess(c.env, generationId, result?.userId ?? null, [], result ? "granted" : "not_found", c.get("adminSubject"), c.get("adminPurpose"));
   if (!result) return c.json(error(c.get("requestId"), "not_found", "Generation not found"), 404);
   return c.json(result.response, 200);
+});
+
+adminPatternRoutes.get("/pattern-generations/:generation_id/candidate-revalidation", async (c) => {
+  const requestId = c.get("requestId");
+  const generationId = c.req.param("generation_id");
+  if (!/^pgen_[a-f0-9]{32}$/.test(generationId)) {
+    return c.json(error(requestId, "invalid_generation_id", "An exact generation identifier is required"), 400);
+  }
+  const owner = await c.env.DB.prepare(
+    "SELECT user_id FROM pattern_generation_jobs WHERE generation_id = ?",
+  ).bind(generationId).first<{ user_id: string }>();
+  // The existing Access auditor assertion and purpose middleware apply. Persist
+  // authorization before opening either the domain or provider artifact keys.
+  // A grant is an access decision, not a claim that revalidation succeeded.
+  try {
+    await recordAccess(
+      c.env,
+      generationId,
+      owner?.user_id ?? null,
+      ["generation_command", "fact_packet", "validated_plan", "writer_request", "writer_response"],
+      owner ? "granted" : "not_found",
+      c.get("adminSubject"),
+      c.get("adminPurpose"),
+    );
+  } catch {
+    return c.json(error(requestId, "revalidation_audit_unavailable", "Revalidation audit is unavailable"), 503);
+  }
+  if (!owner) return c.json(error(requestId, "not_found", "Generation not found"), 404);
+  try {
+    const now = new Date().toISOString();
+    const target = await loadPatternCandidateRevalidationTarget(c.env, generationId, now);
+    if (!target || target.userId !== owner.user_id) {
+      return c.json(error(requestId, "integrity_conflict", "Exact retained candidate could not be revalidated"), 409);
+    }
+    return c.json(await revalidatePatternCandidate(c.env, target, now), 200);
+  } catch (cause) {
+    if (cause instanceof PatternCandidateRevalidationError) {
+      return c.json(
+        error(requestId, cause.code, "Exact retained candidate could not be revalidated"),
+        cause.code === "artifact_unavailable" ? 410 : 409,
+      );
+    }
+    // Never expose or log exception messages from decryption or validation.
+    return c.json(error(requestId, "revalidation_unavailable", "Candidate revalidation is unavailable"), 503);
+  }
 });
 
 adminPatternRoutes.get("/pattern-generations/:generation_id", async (c) => {

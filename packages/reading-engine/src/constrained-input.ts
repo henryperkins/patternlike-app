@@ -37,6 +37,7 @@ import {
   GENERATED_PARAGRAPH_ROLES,
 } from "@patternlike/shared";
 
+import { uncertaintyDisclosureRepresentable } from "./claim-support.js";
 import { partitionContext, factSuppressionReason } from "./eligibility.js";
 import { localDayMidpoint, projectUncertainty } from "./identity.js";
 import { computePhase } from "./phase.js";
@@ -1014,6 +1015,36 @@ export function prepareConstrainedReadingInput(
     prior_readings: [],
     composition,
   };
+
+  // A mandatory disclosure the grammar cannot express is refused here, before
+  // the provider is paid. `uncertainty_note_required` is forced by a surviving
+  // qualification as well as by a suppression, but the accepted disclosure
+  // forms are built only from `suppressed_features` and the approximate-time
+  // sentence, so a chart carrying only qualifications — which calc-stub emits
+  // for `birthplace` and `birth_instant` at every accuracy — demands a note
+  // that no candidate can satisfy. Left to run, every attempt is rejected
+  // `unsupported_uncertainty_disclosure`, and `publisher_output_invalid`
+  // automatically replaces the command until the generation cap is spent.
+  //
+  // This is a stop-gap that stops the spend, not a repair: the qualification
+  // still goes undisclosed, exactly as it already does on approximate and
+  // unknown-time charts, where the note names only the birth time. The fix is
+  // a versioned provider projection that can carry qualification classes and
+  // disclose them.
+  if (
+    composition.uncertainty_note_required &&
+    !uncertaintyDisclosureRepresentable(
+      request.birth_time_accuracy,
+      request.suppressed_features,
+    )
+  ) {
+    throw new ConstrainedInputError(
+      "this chart requires an uncertainty disclosure that the accepted disclosure " +
+        `forms cannot express: birth_time_accuracy is ${request.birth_time_accuracy} ` +
+        "with no suppressed feature, and the note is required by " +
+        `${uncertainty.qualified_features.length} qualified feature(s)`,
+    );
+  }
 
   let bytes = packetBytes(request);
   if (bytes > input.context_max_bytes) {
