@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Static build of the Pattern/Like web PWA, served by nginx.
 #
 # IMPORTANT — build context:
@@ -14,7 +16,8 @@ WORKDIR /repo
 COPY package.json package-lock.json* tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/web/package.json apps/web/
-RUN npm install --workspace=@patternlike/web --include-workspace-root=false
+RUN --mount=type=cache,target=/root/.npm \
+  npm install --workspace=@patternlike/web --include-workspace-root=false
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 RUN npm run build -w @patternlike/web

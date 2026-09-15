@@ -81,6 +81,7 @@ FIXTURE_SCHEMA = {
         "runtime-health-policy": "https://patternlike.app/contracts/runtime-health-v1/runtime-health-policy.schema.json",
         "runtime-health": "https://patternlike.app/contracts/runtime-health-v1/runtime-health.schema.json",
         "pattern-diagnostics": "https://patternlike.app/contracts/runtime-health-v1/pattern-diagnostics.schema.json",
+        "pattern-candidate-revalidation": "https://patternlike.app/contracts/runtime-health-v1/pattern-candidate-revalidation.schema.json",
     },
     "reading-feedback-v1": {
         "feedback-request": READING_FEEDBACK_V1_BASE + "reading-feedback.schema.json#/$defs/request",

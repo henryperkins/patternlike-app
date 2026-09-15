@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/runtime-health-v1/pattern-candidate-revalidation.schema.json",
+  "title": "Audited retained final Pattern candidate revalidation, version 1",
+  "description": "Content-free deterministic replay under the frozen 1.0.0 validation policy. Not semantic approval, publication, or regeneration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generation_id",
+    "provider_job_id",
+    "stage_generation",
+    "stage_attempt",
+    "hashes",
+    "validation_policy_version",
+    "ok",
+    "failures"
+  ],
+  "properties": {
+    "schema_version": { "const": "pattern-candidate-revalidation/v1" },
+    "generation_id": { "type": "string", "pattern": "^pgen_[a-f0-9]{32}$" },
+    "provider_job_id": { "type": "string", "pattern": "^cpjob_[a-f0-9]{32}$" },
+    "stage_generation": { "$ref": "#/$defs/nonnegativeInteger" },
+    "stage_attempt": { "$ref": "#/$defs/nonnegativeInteger" },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_response", "provider_request", "writer_request", "validated_plan",
+        "fact_packet", "frozen_plan", "ontology_bundle"
+      ],
+      "properties": {
+        "provider_response": { "$ref": "#/$defs/hash" },
+        "provider_request": { "$ref": "#/$defs/hash" },
+        "writer_request": { "$ref": "#/$defs/hash" },
+        "validated_plan": { "$ref": "#/$defs/hash" },
+        "fact_packet": { "$ref": "#/$defs/hash" },
+        "frozen_plan": { "$ref": "#/$defs/hash" },
+        "ontology_bundle": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "validation_policy_version": { "const": "1.0.0" },
+    "ok": { "type": "boolean" },
+    "failures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/failure" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+      "then": { "properties": { "failures": { "maxItems": 0 } } },
+      "else": { "properties": { "failures": { "minItems": 1 } } }
+    }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nonnegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "path": {
+      "type": "string",
+      "description": "JSON Pointer using fixed field names and zero-based numeric indexes, never source keys or aliases. Empty means root or no unambiguous location. /plan addresses the frozen plan; other paths address the retained writer response.",
+      "anyOf": [
+        { "enum": ["", "/schema_version", "/title", "/chapters", "/additional_signatures", "/uncertainty_note"] },
+        { "pattern": "^/chapters/(0|[1-9][0-9]*)(/title|/(sections|tensions|resources)/(0|[1-9][0-9]*)(/text|/(feature_aliases|ontology_rule_ids)/(0|[1-9][0-9]*))?|/counter_expression(/text|/(feature_aliases|ontology_rule_ids)/(0|[1-9][0-9]*))?)?$" },
+        { "pattern": "^/additional_signatures/(0|[1-9][0-9]*)(/(feature_aliases|ontology_rule_ids)/(0|[1-9][0-9]*))?$" },
+        { "pattern": "^/plan/chapters/(0|[1-9][0-9]*)/feature_aliases/(0|[1-9][0-9]*)$" }
+      ]
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "path"],
+      "properties": {
+        "code": {
+          "enum": [
+            "schema_version", "title_too_long", "chapter_mismatch", "unknown_chapter_key",
+            "section_count", "tension_count", "resource_count", "empty_claim_ledger",
+            "unassigned_alias", "unknown_rule", "unauthorized_rule", "paragraph_too_long",
+            "counter_class", "chapter_word_count", "missing_planned_alias", "signature_mismatch",
+            "unknown_signature_key", "signature_word_count", "missing_uncertainty_note",
+            "uncertainty_word_count", "uncertainty_class", "total_word_count", "schema_invalid"
+          ]
+        },
+        "path": { "$ref": "#/$defs/path" },
+        "actual_count": { "$ref": "#/$defs/nonnegativeInteger" }
+      }
+    }
+  }
+}

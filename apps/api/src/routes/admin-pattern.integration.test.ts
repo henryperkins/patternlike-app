@@ -23,6 +23,10 @@ import {
   resetDb,
   seedUser,
 } from "../../test/helpers.js";
+import {
+  REVALIDATION_GENERATION_ID,
+  seedPatternRevalidationFixture,
+} from "../../test/pattern-revalidation-fixture.js";
 
 const TEAM_DOMAIN = "https://patternlike.cloudflareaccess.com";
 const POLICY_AUD = "admin-audience-tag";
@@ -258,6 +262,109 @@ describe("Cloudflare Access Pattern administration", () => {
   });
 
   afterEach(() => fetchSpy.mockRestore());
+
+  it("audits a revalidation request without advancing a nonterminal generation", async () => {
+    const before = await env.DB.prepare("SELECT * FROM pattern_generation_jobs WHERE generation_id = ?").bind(GENERATION_ID).first();
+    const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/candidate-revalidation?purpose=incident_response`);
+    expect(response.status).toBe(409);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ error: { code: "generation_not_revalidatable" } });
+    expect(await env.DB.prepare("SELECT * FROM pattern_generation_jobs WHERE generation_id = ?").bind(GENERATION_ID).first()).toEqual(before);
+    expect(await env.DB.prepare("SELECT admin_subject, generation_id, purpose_class, artifact_classes_json, result FROM pattern_admin_access_events").first()).toEqual({
+      admin_subject: "access-subject-alice",
+      generation_id: GENERATION_ID,
+      purpose_class: "incident_response",
+      artifact_classes_json: JSON.stringify(["generation_command", "fact_packet", "validated_plan", "writer_request", "writer_response"]),
+      result: "granted",
+    });
+  });
+
+  it("audits missing revalidation targets and rejects malformed generation identifiers", async () => {
+    const missingId = `pgen_${"0".repeat(32)}`;
+    const missing = await adminRequest(`/admin/pattern-generations/${missingId}/candidate-revalidation?purpose=incident_response`);
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ error: { code: "not_found" } });
+    expect(await env.DB.prepare("SELECT target_user_id, result FROM pattern_admin_access_events WHERE generation_id = ?").bind(missingId).first()).toEqual({ target_user_id: null, result: "not_found" });
+    const malformed = await adminRequest("/admin/pattern-generations/not-an-id/candidate-revalidation?purpose=incident_response");
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({ error: { code: "invalid_generation_id" } });
+  });
+
+  it("does not open revalidation artifacts when durable auditing fails", async () => {
+    await env.DB.prepare("UPDATE pattern_generation_jobs SET stage='failed', failure_class='candidate_invalid', stage_generation=3, writer_attempts=2 WHERE generation_id=?").bind(GENERATION_ID).run();
+    await env.DB.prepare("CREATE TRIGGER reject_revalidation_audit BEFORE INSERT ON pattern_admin_access_events BEGIN SELECT RAISE(ABORT, 'unavailable'); END").run();
+    const objectRead = vi.spyOn(env.ARTIFACTS!, "get");
+    try {
+      const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/candidate-revalidation?purpose=incident_response`);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ error: { code: "revalidation_audit_unavailable" } });
+      expect(objectRead).not.toHaveBeenCalled();
+    } finally {
+      objectRead.mockRestore();
+      await env.DB.prepare("DROP TRIGGER reject_revalidation_audit").run();
+    }
+  });
+
+  it("requires the existing auditor assertion and exact purpose for revalidation", async () => {
+    const path = `/admin/pattern-generations/${GENERATION_ID}/candidate-revalidation`;
+    for (const authorization of [undefined, "Bearer reader-token", "Bearer runner-token", `Bearer ${env.SERVICE_AUTH_TOKEN}`]) {
+      expect((await adminRequest(`${path}?purpose=incident_response`, { audience: "none", authorization })).status).toBe(401);
+    }
+    expect((await adminRequest(`${path}?purpose=incident_response`, { audience: "consumer-app" })).status).toBe(401);
+    for (const query of ["", "?purpose=bogus", "?purpose=incident_response&purpose=quality_review"]) {
+      expect((await adminRequest(`${path}${query}`)).status).toBe(400);
+    }
+    expect((await env.DB.prepare("SELECT * FROM pattern_admin_access_events").all()).results).toHaveLength(0);
+  });
+
+  it("returns only verified final-candidate diagnostics after auditing every artifact read", async () => {
+    await resetDb();
+    const fixture = await seedPatternRevalidationFixture();
+    const before = await env.DB.prepare("SELECT * FROM pattern_generation_jobs WHERE generation_id = ?").bind(REVALIDATION_GENERATION_ID).first();
+    const providerBefore = await env.DB.prepare("SELECT * FROM codex_provider_jobs WHERE id = ?").bind(fixture.providerJobId).first();
+    const originalGet = env.ARTIFACTS!.get.bind(env.ARTIFACTS!);
+    const objectRead = vi.spyOn(env.ARTIFACTS!, "get").mockImplementation(async (key: string) => {
+      const audit = await env.DB.prepare("SELECT result FROM pattern_admin_access_events WHERE generation_id = ?").bind(REVALIDATION_GENERATION_ID).first();
+      expect(audit).toEqual({ result: "granted" });
+      return originalGet(key);
+    });
+    try {
+      const response = await adminRequest(`/admin/pattern-generations/${REVALIDATION_GENERATION_ID}/candidate-revalidation?purpose=incident_response`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      const body = await response.json();
+      expect(body).toMatchObject({
+        schema_version: "pattern-candidate-revalidation/v1",
+        generation_id: REVALIDATION_GENERATION_ID,
+        provider_job_id: fixture.providerJobId,
+        stage_generation: 3,
+        stage_attempt: 2,
+        ok: false,
+        hashes: { provider_response: fixture.responseHash },
+        failures: expect.arrayContaining([expect.objectContaining({ code: "paragraph_too_long", path: "/chapters/0/sections/0/text" })]),
+      });
+      const serialized = JSON.stringify(body);
+      expect(serialized).not.toMatch(/privateword|object_key|ciphertext|nonce|user_id|ontology_records|feature_aliases/);
+      expect(serialized).not.toContain(fixture.writer.title);
+      expect(await env.DB.prepare("SELECT * FROM pattern_generation_jobs WHERE generation_id = ?").bind(REVALIDATION_GENERATION_ID).first()).toEqual(before);
+      expect(await env.DB.prepare("SELECT * FROM codex_provider_jobs WHERE id = ?").bind(fixture.providerJobId).first()).toEqual(providerBefore);
+    } finally {
+      objectRead.mockRestore();
+    }
+  });
+
+  it("returns revalidation_unavailable when artifact storage fails during replay", async () => {
+    await resetDb();
+    await seedPatternRevalidationFixture();
+    const objectRead = vi.spyOn(env.ARTIFACTS!, "get").mockRejectedValue(new Error("R2 unavailable"));
+    try {
+      const response = await adminRequest(`/admin/pattern-generations/${REVALIDATION_GENERATION_ID}/candidate-revalidation?purpose=incident_response`);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ error: { code: "revalidation_unavailable" } });
+    } finally {
+      objectRead.mockRestore();
+    }
+  });
 
   it("audits aggregate access without inventing a target and rejects wrong/repeated purpose", async () => {
     const response = await adminRequest("/admin/runtime-health?purpose=incident_response");
