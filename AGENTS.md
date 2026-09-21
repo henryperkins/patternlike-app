@@ -15,6 +15,8 @@ Run commands from the repository root with the Node 22 pinned by `.nvmrc` (the p
 - `npm run calc:dev` starts the calculation service on port 8080; `npm run dev:api` starts Wrangler on port 8787.
 - `npm run db:local` applies the ordered `db/d1/` migration directory to local D1.
 - `npm run test:contracts` and `npm run calc:golden` run focused verification lanes.
+- `npm run generate:validators -w @patternlike/api` after any `contracts/` change (`apps/api/src/generated/` is build output).
+- `npm run generate:pattern-source -w @patternlike/api` after editing a file listed in `apps/api/pattern-creation-sources.json`.
 
 ## Coding Style & Naming Conventions
 

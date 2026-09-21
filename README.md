@@ -63,6 +63,20 @@ On a fresh local database, run the seed command afterward. It idempotently
 creates the local `users` row with its crypto subject and wrapped DEK. It does
 not create an `identities` row or grant account-processing consent.
 
+### Generated Worker artifacts
+
+`apps/api/src/generated/` is build output, not hand-edited source. After any
+`contracts/` change, run `npm run generate:validators -w @patternlike/api`.
+After editing a file listed in `apps/api/pattern-creation-sources.json`, run
+`npm run generate:pattern-source -w @patternlike/api`. `pretest` and `prebuild`
+fail on drift. Do not add a runtime `new Ajv`, `addSchema`, or `compile` call
+in Worker source — that either blows the startup CPU budget or dies at request
+time because Workers forbid dynamic code generation. Details are in `CLAUDE.md`.
+
+`evals/promptfoo/` is optional operator exploration of Daily validators and
+fresh Codex turns. It is outside the npm workspaces and is not part of
+`npm run ci:local`. See `evals/promptfoo/README.md`.
+
 ### Birth → chart (local)
 
 ```bash
@@ -351,6 +365,27 @@ new user-owned table missing from that list — or from
 `services/deletion-manifest.ts` — leaks rows between suites or fails
 deletion tests.
 
+### Reader connections and categorical feedback
+
+A published Daily paragraph can open the exact Pattern chapter or Timing pass
+it rests on. The graph is written at publication into
+`reader_relationship_supports` (migration `0030`); older readings simply have
+no supported connections. A browser-held relationship id confers no access —
+destination opens recompute the source-bound graph.
+
+| Surface | Behavior |
+| --- | --- |
+| `GET /v1/readings/:id/relationships` | Bounded graph for one authorized reading. |
+| `GET /v1/readings/:id/relationship-source` | Exact source paragraph coordinate. |
+| `GET /v1/readings/:id/relationship-target` | Open a source-bound destination. |
+| `GET /v1/timing/cycles/:id` | Exact Timing pass named by a connection. |
+| `GET /v1/readings/:id/feedback-options` | Opaque grant-state tag (migration `0031`). |
+| `POST /v1/readings/:id/feedback-events` | Must echo that tag. A changed tag is `409 feedback_use_changed` with nothing written. Same-key/same-body replay returns the original receipt without renewing permission. |
+
+Responses on these paths are `Cache-Control: private, no-store`. Categorical
+actions never fabricate a resonance rating on the older `reading_feedback`
+table. Support rows cascade from the reading/document and are non-portable.
+
 ## Pattern portraits
 
 The account's `#pattern` surface opens the observatory by default for published
@@ -453,14 +488,26 @@ root** — the Docker build context must remain the root so the Dockerfile can c
 `packages/shared`. The API and PWA ship together as one Cloudflare Worker backed
 by D1.
 
-| App | Serves | Config | Deploy |
+| App | Serves | Region | Config |
 | --- | --- | --- | --- |
-| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` |
+| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `iad` | `fly.toml` — **see unsafe-to-deploy note below** |
+
+> **The committed `fly.toml` is currently unsafe to deploy as-is.** Fly Launch
+> has clobbered it twice, most recently PR #58 (`0ffb851`, 2026-09-11), which
+> set `app = 'patternlike-app'` and `primary_region = 'ams'` while keeping the
+> calc Dockerfile. A bare `fly deploy` from this checkout therefore aims the
+> calc image at the retired PWA app's name in a region with none of its
+> machines. The correct values are `app = 'patternlike-calc'`,
+> `primary_region = 'iad'`. `fly deploy -a patternlike-calc` does **not**
+> override region. Diff those two lines and the `[[http_service.checks]]` block
+> before any authorized deploy; treat a "New files from Fly.io Launch" PR as a
+> revert candidate. Details: `CLAUDE.md` Deployment.
 
 > **Do not** run `fly deploy` from inside an app directory and do not pass
-> `--build-context`. The calc Dockerfile expects root-level workspace files.
-> `fly.web.toml` is the retired PWA deployment; using it would resurrect the
-> superseded `patternlike-app` service.
+> `--build-context`. The calc Dockerfile expects root-level workspace files
+> and now starts with `# syntax=docker/dockerfile:1` plus an npm BuildKit
+> cache mount. `fly.web.toml` is the retired PWA deployment; using it would
+> resurrect the superseded `patternlike-app` service.
 
 ### Calc service auth
 

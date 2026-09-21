@@ -149,9 +149,13 @@ it from the repository root, never from inside the app directory:
 fly deploy --config fly.toml
 ```
 
-Before deploying, diff `app`, `primary_region`, and the `[[http_service.checks]]`
-block against the committed file: Fly Launch has rewritten this configuration
-once before, pointing the calculation Dockerfile at the web app's name.
+Do **not** treat the committed `fly.toml` as the desired target. Fly Launch has
+clobbered it twice, most recently PR #58 (`0ffb851`, 2026-09-11), which set
+`app = 'patternlike-app'` and `primary_region = 'ams'` while keeping the calc
+Dockerfile. The live calc app is `patternlike-calc` in `iad`.
+`fly deploy -a patternlike-calc` does not override region. Diff those two lines
+and `[[http_service.checks]]` against the *intended* values in `CLAUDE.md`
+Deployment, not against the currently committed file.
 
 Verify: the deployed image digest matches what was built; `/health` answers; and
 an authenticated synthetic `POST /v1/daily-sky` — invented coordinates, no real

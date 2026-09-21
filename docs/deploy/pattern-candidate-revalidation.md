@@ -23,15 +23,26 @@ Issue one GET, with no body, to the API origin:
 
 The identifier above is synthetic; replace it with the exact failed generation
 ID. Supply exactly one existing purpose: `quality_review`, `safety_investigation`,
-`incident_response`, or `retention_audit`. All responses are `Cache-Control: no-store`.
+`incident_response`, or `retention_audit`. All `/admin/*` responses are
+`Cache-Control: no-store` (set on the admin mount, not only this handler).
+
+`npx tsx apps/api/scripts/runtime-health.ts` has only `aggregate` and
+`pattern <generation_id> <purpose>`. The `pattern` subcommand calls
+diagnostics and does **not** wrap this route. Do not invent a third CLI mode;
+call the GET directly with the existing Access assertion.
 
 ## Eligibility and interpretation
 
 The route records the scoped access decision durably before opening any key or
-artifact. An audit grant means access was authorized, not that replay succeeded.
-The generation must be terminal failed with `candidate_invalid`. Only its exact
-final completed writer coordinate is selected; a nearby timestamp, an earlier
-correction document, or a different attempt is not a substitute.
+artifact. The audit row names the intended classes (`generation_command`,
+`fact_packet`, `validated_plan`, `writer_request`, `writer_response`) even when
+the generation is later refused as `generation_not_revalidatable`. An audit
+grant means access was authorized, not that replay succeeded.
+The generation must be terminal failed with `candidate_invalid` and a completed
+writer job at the exact coordinate `(stage_generation - 1, writer_attempts)`
+taken from the failed `pattern_generation_jobs` row. A nearby timestamp, an
+earlier correction document, or a different attempt is not a substitute;
+multiple provider rows for that coordinate are `integrity_conflict`.
 
 Required inputs and keys must still be retained. Replay checks ownership,
 coordinates, frozen command, plan, fact packet, ontology and request/response
