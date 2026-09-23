@@ -43,9 +43,19 @@ yellow(){ printf '\033[33m%s\033[0m\n' "$*"; }
 # ---------------------------------------------------------------------------
 WANT_NODE="$(tr -d '[:space:]' < .nvmrc)"
 if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  # `npm run` exports npm's own prefix, and nvm deactivates itself, taking npm
+  # off PATH, when that prefix lies outside $NVM_DIR. It does whenever npm runs
+  # on a node nvm does not manage, such as the one Cursor Cloud agents put first
+  # on PATH.
+  unset npm_config_prefix NPM_CONFIG_PREFIX
   # shellcheck disable=SC1091
   . "$HOME/.nvm/nvm.sh"
-  nvm use "$WANT_NODE" >/dev/null 2>&1 || true
+  # nvm use can swap its PATH entry in place instead of moving it to the front,
+  # which leaves a node listed earlier in charge.
+  if nvm use "$WANT_NODE" >/dev/null 2>&1 && [ -n "${NVM_BIN:-}" ]; then
+    PATH="$NVM_BIN:$PATH"
+    export PATH
+  fi
 fi
 
 HAVE_NODE="$(node -v 2>/dev/null)"
