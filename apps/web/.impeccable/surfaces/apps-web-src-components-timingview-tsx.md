@@ -1,16 +1,16 @@
 ---
 version: 1
 slug: "apps-web-src-components-timingview-tsx"
-primary_target: "apps/web/src/components/TimingView.tsx"
-related_targets: ["apps/web/src/lib/timing-format.ts","apps/web/src/styles.css"]
+primary_target: "src/components/TimingView.tsx"
+related_targets: ["src/lib/timing-format.ts","src/styles.css"]
 ---
 
 # Timing
 
 ## Scope and mode
 
-- **Primary target:** `apps/web/src/components/TimingView.tsx`
-- **Related targets:** `apps/web/src/lib/timing-format.ts`, `apps/web/src/styles.css`
+- **Primary target:** `src/components/TimingView.tsx`
+- **Related targets:** `src/lib/timing-format.ts`, `src/styles.css`
 - **Visitor mode:** Operate.
 - Timing is a read-only inspection surface for active and already-persisted upcoming cycle arcs. It does not calculate, refresh, enqueue, interpret, or promise future coverage.
 

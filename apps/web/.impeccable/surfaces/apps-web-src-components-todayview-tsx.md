@@ -1,16 +1,16 @@
 ---
 version: 1
 slug: "apps-web-src-components-todayview-tsx"
-primary_target: "apps/web/src/components/TodayView.tsx"
-related_targets: ["apps/web/src/components/WhyThisDrawer.tsx","apps/web/src/styles.css"]
+primary_target: "src/components/TodayView.tsx"
+related_targets: ["src/components/WhyThisDrawer.tsx","src/styles.css"]
 ---
 
 # Today
 
 ## Scope and mode
 
-- **Primary target:** `apps/web/src/components/TodayView.tsx`
-- **Related targets:** `apps/web/src/components/WhyThisDrawer.tsx`, `apps/web/src/styles.css`
+- **Primary target:** `src/components/TodayView.tsx`
+- **Related targets:** `src/components/WhyThisDrawer.tsx`, `src/styles.css`
 - **Visitor mode:** Read.
 - Today is a theme-first, read-only, self-contained daily chapter. It does not add journaling, acknowledgment, saving, a Timing bridge, API work, or changes to neighboring surfaces.
 

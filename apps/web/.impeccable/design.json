@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-09T19:57:57.193Z",
+  "generatedAt": "2026-09-23T09:41:00.109Z",
   "title": "Design System: Pattern/Like",
   "extensions": {
     "colorMeta": {
@@ -85,8 +85,8 @@
       "on-surface-faint": {
         "role": "neutral",
         "displayName": "Faint Ink Green",
-        "canonical": "#7a8781",
-        "tonalRamp": ["oklch(15% 0.0176 166.4)", "oklch(25% 0.0176 166.4)", "oklch(35% 0.0176 166.4)", "oklch(45% 0.0176 166.4)", "oklch(55% 0.0176 166.4)", "oklch(65% 0.0176 166.4)", "oklch(80% 0.0176 166.4)", "oklch(95% 0.0176 166.4)"]
+        "canonical": "#596962",
+        "tonalRamp": ["oklch(15% 0.0223 167.2)", "oklch(25% 0.0223 167.2)", "oklch(35% 0.0223 167.2)", "oklch(45% 0.0223 167.2)", "oklch(55% 0.0223 167.2)", "oklch(65% 0.0223 167.2)", "oklch(80% 0.0223 167.2)", "oklch(95% 0.0223 167.2)"]
       },
       "outline": {
         "role": "neutral",
@@ -111,6 +111,42 @@
         "displayName": "Dark-Surface Paper",
         "canonical": "#f5f0e4",
         "tonalRamp": ["oklch(15% 0.0168 88.0)", "oklch(25% 0.0168 88.0)", "oklch(35% 0.0168 88.0)", "oklch(45% 0.0168 88.0)", "oklch(55% 0.0168 88.0)", "oklch(65% 0.0168 88.0)", "oklch(80% 0.0168 88.0)", "oklch(95% 0.0168 88.0)"]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "Portrait Night",
+        "canonical": "#091923",
+        "tonalRamp": ["oklch(15% 0.0296 237.9)", "oklch(25% 0.0296 237.9)", "oklch(35% 0.0296 237.9)", "oklch(45% 0.0296 237.9)", "oklch(55% 0.0296 237.9)", "oklch(65% 0.0296 237.9)", "oklch(80% 0.0296 237.9)", "oklch(95% 0.0296 237.9)"]
+      },
+      "on-night": {
+        "role": "neutral",
+        "displayName": "Portrait Night Ink",
+        "canonical": "#e5e8e5",
+        "tonalRamp": ["oklch(15% 0.0051 145.5)", "oklch(25% 0.0051 145.5)", "oklch(35% 0.0051 145.5)", "oklch(45% 0.0051 145.5)", "oklch(55% 0.0051 145.5)", "oklch(65% 0.0051 145.5)", "oklch(80% 0.0051 145.5)", "oklch(95% 0.0051 145.5)"]
+      },
+      "on-night-soft": {
+        "role": "neutral",
+        "displayName": "Soft Portrait Night Ink",
+        "canonical": "#c2d1d7",
+        "tonalRamp": ["oklch(15% 0.0183 223.6)", "oklch(25% 0.0183 223.6)", "oklch(35% 0.0183 223.6)", "oklch(45% 0.0183 223.6)", "oklch(55% 0.0183 223.6)", "oklch(65% 0.0183 223.6)", "oklch(80% 0.0183 223.6)", "oklch(95% 0.0183 223.6)"]
+      },
+      "night-outline": {
+        "role": "neutral",
+        "displayName": "Portrait Night Rule",
+        "canonical": "#879ca8",
+        "tonalRamp": ["oklch(15% 0.0296 232.9)", "oklch(25% 0.0296 232.9)", "oklch(35% 0.0296 232.9)", "oklch(45% 0.0296 232.9)", "oklch(55% 0.0296 232.9)", "oklch(65% 0.0296 232.9)", "oklch(80% 0.0296 232.9)", "oklch(95% 0.0296 232.9)"]
+      },
+      "night-hover": {
+        "role": "neutral",
+        "displayName": "Portrait Night Hover",
+        "canonical": "#213b49",
+        "tonalRamp": ["oklch(15% 0.0404 233.3)", "oklch(25% 0.0404 233.3)", "oklch(35% 0.0404 233.3)", "oklch(45% 0.0404 233.3)", "oklch(55% 0.0404 233.3)", "oklch(65% 0.0404 233.3)", "oklch(80% 0.0404 233.3)", "oklch(95% 0.0404 233.3)"]
+      },
+      "night-focus": {
+        "role": "tertiary",
+        "displayName": "Portrait Night Focus",
+        "canonical": "#e9cf96",
+        "tonalRamp": ["oklch(15% 0.0791 86.2)", "oklch(25% 0.0791 86.2)", "oklch(35% 0.0791 86.2)", "oklch(45% 0.0791 86.2)", "oklch(55% 0.0791 86.2)", "oklch(65% 0.0791 86.2)", "oklch(80% 0.0791 86.2)", "oklch(95% 0.0791 86.2)"]
       }
     },
     "typographyMeta": {
@@ -174,7 +210,7 @@
       "refersTo": "field",
       "description": "A square, paper-backed field with an explicit uppercase label.",
       "html": "<label class=\"ds-field\"><span>BIRTH DATE</span><input type=\"text\" placeholder=\"YYYY-MM-DD\"></label>",
-      "css": ".ds-field { display:grid; gap:8px; color:var(--ink-soft, #4e625b); font-family:var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); } .ds-field span { font-size:10px; font-weight:750; letter-spacing:0.08em; } .ds-field input { box-sizing:border-box; width:100%; height:49px; padding:0 14px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:var(--paper-light, #faf8f2); font:400 14px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); } .ds-field input:hover { border-color:var(--line-dark, #9fa89f); } .ds-field input:focus-visible { border-color:var(--forest, #173f35); outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; } .ds-field input::placeholder { color:#9a9e96; }"
+      "css": ".ds-field { display:grid; gap:8px; color:var(--ink-soft, #4e625b); font-family:var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); } .ds-field span { font-size:10px; font-weight:750; letter-spacing:0.08em; } .ds-field input { box-sizing:border-box; width:100%; height:49px; padding:0 14px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:var(--paper-light, #faf8f2); font:400 16px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); } .ds-field input:hover { border-color:var(--line-dark, #9fa89f); } .ds-field input:focus-visible { border-color:var(--forest, #173f35); outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; } .ds-field input::placeholder { color:var(--ink-faint, #596962); }"
     },
     {
       "name": "Active Navigation Item",
@@ -198,7 +234,7 @@
       "refersTo": "panel",
       "description": "The default flat container, separated by warm transparency and a fine rule.",
       "html": "<section class=\"ds-panel\"><small>INSPECTABLE EVIDENCE</small><h3>Calculation map</h3><p>Facts stay visible without becoming visual noise.</p></section>",
-      "css": ".ds-panel { box-sizing:border-box; padding:30px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:rgba(250, 248, 242, 0.72); box-shadow:none; } .ds-panel small { color:var(--ink-faint, #7a8781); font:800 10px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.13em; } .ds-panel h3 { margin:7px 0 0; font:500 27px/1.1 var(--serif, \"Iowan Old Style\", Georgia, serif); letter-spacing:-0.035em; } .ds-panel p { margin:18px 0 0; color:var(--ink-soft, #4e625b); font:400 14px/1.6 var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); }"
+      "css": ".ds-panel { box-sizing:border-box; padding:30px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:rgba(250, 248, 242, 0.72); box-shadow:none; } .ds-panel small { color:var(--ink-faint, #596962); font:800 10px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.13em; } .ds-panel h3 { margin:7px 0 0; font:500 27px/1.1 var(--serif, \"Iowan Old Style\", Georgia, serif); letter-spacing:-0.035em; } .ds-panel p { margin:18px 0 0; color:var(--ink-soft, #4e625b); font:400 14px/1.6 var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); }"
     },
     {
       "name": "Accuracy Option",
@@ -214,7 +250,7 @@
       "refersTo": "panel",
       "description": "The signature disclosure for provenance and reproducibility details.",
       "html": "<details class=\"ds-evidence\"><summary><span><small>TECHNICAL EVIDENCE</small>Reproduce this calculation</span><span class=\"ds-evidence-toggle\">Open</span></summary><dl><div><dt>CONTRACT</dt><dd>chart@0.2.0</dd></div><div><dt>PROFILE</dt><dd>version 3</dd></div><div><dt>STATUS</dt><dd>verified</dd></div></dl></details>",
-      "css": ".ds-evidence { color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:#e8e3d8; } .ds-evidence summary { display:flex; min-height:82px; align-items:center; justify-content:space-between; gap:30px; padding:18px 28px; cursor:pointer; list-style:none; font:600 17px var(--serif, \"Iowan Old Style\", Georgia, serif); } .ds-evidence summary::-webkit-details-marker { display:none; } .ds-evidence summary small { display:block; margin-bottom:5px; color:var(--ink-faint, #7a8781); font:500 8px var(--mono, Consolas, monospace); letter-spacing:0.1em; } .ds-evidence-toggle { font:500 9px var(--mono, Consolas, monospace); letter-spacing:0.08em; text-transform:uppercase; } .ds-evidence[open] .ds-evidence-toggle { font-size:0; } .ds-evidence[open] .ds-evidence-toggle::after { font-size:9px; content:\"Close\"; } .ds-evidence dl { display:grid; grid-template-columns:repeat(3, 1fr); margin:0; border-top:1px solid var(--line, #cec7b8); } .ds-evidence dl div { padding:20px 28px; border-right:1px solid var(--line, #cec7b8); } .ds-evidence dt { margin-bottom:8px; color:var(--ink-faint, #7a8781); font:500 8px var(--mono, Consolas, monospace); letter-spacing:0.07em; } .ds-evidence dd { margin:0; font:500 10px var(--mono, Consolas, monospace); } .ds-evidence summary:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+      "css": ".ds-evidence { color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:#e8e3d8; } .ds-evidence summary { display:flex; min-height:82px; align-items:center; justify-content:space-between; gap:30px; padding:18px 28px; cursor:pointer; list-style:none; font:600 17px var(--serif, \"Iowan Old Style\", Georgia, serif); } .ds-evidence summary::-webkit-details-marker { display:none; } .ds-evidence summary small { display:block; margin-bottom:5px; color:var(--ink-faint, #596962); font:500 9px var(--mono, Consolas, monospace); letter-spacing:0.1em; } .ds-evidence-toggle { font:500 9px var(--mono, Consolas, monospace); letter-spacing:0.08em; text-transform:uppercase; } .ds-evidence[open] .ds-evidence-toggle { font-size:0; } .ds-evidence[open] .ds-evidence-toggle::after { font-size:9px; content:\"Close\"; } .ds-evidence dl { display:grid; grid-template-columns:repeat(3, 1fr); margin:0; border-top:1px solid var(--line, #cec7b8); } .ds-evidence dl div { padding:20px 28px; border-right:1px solid var(--line, #cec7b8); } .ds-evidence dt { margin-bottom:8px; color:var(--ink-faint, #596962); font:500 9px var(--mono, Consolas, monospace); letter-spacing:0.07em; } .ds-evidence dd { margin:0; font:500 10px var(--mono, Consolas, monospace); } .ds-evidence summary:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
     }
   ],
   "narrative": {
@@ -230,7 +266,8 @@
     "rules": [
       {"name": "The Signal, Not Decoration Rule", "body": "Signal Coral marks a state, boundary, revision, or consequential action; it does not become a large ambient fill.", "section": "colors"},
       {"name": "The Paper Before White Rule", "body": "Build hierarchy with warm paper tones and transparency. Pure white is not the default canvas.", "section": "colors"},
-      {"name": "The Focus Is Functional Rule", "body": "Focus Cobalt exists to make keyboard location unmistakable and must not compete as a second decorative accent.", "section": "colors"},
+      {"name": "The Focus Is Functional Rule", "body": "Focus Cobalt makes keyboard location unmistakable on paper. Portrait Night Focus performs the same job only on the dark portrait field; neither is a decorative accent.", "section": "colors"},
+      {"name": "The Night Is an Instrument Rule", "body": "The portrait night palette belongs to the WebGL stage and its attached selection bar. It does not replace Drafting Paper, Observatory Green, or the square paper controls around the stage.", "section": "colors"},
       {"name": "The Three Voices Rule", "body": "Serif explains meaning, sans-serif operates the product, and mono proves what happened. Do not swap their jobs for variety.", "section": "typography"},
       {"name": "The Quiet Scale Rule", "body": "Display type may be large, but it stays lightly weighted and tightly tracked; hierarchy comes from measure and spacing rather than heavy boldness.", "section": "typography"},
       {"name": "The Instrument Grid Rule", "body": "Align content to shared rules, gutters, and baselines so every surface feels observed within the same apparatus.", "section": "layout"},

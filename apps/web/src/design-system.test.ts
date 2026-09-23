@@ -16,9 +16,27 @@ const observatory = readFileSync(
   "utf8",
 );
 const design = readFileSync("DESIGN.md", "utf8");
+const designSidecar = JSON.parse(
+  readFileSync(".impeccable/design.json", "utf8"),
+) as {
+  extensions: {
+    colorMeta: Record<string, { canonical: string }>;
+  };
+};
 const previewDesign = readFileSync("src/preview/DESIGN.md", "utf8");
 const explorerDesign = readFileSync(
   "src/components/portrait-explorer/DESIGN.md",
+  "utf8",
+);
+const impeccableConfig = JSON.parse(
+  readFileSync("../../.impeccable/config.json", "utf8"),
+) as { buildPath?: string };
+const timingBrief = readFileSync(
+  ".impeccable/surfaces/apps-web-src-components-timingview-tsx.md",
+  "utf8",
+);
+const todayBrief = readFileSync(
+  ".impeccable/surfaces/apps-web-src-components-todayview-tsx.md",
   "utf8",
 );
 
@@ -79,14 +97,15 @@ describe("web design contracts", () => {
   });
 
   it("uses a named, documented palette for the portrait night stage", () => {
-    for (const token of [
+    const nightTokens = [
       "--night-surface",
       "--on-night",
       "--on-night-soft",
       "--night-outline",
       "--night-hover",
       "--night-focus",
-    ]) {
+    ];
+    for (const token of nightTokens) {
       expect(styles).toContain(token);
     }
     expect(portrait).toMatch(
@@ -99,5 +118,23 @@ describe("web design contracts", () => {
     expect(design).toContain('night-surface: "#091923"');
     expect(previewDesign).toContain('night-surface: "#091923"');
     expect(explorerDesign).not.toContain("legacy dialog rounding");
+    expect(designSidecar.extensions.colorMeta["on-surface-faint"]?.canonical)
+      .toBe("#596962");
+    for (const token of nightTokens) {
+      expect(designSidecar.extensions.colorMeta[token.slice(2)]?.canonical)
+        .toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it("keeps Impeccable direction and surface targets rooted correctly", () => {
+    expect(impeccableConfig.buildPath).toBe("comp");
+    expect(timingBrief).toContain(
+      'primary_target: "src/components/TimingView.tsx"',
+    );
+    expect(todayBrief).toContain(
+      'primary_target: "src/components/TodayView.tsx"',
+    );
+    expect(timingBrief).not.toContain('primary_target: "apps/web/');
+    expect(todayBrief).not.toContain('primary_target: "apps/web/');
   });
 });
