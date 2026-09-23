@@ -2392,7 +2392,7 @@
       "kind": "source",
       "path": "apps/web/src/components/AppShell.tsx",
       "selector": {
-        "text": "const navigation: Array<{ id: ViewId; label: string; icon: IconName }> = [\n  { id: \"today\", label: \"Today\", icon: \"today\" },\n  { id: \"history\", label: \"History\", icon: \"history\" },\n  { id: \"pattern\", label: \"Your pattern\", icon: \"pattern\" },\n  { id: \"timing\", label: \"Timing\", icon: \"timing\" },\n  { id: \"travel\", label: \"Time travel\", icon: \"travel\" },\n  { id: \"privacy\", label: \"Privacy\", icon: \"privacy\" },\n];"
+        "text": "const navigation: Array<{ id: ViewId; label: string; icon: IconName; stage?: string }> = [\n  { id: \"today\", label: \"Today\", icon: \"today\", stage: \"M3\" },\n  { id: \"history\", label: \"History\", icon: \"history\" },\n  { id: \"pattern\", label: \"Your pattern\", icon: \"pattern\" },\n  { id: \"timing\", label: \"Timing\", icon: \"timing\", stage: \"M3\" },\n  { id: \"travel\", label: \"Time travel\", icon: \"travel\", stage: \"M4\" },\n  { id: \"privacy\", label: \"Privacy\", icon: \"privacy\" },\n];"
       },
       "observed_at": null
     },
