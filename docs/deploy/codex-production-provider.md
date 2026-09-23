@@ -75,12 +75,13 @@ recorded, and Gate 6 spend certification remains open. Neither this status nor
 any later runbook edit authorizes a deployment, provider call, ontology
 activation, or rollout advance.
 
-**Migration evidence (2026-09-08):** `db/d1/MIGRATIONS.json` records 0025–0028
-applied and a prospective prerequisite for 0029. The later
-[0029 apply receipt](../reviews/artifacts/2026-09-07-release-attestation/production-migration-0029.json)
-and [release review](../reviews/2026-09-07-release-attestation-merge.md#completed-deployment-prerequisites)
-record its production apply at 2026-09-07 10:15:26 UTC. Keep that dated evidence
-distinct from both the 2026-08-25 inventory above and a fresh live query.
+**Migration evidence:** the 2026-09-11 ledger-correction note in
+[`MIGRATIONS.json`](../../db/d1/MIGRATIONS.json) records the production applies
+of 0029–0032; a separate entry records 0033 that day. The
+[release-attestation runbook](release-attestation.md#migration-before-compatible-runtime)
+also links the dated 0034 receipt preserved in Git history. Keep these
+historical observations distinct from the 2026-08-25 inventory above and a
+fresh live query.
 Portrait image/mesh work is a separate runner poll after the text queue
 (`CODEX_RUNNER_PORTRAITS`, `CODEX_RUNNER_MESHES`; only `"0"` or `"1"`). See
 [`apps/codex-runner/README.md`](../../apps/codex-runner/README.md) for enablement

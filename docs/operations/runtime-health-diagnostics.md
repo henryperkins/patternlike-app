@@ -17,6 +17,24 @@ The presentation separates permission/admission, reservation, runner execution, 
 
 A visible recovery suggestion is only `reload_status`, with `read_only` authority. It performs no repair, force release, consent renewal or generation retry. Any such action still belongs to its existing domain service and authorization flow. Pattern's `first_open_retry` and `failed_attempt_retry` reservation metadata identify retry origin. Other reservations show unknown retry origin; `revision_reason` is separately uncollected. Daily automatic command replacement cannot be diagnosed from this Pattern scope, including cases that preserve `revision_reason: initial`.
 
+## Candidate revalidation is a separate request
+
+The `pattern` CLI subcommand calls diagnostics only. It never opens keys or
+artifacts and never replays a writer response. To explain a terminal
+`candidate_invalid` result without returning private prose, use the separate
+Access-protected GET:
+
+```text
+/admin/pattern-generations/{generation_id}/candidate-revalidation?purpose=incident_response
+```
+
+That route audits access to the intended artifact classes before opening keys
+or artifacts. It selects only the exact final completed writer coordinate,
+returns provenance hashes and closed failure codes, and does not retry,
+regenerate or publish. An access grant does not establish successful replay.
+See [candidate revalidation](../deploy/pattern-candidate-revalidation.md) for
+eligibility, request authentication and fail-closed outcomes.
+
 ## Safe reporting boundary
 
 Runner stdout now passes every event through `serializeRunnerLogEvent`: only exact lifecycle/idle/processed/poll-failed events, work classes, the compiled scheduling policy and a valid timestamp survive. Private extras, errors, accessor properties, symbols, unexpected prototypes, proxies and serialization hooks become a fixed `codex_runner_log_rejected` event. `job_processed` stays distinct from success. The newly added aggregate parser rejects unknown fields at all levels. This work does not claim to harden every pre-existing API logging call.
