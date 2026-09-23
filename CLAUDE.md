@@ -19,6 +19,7 @@ npm run ci:local           # the merge gate — GitHub Actions does not run; see
 npm run calc:dev           # calc service      :8080
 npm run db:local -w @patternlike/api   # apply the ordered db/d1 migrations to local D1
 node scripts/dev/seed-dev-user.mjs     # then seed usr_local_dev_0001 — X-User-Id names a user, it never creates one
+node scripts/dev/write-dev-vars.mjs    # local-only CODEX_* values in apps/api/.dev.vars; /v1 answers 503 without them
 npm run dev:api            # Wrangler Worker   :8787
 npm run web:dev            # Vite PWA          :5173 (proxies /v1 → :8787); open 127.0.0.1, not localhost
 

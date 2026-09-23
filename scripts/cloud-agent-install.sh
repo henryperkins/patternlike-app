@@ -4,13 +4,14 @@
 #
 # Idempotent, non-interactive repository bootstrap run after checkout. It only
 # prepares durable state (dependencies and the repo-local .venv, ephemeris data,
-# the local D1 database, and a seeded local-dev user); long-running dev servers
-# live in `terminals` in .cursor/environment.json, never here.
+# the local D1 database, a seeded local-dev user, and local-only API settings);
+# long-running dev servers live in `terminals` in .cursor/environment.json,
+# never here.
 #
 # Safe to run repeatedly: pip skips satisfied requirements and an existing .venv
 # is reused, npm ci is deterministic, the ephemeris download re-verifies existing
-# files by digest, the D1 migrations are IF NOT EXISTS, and the dev-user seed
-# uses INSERT OR IGNORE.
+# files by digest, the D1 migrations are IF NOT EXISTS, the dev-user seed uses
+# INSERT OR IGNORE, and apps/api/.dev.vars is only ever created, never rewritten.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -53,5 +54,10 @@ npm run db:local -w @patternlike/api
 #    names an existing user but no longer creates one, so the local birth->chart
 #    curl flow and the PWA both need this row + wrapped DEK to exist.
 node scripts/dev/seed-dev-user.mjs
+
+# 7. Local-only CODEX_* settings, without which the `api` terminal answers every
+#    /v1 request with 503 configuration_error. Written only when
+#    apps/api/.dev.vars is absent, so a developer's own file is never touched.
+node scripts/dev/write-dev-vars.mjs
 
 echo "cloud-agent install complete"
