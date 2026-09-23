@@ -62,7 +62,7 @@ describe("offline Pattern writer 1.0.4", () => {
       const correction = buildPatternResponsesRequest("writer", {}, pin, { correction: true });
       expect(await sha256(plain.instructions)).toBe("d8abe9b7e6dd177c7a5be98d074527e74951337eb978757ba72114d153e7dc8b");
       expect(await sha256(correction.instructions)).toBe("61243674e4e40aeeec9413d8e771ad78df918dc5cabd1cd6b5a4af3c60dbe556");
-      expect(correction.instructions).toBe(PATTERN_WRITER_CORRECTION_POLICY);
+      expect(correction.instructions).not.toBe(PATTERN_WRITER_CORRECTION_POLICY);
     }
   });
 

@@ -553,6 +553,74 @@ describe("Pattern provider packet builders", () => {
   describe("writer correction document", () => {
     const PROSE = "ZZPROSEZZ";
 
+    it("carries earlier failures into later corrections without duplicates", () => {
+      const earlier = buildCorrectionDocument(plan(), {
+        deterministic: [{ code: "uncited_astrological_claim", message: "chapter_01_section_01" }],
+      }, 1);
+      const document = buildCorrectionDocument(plan(), {
+        deterministic: [
+          { code: "prohibited_claim", message: "chapter_01_section_02" },
+        ],
+      }, 2, earlier);
+      expect(document.items.map(({ code, target_key }) => ({ code, target_key }))).toEqual([
+        { code: "uncited_astrological_claim", target_key: "chapter_01_section_01" },
+        { code: "prohibited_claim", target_key: "chapter_01_section_02" },
+      ]);
+      expect(earlier.items).toHaveLength(1);
+      expect(document.attempt).toBe(2);
+      const duplicate = buildCorrectionDocument(plan(), {
+        deterministic: [{ code: "uncited_astrological_claim", message: "chapter_01_section_01" }],
+      }, 2, earlier);
+      expect(duplicate.items).toEqual(earlier.items);
+    });
+
+    it("refuses correction history belonging to another frozen plan", () => {
+      const earlier = buildCorrectionDocument(plan(), { deterministic: [] }, 1);
+      earlier.preserve.plan_hash = `sha256:${"b".repeat(64)}`;
+      expect(() => buildCorrectionDocument(plan(), { deterministic: [] }, 2, earlier))
+        .toThrow("correction history plan mismatch");
+    });
+
+    it.each([0, 2, 3, 1.5])("refuses an invalid or future retained attempt %s", (attempt) => {
+      const earlier = buildCorrectionDocument(plan(), { deterministic: [] }, 1);
+      earlier.attempt = attempt;
+      expect(() => buildCorrectionDocument(plan(), { deterministic: [] }, 2, earlier))
+        .toThrow("correction history attempt mismatch");
+    });
+
+    it("reprojects retained items rather than forwarding fields or unauthorized references", () => {
+      const earlier = buildCorrectionDocument(plan(), { deterministic: [] }, 1);
+      earlier.items.push({
+        code: "claim_not_entailed", origin: "semantic", target_key: PROSE,
+        feature_aliases: ["f001", "f999", PROSE],
+        ontology_rule_ids: ["ont.sun.aries", PROSE],
+        ...{ rationale: PROSE },
+      });
+      const document = buildCorrectionDocument(plan(), { deterministic: [] }, 2, earlier);
+      expect(document.items).toEqual([{
+        code: "claim_not_entailed", origin: "semantic", target_key: null,
+        feature_aliases: ["f001"], ontology_rule_ids: ["ont.sun.aries"],
+      }]);
+      expect(JSON.stringify(document)).not.toContain(PROSE);
+    });
+
+    it("keeps accumulated corrections subject to the existing packet byte cap", () => {
+      const earlier = buildCorrectionDocument(plan(), {
+        deterministic: [{ code: "uncited_astrological_claim", message: "chapter_01_section_01" }],
+      }, 1);
+      const plain = buildWriterInput(plan(), packet(), records(), PATTERN_PACKET_LIMITS_DEFAULT, earlier);
+      expect(plain.ok).toBe(true);
+      if (!plain.ok) return;
+      const accumulated = buildCorrectionDocument(plan(), {
+        deterministic: [{ code: "prohibited_claim", message: "chapter_01_section_02" }],
+      }, 2, earlier);
+      const result = buildWriterInput(plan(), packet(), records(), {
+        ...PATTERN_PACKET_LIMITS_DEFAULT, maxBytes: plain.bytes,
+      }, accumulated);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("pattern_input_too_large");
+    });
+
     /** A rejected candidate whose every sentence is a recognizable sentinel. */
     function rejectedCandidate() {
       const c = candidate();

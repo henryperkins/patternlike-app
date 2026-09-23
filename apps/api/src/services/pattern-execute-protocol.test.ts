@@ -680,6 +680,77 @@ describe("Pattern stage protocol", () => {
     expect(await providerCalls()).toBe(3);
   });
 
+  it.each([
+    ["semantic", "semantic"],
+    ["deterministic", "semantic"],
+    ["publication", "semantic"],
+    ["semantic", "deterministic"],
+    ["semantic", "publication"],
+  ] as const)(
+    "carries %s correction history across a later %s rejection", async (firstRejection, secondRejection) => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-cumulative-correction");
+    const rejections = [firstRejection, secondRejection];
+    let writes = 0;
+    const overrides = {
+      publisher: (...args: Parameters<NonNullable<typeof DETERMINISTIC_PATTERN_PUBLISHER.publisher>>) => {
+        const base = DETERMINISTIC_PATTERN_PUBLISHER.publisher!(...args);
+        return {
+          ...base,
+          write: async (...writeArgs: Parameters<typeof base.write>) => {
+            const outcome = await base.write(...writeArgs);
+            const rejection = rejections[writes++];
+            if (outcome.ok) {
+              if (rejection === "deterministic") {
+                outcome.value.chapters[0]!.sections[0]!.ontology_rule_ids = ["ont.missing.test"];
+              } else if (rejection === "publication") {
+                outcome.value.chapters[0]!.sections[0]!.text += " This guarantees a specific future event.";
+              }
+            }
+            return outcome;
+          },
+          verify: async (...verifyArgs: Parameters<typeof base.verify>) => {
+            const outcome = await base.verify(...verifyArgs);
+            if (!outcome.ok) return outcome;
+            if (rejections[writes - 1] === "publication") return outcome;
+            return { ...outcome, value: {
+              schema_version: "0.7.0" as const, verdict: "reject" as const,
+              findings: [{
+                code: writes === 1
+                  ? "claim_not_entailed" : "voice_boundary_exceeded",
+                severity: "error" as const, target_key: "chapter_01",
+                feature_aliases: [], ontology_rule_ids: [],
+                rationale: "REJECTED PROSE MUST NEVER ENTER THE CORRECTION DOCUMENT",
+              }],
+            } };
+          },
+        };
+      },
+    };
+    expect(await deliver(generationId, env, overrides)).toEqual({ ok: true, terminal: false });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      expect(await deliver(generationId, env, overrides)).toEqual({ ok: true, terminal: false });
+      if (rejections[attempt] !== "deterministic") {
+        expect(await deliver(generationId, env, overrides)).toEqual({ ok: true, terminal: false });
+      }
+    }
+    const writing = await loadPatternJob(env, generationId);
+    expect(writing?.writer_attempts).toBe(2);
+    expect(await deliver(generationId, env, overrides)).toEqual({ ok: true, terminal: false });
+    const request = await getArtifactAt<{ correction: { items: Array<{ code: string }> } }>(
+      env, IDENTITY_A, generationId, "writer_request", writing!.stage_generation, 2,
+    );
+    const firstCode = { semantic: "claim_not_entailed", deterministic: "unknown_rule", publication: "prohibited_claim" }[firstRejection];
+    const secondCode = { semantic: "voice_boundary_exceeded", deterministic: "unknown_rule", publication: "prohibited_claim" }[secondRejection];
+    expect(request?.value.correction.items.map((item) => item.code)).toEqual(
+      expect.arrayContaining([firstCode, secondCode]),
+    );
+    expect(JSON.stringify(request?.value)).not.toContain(
+      "REJECTED PROSE MUST NEVER ENTER THE CORRECTION DOCUMENT",
+    );
+  });
+
   it("runs all three candidates with two verifier calls each and stops at exactly 11 fetches", async () => {
     enablePatternAi();
     standInKey = OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY;

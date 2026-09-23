@@ -343,7 +343,7 @@ const VERIFIER_POLICY = [
  * chapter_01_section_02" and given no text will otherwise spend its reasoning
  * looking for text that is not there, or ask for it.
  */
-export const PATTERN_WRITER_CORRECTION_POLICY = [
+const BASE_WRITER_CORRECTION_POLICY = [
   WRITER_POLICY,
   "",
   "This is a correction attempt against the same frozen plan.",
@@ -376,8 +376,24 @@ export const PATTERN_OFFLINE_WRITER_POLICY = [
 ].join("\n\n");
 
 export const PATTERN_OFFLINE_WRITER_CORRECTION_POLICY = [
-  PATTERN_WRITER_CORRECTION_POLICY,
+  BASE_WRITER_CORRECTION_POLICY,
   OFFLINE_WRITER_GUIDANCE,
+].join("\n\n");
+
+// Version 1.0.5 strengthens authoring guidance, not the acceptance policy.
+// Keep historical 1.0.3 and offline 1.0.4 instruction bytes unchanged.
+const WRITER_GROUNDING_GUIDANCE = [
+  "Ground every claim in the cited records for that specific prose unit. Preserve each record's conditions, alternatives and limits beside the claim they qualify, not only in a later tension or closing note.",
+  "Possibility words such as may do not authorize an unsupported mechanism, feeling, duration, comparison or personal outcome. Use the narrowest supported relationship. Omit an example or practical suggestion that needs an additional unsupported premise.",
+  "Each prose unit needs nonempty feature_aliases and ontology_rule_ids. A rule authorized for the chapter is not automatically supported by every alias in that chapter: cite only rules supported by this unit's own aliases, including every dependency of a derived synthesis. Leave derived_synthesis_ids empty when none is supported.",
+  "Copy exact ontology record ids. Required tension, resource and counter-expression identifiers describe plan obligations; they are not additional ontology records to cite.",
+  "Do not repeat a prohibited claim as a quotation or to deny it. Express the permitted interpretation and its limits in different wording, without diagnosis, prediction, fate, guarantee or inevitability language.",
+].join("\n");
+
+export const PATTERN_WRITER_CORRECTION_POLICY = [
+  BASE_WRITER_CORRECTION_POLICY,
+  WRITER_GROUNDING_GUIDANCE,
+  "Correction items accumulate failures from earlier attempts against this same frozen plan. Avoid reintroducing any of them. Earlier section keys locate the earlier draft, not proof that a reorganized section currently fails. Check the entire rewritten document against all constraints, not only the latest finding.",
 ].join("\n\n");
 
 
@@ -426,7 +442,7 @@ export const WORKERS_AI_WRITER_POLICY = [
 
 export const PATTERN_SYSTEM_POLICY: Record<PatternPass, string> = {
   planner: PLANNER_POLICY,
-  writer: WRITER_POLICY,
+  writer: [WRITER_POLICY, WRITER_GROUNDING_GUIDANCE].join("\n\n"),
   verifier: VERIFIER_POLICY,
 };
 
@@ -497,6 +513,8 @@ export function buildPatternResponsesRequest(
     instructions = options.correction
       ? PATTERN_OFFLINE_WRITER_CORRECTION_POLICY
       : PATTERN_OFFLINE_WRITER_POLICY;
+  } else if (pass === "writer" && ["1.0.1", "1.0.2", "1.0.3"].includes(pin.writer_prompt_version)) {
+    instructions = options.correction ? BASE_WRITER_CORRECTION_POLICY : WRITER_POLICY;
   }
   return {
     model: pin[`${pass}_model`],
