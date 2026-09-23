@@ -22,7 +22,7 @@ The volumetric chapter objects, bidirectional reading links, and Your sky instru
 - Surface: standalone `PortraitExplorer` with authored fixtures and the fictional Cancer/Taurus/Libra sky. Account embedding, signed-in generation, Safari, VoiceOver/NVDA, and physical GPU performance were not exercised.
 - Browser: Chromium through Playwright. Later desktop steps used `prefers-reduced-motion: reduce` so camera poses would settle. This is not a hardware frame-time measurement.
 - Viewports: 1440 × 900, 390 × 844, 320 × 740, 844 × 390.
-- Specs compared: [experience redesign](../superpowers/specs/2026-09-06-pattern-portrait-experience-redesign.md) §§4–9, [observatory](../superpowers/specs/2026-09-06-portrait-observatory-design.md), [zodiac](../superpowers/specs/2026-09-06-zodiac-observatory-design.md), and local [DESIGN.md](../../apps/web/src/components/portrait-explorer/DESIGN.md).
+- Specs compared: [experience redesign](../superpowers/archive/specs/2026-09-06-pattern-portrait-experience-redesign.md) §§4–9, [observatory](../superpowers/archive/specs/2026-09-06-portrait-observatory-design.md), [zodiac](../superpowers/archive/specs/2026-09-06-zodiac-observatory-design.md), and local [DESIGN.md](../../apps/web/src/components/portrait-explorer/DESIGN.md).
 - Measurements: [measurements.json](artifacts/2026-09-07-3d-ui-review/measurements.json). Screenshot hashes are in that folder.
 
 Captured flow:

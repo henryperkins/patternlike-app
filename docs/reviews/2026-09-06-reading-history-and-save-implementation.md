@@ -4,7 +4,7 @@ Status: implementation, independent review, and local browser verification compl
 
 Readers can save one immutable Daily revision and revisit earlier chapters through History. History selects one readable artifact per local date, prioritizing published, then invalidated, then superseded revisions. Saved preserves every explicitly saved revision, including two revisions from the same date.
 
-The implementation follows the [Reading History and Save plan](../superpowers/plans/2026-08-26-reading-history-and-save.md), with migration 0028 replacing the already-used 0019 and the existing M8 contract's required view filter taking precedence over the plan's original default.
+The implementation follows the [Reading History and Save plan](../superpowers/archive/plans/2026-08-26-reading-history-and-save.md), with migration 0028 replacing the already-used 0019 and the existing M8 contract's required view filter taking precedence over the plan's original default.
 
 ## Compatibility and privacy
 

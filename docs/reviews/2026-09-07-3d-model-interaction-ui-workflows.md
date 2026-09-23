@@ -17,7 +17,7 @@ The portrait explorer is a working reading companion with real volumetric chapte
 
 This review covers the current `PortraitExplorer` observatory on `main` (`76b4671`), not the retired graph constellation. It does not authorize a redesign, provider, migration, or production change.
 
-Prior work: [2026-09-06 experience review](2026-09-06-pattern-portrait-experience-review.md), [redesign spec](../superpowers/specs/2026-09-06-pattern-portrait-experience-redesign.md), [explorer implementation](2026-09-06-portrait-explorer-implementation.md), [observatory merge](2026-09-07-portrait-observatory-merge.md). The observatory direction itself records that the courtyard was an implementation assumption, not a user-approved concept.
+Prior work: [2026-09-06 experience review](2026-09-06-pattern-portrait-experience-review.md), [redesign spec](../superpowers/archive/specs/2026-09-06-pattern-portrait-experience-redesign.md), [explorer implementation](2026-09-06-portrait-explorer-implementation.md), [observatory merge](2026-09-07-portrait-observatory-merge.md). The observatory direction itself records that the courtyard was an implementation assumption, not a user-approved concept.
 
 ## Scope and evidence
 

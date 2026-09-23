@@ -2,7 +2,7 @@
 
 Date: 2026-09-07
 
-Status: implemented locally; map maintenance is optional. See the [implementation record](../plans/2026-09-09-source-map-maintenance-implementation.md) for dated results.
+Status: implemented locally; map maintenance is optional. See the [implementation record](../archive/plans/2026-09-09-source-map-maintenance-implementation.md) for dated results.
 
 Scope simplified: 2026-09-09. Keep map commands and their focused tests available for maintenance without adding them to existing verification gates. The proposed Slice 2 preflight is withdrawn; this work does not introduce a replacement release process.
 

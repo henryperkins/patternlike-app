@@ -4,7 +4,7 @@ Date: 2026-09-08
 
 Reconciled: 2026-09-09 against the [updated alignment roadmap](../../reviews/2026-09-07-mind-map-alignment-roadmap.md), especially section 6.5.
 
-Status: immediate reader continuity is substantially implemented through [Slice 4, now separately deployed](../plans/2026-09-09-reader-journey-production-implementation.md). On September 11, 2026 the owner selected the generated-artwork v2 expansion: images must cover every chapter, including Patterns longer than four chapters. Implementation and verification are tracked in the [all-chapter artwork plan](../plans/2026-09-11-all-chapter-artwork.md). Deployment, runner installation, production migration and producer enablement remain separate operations. Signed-in production journey observation and human comprehension review remain open.
+Status: immediate reader continuity is substantially implemented through [Slice 4, now separately deployed](../archive/plans/2026-09-09-reader-journey-production-implementation.md). On September 11, 2026 the owner selected the generated-artwork v2 expansion: images must cover every chapter, including Patterns longer than four chapters. Implementation and verification are tracked in the [all-chapter artwork plan](../archive/plans/2026-09-11-all-chapter-artwork.md). Deployment, runner installation, production migration and producer enablement remain separate operations. Signed-in production journey observation and human comprehension review remain open.
 
 Parent: [12+1 delivery ledger](../plans/2026-09-07-mind-map-alignment-slices.md). Related state/queue interface: [Slices 7–8](2026-09-08-readiness-runner-fairness-design.md).
 

@@ -273,7 +273,7 @@ It does not return record bodies.
 ### 11. Replay ledger — specified, numbered `0008`
 
 **Decision.** The disaster-recovery replay source is specified in
-[`2026-08-16-pattern-replay-ledger-design.md`](2026-08-16-pattern-replay-ledger-design.md).
+[`2026-08-16-pattern-replay-ledger-design.md`](../archive/specs/2026-08-16-pattern-replay-ledger-design.md).
 `0008` is that ledger. The adapter plan’s per-stage-class usage ledger and
 the `correction_document` CHECK rebuild do not share it:
 `correction_document` takes `0009`, while per-stage-class usage and any D1

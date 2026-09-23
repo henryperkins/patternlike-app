@@ -15,7 +15,7 @@ Date: 2026-09-07. Status: review complete; implementation unchanged.
 
 This is a live review of the current observatory on `main` (`6e706741f03253f2807d33380afb529161f3481f`), not a redesign proposal. It asks whether a reader can investigate the portrait: rotate it, identify chapters, reach published prose, and return without losing their place.
 
-The interaction contract remains [the 2026-09-06 experience redesign](../superpowers/specs/2026-09-06-pattern-portrait-experience-redesign.md). Local surface rules are in [`apps/web/src/components/portrait-explorer/DESIGN.md`](../../apps/web/src/components/portrait-explorer/DESIGN.md). Account session work from the same-day follow-up (`web: improve portrait reading, navigation, and recovery`) is included.
+The interaction contract remains [the 2026-09-06 experience redesign](../superpowers/archive/specs/2026-09-06-pattern-portrait-experience-redesign.md). Local surface rules are in [`apps/web/src/components/portrait-explorer/DESIGN.md`](../../apps/web/src/components/portrait-explorer/DESIGN.md). Account session work from the same-day follow-up (`web: improve portrait reading, navigation, and recovery`) is included.
 
 ## Scope and evidence
 

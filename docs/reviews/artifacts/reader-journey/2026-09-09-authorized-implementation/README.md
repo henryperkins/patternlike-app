@@ -1,6 +1,6 @@
 # Authorized reader journey: local verification
 
-Date: 2026-09-09. Worktree: `codex/source-map-maintenance`. [Implementation record](../../../../superpowers/plans/2026-09-09-reader-journey-production-implementation.md).
+Date: 2026-09-09. Worktree: `codex/source-map-maintenance`. [Implementation record](../../../../superpowers/archive/plans/2026-09-09-reader-journey-production-implementation.md).
 
 These screenshots show the production application components with test reading responses at the browser API boundary. They contain contract/example prose, not a live account’s personal readings. Ownership, encrypted persistence, publication, and lifecycle behavior are exercised separately by the API’s real D1 integration tests. No production migration, deployment, real-account generation, or human comprehension exercise occurred.
 

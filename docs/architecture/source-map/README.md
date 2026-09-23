@@ -63,3 +63,5 @@ The maintained map was reconciled in the isolated Slice 1 checkout based on `d33
 | `output/mindmaps/2026-09-07-184743/source-snapshot.json` | [source-snapshot.json](archive/2026-09-07-184743/source-snapshot.json) | 21695 | `a54b6367b014389c5036584950feb6455f2b8697d5f4af0fbfdbda306d71ec3a` |
 | `output/mindmaps/2026-09-09-corrected/patternlike-source-mindmap.md` | [patternlike-source-mindmap.md](archive/2026-09-09-corrected/patternlike-source-mindmap.md) | 15585 | `b09bc6e9275e5e530423f76ebbbc1b80447bb9e71356bf39214c6d91f9d74e9e` |
 | `output/mindmaps/2026-09-09-corrected/patternlike-source-mindmap.with-anchors.md` | [patternlike-source-mindmap.with-anchors.md](archive/2026-09-09-corrected/patternlike-source-mindmap.with-anchors.md) | 22084 | `05fca0beb6314ce2d0889f4a229c1d48221bde58de0e4965c895355fd8c3606a` |
+
+The one-off September 8 static-source audit of the pre-maintenance mind map, originally kept at the repository root, was moved to [verification-c98ecf0/](archive/verification-c98ecf0/) during documentation consolidation. It predates this maintained map and is retained only as a dated record of the corrected generation input.

@@ -2,7 +2,7 @@
 
 Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculation authority; editorial content ships via signed WordPress releases; Fly.io is portable compute (not launch-critical).
 
-**Spec:** `spec-bundle/` (v0.2) · **Contracts:** frozen baseline and additive packages under `contracts/` · **D1:** `db/d1/`
+**Spec:** `spec-bundle/` (v0.2 is the frozen M0 baseline; v0.5 restates the daily-reading contract) · **Contracts:** frozen baseline and additive packages under `contracts/` · **D1:** `db/d1/`
 
 **Open contract decisions:** [`docs/reviews/2026-08-01-spec-escalations.md`](docs/reviews/2026-08-01-spec-escalations.md) — twelve reviewed items where the code implements the frozen contract faithfully and the fix belongs in the spec.
 

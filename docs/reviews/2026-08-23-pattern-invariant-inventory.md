@@ -25,11 +25,11 @@ Current cross-file guidance:
 
 - CLAUDE.md, AI Pattern generation (M7);
 - docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md;
-- docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md;
+- docs/superpowers/archive/specs/2026-08-15-openai-pattern-adapter-design.md;
 - docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md;
 - docs/superpowers/specs/2026-08-16-m7-evidence-gates-design.md;
-- docs/superpowers/specs/2026-08-16-pattern-replay-ledger-design.md;
-- docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md;
+- docs/superpowers/archive/specs/2026-08-16-pattern-replay-ledger-design.md;
+- docs/superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md;
 - docs/superpowers/plans/2026-08-15-m7-remaining-slices-ledger.md; and
 - docs/deploy/openai-pattern-rollout.md.
 

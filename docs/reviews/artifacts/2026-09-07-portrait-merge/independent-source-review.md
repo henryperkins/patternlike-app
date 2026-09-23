@@ -19,25 +19,25 @@
 
 ### I1. The minimized sky projection copied retrograde state outside the accepted allowlist
 
-- Original files/lines: `apps/web/src/lib/portrait-sky.ts:12,57`; `apps/web/src/components/portrait-explorer/SkyReader.tsx:51`; acceptance authority at `docs/superpowers/specs/2026-09-06-zodiac-observatory-design.md:15`.
+- Original files/lines: `apps/web/src/lib/portrait-sky.ts:12,57`; `apps/web/src/components/portrait-explorer/SkyReader.tsx:51`; acceptance authority at `docs/superpowers/archive/specs/2026-09-06-zodiac-observatory-design.md:15`.
 - Impact: the proposed `PortraitSky` projection copied and could display `retrograde`, although the data contract permits only supported Sun/Moon/rising placements, sign/degree, permitted house, qualification, user-facing uncertainty, and the chart identity needed for the match. This weakened the explicit frontend minimization boundary.
 - Resolution reviewed: `PortraitSkyPlacement` now contains only body, normalized longitude, derived sign/degree, optional permitted house, and optional qualification (`portrait-sky.ts:6-13`). The projection no longer copies `position.retrograde`, and `SkyReader` renders only a permitted house (`SkyReader.tsx:51`). The full-object equality regression at `portrait-sky.test.ts:28-40` now rejects an extra projected property while confirming that private source fields do not cross the boundary.
 
 ### I2. Sky refresh/removal remounted the whole explorer and discarded same-source state
 
-- Original file/line: `apps/web/src/components/portrait-explorer/PortraitExplorer.tsx:23` in the supplied review package, where `sky` was included in the `ReadyExplorer` React key; acceptance authority at `docs/superpowers/specs/2026-09-06-portrait-observatory-design.md:25` and `docs/superpowers/specs/2026-09-06-zodiac-observatory-design.md:9,25`.
+- Original file/line: `apps/web/src/components/portrait-explorer/PortraitExplorer.tsx:23` in the supplied review package, where `sky` was included in the `ReadyExplorer` React key; acceptance authority at `docs/superpowers/archive/specs/2026-09-06-portrait-observatory-design.md:25` and `docs/superpowers/archive/specs/2026-09-06-zodiac-observatory-design.md:9,25`.
 - Impact: changing or removing the optional sky projection for the same saved Pattern remounted `ReadyExplorer`. That cleared chapter/facet/navigation, desk/turn state, camera and scroll bookmarks, motion and quality choices. The account test only mocked `PortraitExplorer`, so retaining the source and loaded blob URLs did not prove UI-state retention.
 - Resolution reviewed: the source-derived key again excludes `sky` (`PortraitExplorer.tsx:20-25`). Sky changes remount only the scene boundary that owns sky-dependent geometry (`PortraitExplorer.tsx:262-268`), while the requested body is reconciled against currently supported placements (`PortraitExplorer.tsx:84-87`). The regression at `PortraitExplorer.test.tsx:414-443` refreshes, changes, and removes sky facts while retaining chapter 2, Resources, the camera bookmark, open desk, object turn, and Dusk state; it also proves the scene itself is refreshed and the selected body remains valid.
 
 ### I3. No-placement fallbacks claimed markers and instructed an impossible placement choice
 
-- Original files/lines: `apps/web/src/components/portrait-explorer/PortraitScene.tsx:116`; `apps/web/src/components/portrait-explorer/ObservatoryControls.tsx:30`; `apps/web/src/components/portrait-explorer/SkyReader.tsx:60`; acceptance authority at `docs/superpowers/specs/2026-09-06-zodiac-observatory-design.md:9,17,21`.
+- Original files/lines: `apps/web/src/components/portrait-explorer/PortraitScene.tsx:116`; `apps/web/src/components/portrait-explorer/ObservatoryControls.tsx:30`; `apps/web/src/components/portrait-explorer/SkyReader.tsx:60`; acceptance authority at `docs/superpowers/archive/specs/2026-09-06-zodiac-observatory-design.md:9,17,21`.
 - Impact: the canvas alternative text claimed birth-chart markers even when the active projection had no placements or only a saved Sun sector without longitude. The adjacent hint told the reader to choose an unavailable placement, and the map note presupposed markers. These contradicted the otherwise-correct missing-data fallback.
 - Resolution reviewed: the canvas names markers only when `props.sky.placements` is nonempty (`PortraitScene.tsx:116`); the sky hint now describes the ring and any available placements (`ObservatoryControls.tsx:30`); and the map note is explicitly conditional (`SkyReader.tsx:60`). Runtime regressions assert the presence and absence of the marker phrase alongside actual geometry in `PortraitScene.runtime.test.tsx:95-135`.
 
 ### I4. The projection retained an unused birth-time accuracy field outside the output allowlist
 
-- Original file/lines: `apps/web/src/lib/portrait-sky.ts:17,68` before correction; acceptance authority at `docs/superpowers/specs/2026-09-06-zodiac-observatory-design.md:15`.
+- Original file/lines: `apps/web/src/lib/portrait-sky.ts:17,68` before correction; acceptance authority at `docs/superpowers/archive/specs/2026-09-06-zodiac-observatory-design.md:15`.
 - Impact: `accuracy` was required internally to suppress or qualify facts, but no explorer or renderer consumed the copied output field. Retaining it made the minimized projection broader than the accepted output contract for no product behavior.
 - Resolution reviewed: `accuracy` remains an internal input used at `portrait-sky.ts:27-61` but is absent from `PortraitSky` and the returned object (`portrait-sky.ts:15-20,66-69`). Exact whole-object expectations in `portrait-sky.test.ts:28-40` enforce the narrower result.
 

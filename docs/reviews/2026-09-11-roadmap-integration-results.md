@@ -1,6 +1,6 @@
 # Roadmap integration results — 2026-09-11
 
-The [approved sequence](../superpowers/plans/2026-09-11-roadmap-integration.md) has produced a reviewed integration branch from main `69a4f78`. [PR 54](https://github.com/henryperkins/patternlike-app/pull/54) carries the actual full-gate, migration, merge and deployment outcomes. This document records the implementation and local assessment; the dated September 9 records remain intact.
+The [approved sequence](../superpowers/archive/plans/2026-09-11-roadmap-integration.md) has produced a reviewed integration branch from main `69a4f78`. [PR 54](https://github.com/henryperkins/patternlike-app/pull/54) carries the actual full-gate, migration, merge and deployment outcomes. This document records the implementation and local assessment; the dated September 9 records remain intact.
 
 ## Delivered implementation
 

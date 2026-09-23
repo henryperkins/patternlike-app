@@ -4,7 +4,7 @@ Date: 2026-09-06. Status: review complete; redesign proposed; implementation unc
 
 The current portrait has a useful reading and accessibility foundation, but the 3D experience is too shallow to carry the product. Rotation reveals the limits of the contour drawing, while most interaction happens in the adjacent reader. The next iteration should be a volumetric portrait with a hierarchy of exploration: whole portrait → chapter → reading facet → exact passage, with an explicit return path.
 
-The [redesign specification](../superpowers/specs/2026-09-06-pattern-portrait-experience-redesign.md) defines the recommended replacement, its asset requirements, interaction states, mobile behavior, and acceptance gates.
+The [redesign specification](../superpowers/archive/specs/2026-09-06-pattern-portrait-experience-redesign.md) defines the recommended replacement, its asset requirements, interaction states, mobile behavior, and acceptance gates.
 
 ## Scope and evidence
 

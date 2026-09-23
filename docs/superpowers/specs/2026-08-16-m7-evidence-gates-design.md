@@ -5,7 +5,7 @@
 **Status:** Draft for approval. No plan may be derived until this is
 approved. Criterion 23 cannot be scheduled until `0008` is applied and
 the replay runtime in
-[`2026-08-16-pattern-replay-ledger-design.md`](2026-08-16-pattern-replay-ledger-design.md)
+[`2026-08-16-pattern-replay-ledger-design.md`](../archive/specs/2026-08-16-pattern-replay-ledger-design.md)
 exists.
 
 **Scope:** The three acceptance criteria that are runs, not commits:

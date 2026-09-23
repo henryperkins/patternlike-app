@@ -12,7 +12,7 @@
 > `apps/api/wrangler.toml` and `CLAUDE.md`. The current Daily procedure is
 > [`codex-production-provider.md`](./codex-production-provider.md), and the
 > ordered enablement sequence is
-> `docs/superpowers/plans/2026-08-27-codex-reader-rollout.md`.
+> `docs/superpowers/archive/plans/2026-08-27-codex-reader-rollout.md`.
 >
 > What carried over unchanged: the frozen-command contract, the four-attempt
 > retry policy, the UTC-day call ceiling and its 10,000 approval, scheduler
@@ -240,7 +240,7 @@ header, so a stored key configured in the dashboard does nothing while this
 procedure is followed — the deployment looks BYOK and is not. Using the stored
 key requires omitting `Authorization`, which the current adapter cannot do; that
 is the subject of Task 5a in
-`docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md`, and it is a
+`docs/superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md`, and it is a
 single-version cutover — gateway ids, key alias and `AI_GATEWAY_TOKEN` become
 present while `OPENAI_API_KEY` becomes absent in the same Worker version, because
 either intermediate combination is refused on every request. Do not attempt it by

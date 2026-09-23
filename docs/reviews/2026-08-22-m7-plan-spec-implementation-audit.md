@@ -11,9 +11,9 @@ No—not collectively. On local `main` at `26990c1`, the core adapter is impleme
 
 | Document | Verdict |
 |---|---|
-| [OpenAI adapter design](../superpowers/specs/2026-08-15-openai-pattern-adapter-design.md#scope) | Core engineering implemented; operational rollout not executed. |
+| [OpenAI adapter design](../superpowers/archive/specs/2026-08-15-openai-pattern-adapter-design.md#scope) | Core engineering implemented; operational rollout not executed. |
 | [M7 spec amendments](../superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md) | Implemented as specifications/contracts; some downstream runtime slices remain incomplete. |
-| [OpenAI adapter plan](../superpowers/plans/2026-08-15-openai-pattern-adapter.md#task-7-derive-provenance-from-the-pin-that-ran) | Tasks 1–9 implemented despite stale unchecked boxes; Task 10 incomplete. |
+| [OpenAI adapter plan](../superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md#task-7-derive-provenance-from-the-pin-that-ran) | Tasks 1–9 implemented despite stale unchecked boxes; Task 10 incomplete. |
 | [M7 remaining-slices ledger](../superpowers/plans/2026-08-15-m7-remaining-slices-ledger.md#where-m7-stands) | Status document, not implementable itself—and materially stale. |
 | [Archived handoff](../superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md#your-task) | Completed as a scoping deliverable; code was explicitly out of scope. |
 

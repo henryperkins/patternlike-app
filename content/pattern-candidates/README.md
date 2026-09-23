@@ -10,10 +10,11 @@ resulting release with a real key, and an operator ingests and activates it.
 
 ## Why this is not a fallback
 
-`GET /v1/pattern` reads the active signed release and nothing else. When no M4
-release is active it answers `503 pattern_release_not_active` and the client
-says so. That refusal is the product working correctly: substituting draft prose
-for reviewed prose would make "reviewed" mean nothing.
+No runtime code path reads this directory, and none may: draft prose is never a
+substitute for reviewed, signed prose, because that would make "reviewed" mean
+nothing. `GET /v1/pattern` serves generated Patterns from the M7 path; the old
+M4 release-reader path that once made this point (`pattern_release_not_active`,
+the cursor contract, the matcher) no longer exists in runtime source.
 
 `scripts/pattern-release/build.test.mjs` asserts that no runtime source file
 references this path.

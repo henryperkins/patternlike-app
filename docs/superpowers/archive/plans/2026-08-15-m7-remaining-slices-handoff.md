@@ -26,7 +26,7 @@ where a short read-only probe is needed to answer a scoping question.
 
 This repository's convention is `docs/superpowers/specs/` (design, approved
 first) then `docs/superpowers/plans/` (task-by-task implementation plan derived
-from it). Follow it. `docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md`
+from it). Follow it. `docs/superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md`
 is the most recent worked example of the plan format — Files / Interfaces /
 checkbox Steps / dependency map / sign-off gates.
 
@@ -35,7 +35,7 @@ Read these before anything else:
 1. `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` — the M7
    design. **Authoritative.** §31 is its own work decomposition and §32 its
    acceptance criteria; both are the frame for everything below.
-2. `docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md` — the already
+2. `docs/superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md` — the already
    written plan for the provider adapter. **Do not re-plan it.** Read it for the
    locked decisions and constraints it records, which bind your slices too.
 3. `CLAUDE.md` and `AGENTS.md`. The `CLAUDE.md` invariants are real and several

@@ -1,6 +1,6 @@
 # Pattern portrait explorer — implementation and verification
 
-Approved design: [Detailed redesign specification](../superpowers/specs/2026-09-06-pattern-portrait-experience-redesign.md). Original evidence: [Experience review](2026-09-06-pattern-portrait-experience-review.md).
+Approved design: [Detailed redesign specification](../superpowers/archive/specs/2026-09-06-pattern-portrait-experience-redesign.md). Original evidence: [Experience review](2026-09-06-pattern-portrait-experience-review.md).
 
 This implementation delivers the fictional fixture experience in an isolated worktree, based on portrait commit `82d5dd9fd3ff406bcec985411dc58fcbf2bf3432`. Branch: `codex/portrait-explorer`. Local development preview: `http://127.0.0.1:5175/pattern-portrait.html`. Built preview: `http://127.0.0.1:4175/pattern-portrait.html`. At the initial implementation handoff, no commit, push, migration, account rollout, or deployment had been performed. The verification record below is updated for the subsequent main integration request.
 

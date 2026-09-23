@@ -114,7 +114,7 @@ ST-08–ST-12 are Task 3-owned map dispositions. Reviewed the authored 42-topic/
 
 ## Requested Slice 2 preparation review
 
-Read-only review of `docs/superpowers/plans/2026-09-09-release-preflight-implementation.md` against `docs/superpowers/specs/2026-09-08-release-preflight-design.md` and current `scripts/pattern-release/release-evidence.mjs` found no actual interface contradiction. The exported helpers, 131,072-character capture tail, source exclusions, and fourteen-lane contract match the preparation text. The plan correctly leaves exact-summary sidecars, release:gate, candidate-tree mapping, PR observations, and release:preflight prospective. No Slice 2 implementation or passing preflight is claimed.
+Read-only review of `docs/superpowers/archive/plans/2026-09-09-release-preflight-implementation.md` against `docs/superpowers/archive/specs/2026-09-08-release-preflight-design.md` and current `scripts/pattern-release/release-evidence.mjs` found no actual interface contradiction. The exported helpers, 131,072-character capture tail, source exclusions, and fourteen-lane contract match the preparation text. The plan correctly leaves exact-summary sidecars, release:gate, candidate-tree mapping, PR observations, and release:preflight prospective. No Slice 2 implementation or passing preflight is claimed.
 
 ## Final maintained-map disposition
 
