@@ -6,7 +6,7 @@ The Pattern page (`PatternExperience` and its portrait wrappers) has a strong, h
 
 ## Scope and evidence
 
-- Source review only; no live browser session was run in this pass. Prior visual evidence for the portrait surface exists in [2026-09-06-pattern-portrait-experience-review.md](2026-09-06-pattern-portrait-experience-review.md).
+- Source review only; no live browser session was run in this pass.
 - Reviewed: [PatternExperience.tsx](../../apps/web/src/components/PatternExperience.tsx), [PatternConsent.tsx](../../apps/web/src/components/PatternConsent.tsx), [PatternPortrait.tsx](../../apps/web/src/components/PatternPortrait.tsx), [PatternSculpture.tsx](../../apps/web/src/components/PatternSculpture.tsx), [AccountPatternPortrait.tsx](../../apps/web/src/components/AccountPatternPortrait.tsx), [AccountPortraitExplorer.tsx](../../apps/web/src/components/AccountPortraitExplorer.tsx), [pattern-portrait.css](../../apps/web/src/components/pattern-portrait.css), [account-pattern-portrait.css](../../apps/web/src/components/account-pattern-portrait.css), and the `.pattern-*` rules in [styles.css](../../apps/web/src/styles.css).
 - Design context: `apps/web/PRODUCT.md`, `apps/web/DESIGN.md` (Private Observatory system).
 - Automated design-system scan over the two portrait stylesheets returned 33 advisory findings (22 off-ramp font sizes, 9 undocumented colors, 1 off-scale radius). All TSX components scanned clean. No false positives identified.

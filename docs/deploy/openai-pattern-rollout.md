@@ -70,12 +70,12 @@ generation while preserving accepted reads and erasure behavior.
 
 **Companion artifacts:**
 
-- adapter design:
-  `docs/superpowers/archive/specs/2026-08-15-openai-pattern-adapter-design.md`
-- adapter plan:
-  `docs/superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md`
-- internal ontology plan:
-  `docs/superpowers/archive/plans/2026-08-20-internal-ontology-activation.md`
+- adapter design (removed; in Git history):
+  `2026-08-15-openai-pattern-adapter-design.md`
+- adapter plan (removed; in Git history):
+  `2026-08-15-openai-pattern-adapter.md`
+- internal ontology plan (removed; in Git history):
+  `2026-08-20-internal-ontology-activation.md`
 - automated ontology plan:
   `docs/superpowers/plans/2026-08-20-automated-ontology-pipeline.md`
 - current ledger:
@@ -870,7 +870,7 @@ does not establish which upstream component introduced the condition.
 
 ### Gate 7A — shortest internal path
 
-Reconcile `docs/superpowers/archive/plans/2026-08-20-internal-ontology-activation.md`
+Reconcile `2026-08-20-internal-ontology-activation.md` (removed; in Git history)
 with current source before any operation. Record the compiled internal candidate,
 canonical bundle hash, signature/key id, ingestion, and active pointer separately.
 The signing route signs and returns; ingestion and activation belong to the

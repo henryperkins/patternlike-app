@@ -16,8 +16,7 @@ code alone would make the implementation diverge from the contract it is
 validated against.
 
 Code-level findings from the same review were fixed on `main` between the
-baseline commit (`53847f0`) and this document. The work is recorded in
-[`docs/superpowers/archive/plans/2026-08-01-code-review-remediation.md`](../superpowers/archive/plans/2026-08-01-code-review-remediation.md).
+baseline commit (`53847f0`) and this document, in `53847f0..0d2784b`.
 
 Every claim below was re-confirmed against the tree at the time of writing.
 

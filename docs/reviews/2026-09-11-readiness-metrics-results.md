@@ -1,6 +1,6 @@
 # Readiness, metrics and prose guidance — 2026-09-11
 
-The user authorized the next sequence after PR 54: [implementation plan](../superpowers/archive/plans/2026-09-11-readiness-metrics.md), based on main `b38d87c76167f60bcce86fb5443a34b9ae6dc4c3`. This follow-up advances Slice 7 and prepares future prose guidance without changing retained readings or production writer selection.
+The user authorized the next sequence after PR 54: an implementation plan based on main `b38d87c76167f60bcce86fb5443a34b9ae6dc4c3`. This follow-up advances Slice 7 and prepares future prose guidance without changing retained readings or production writer selection.
 
 ## Separate completion records
 

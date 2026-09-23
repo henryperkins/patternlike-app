@@ -17,10 +17,10 @@ live account, the preconditions section says how to verify it.
 
 **Companion artifacts:**
 
-- implementation plan:
-  `docs/superpowers/archive/plans/2026-08-26-birth-operational-guards.md`
-- umbrella plan:
-  `docs/superpowers/archive/plans/2026-08-26-p0-p1-hardening-and-core-loop.md`
+- implementation plan (removed; in Git history):
+  `2026-08-26-birth-operational-guards.md`
+- umbrella plan (removed; in Git history):
+  `2026-08-26-p0-p1-hardening-and-core-loop.md`
 - deferred workstream:
   `docs/superpowers/plans/2026-08-01-backend-completion-roadmap.md` § Stream 8
 

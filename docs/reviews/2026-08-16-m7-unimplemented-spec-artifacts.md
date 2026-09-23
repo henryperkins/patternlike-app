@@ -30,11 +30,11 @@ Where a later document already recorded a finding, this review cites it and
 adds only what opening the named section changes.
 
 Related later documents, not re-litigated here except where they silently
-amend the subject:
+amend the subject (since removed from the tree; they remain in Git history):
 
-- [`docs/superpowers/archive/specs/2026-08-15-openai-pattern-adapter-design.md`](../superpowers/archive/specs/2026-08-15-openai-pattern-adapter-design.md)
-- [`docs/superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md`](../superpowers/archive/plans/2026-08-15-openai-pattern-adapter.md)
-- [`docs/superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md`](../superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md)
+- `2026-08-15-openai-pattern-adapter-design.md`
+- `2026-08-15-openai-pattern-adapter.md`
+- `2026-08-15-m7-remaining-slices-handoff.md`
 
 ---
 

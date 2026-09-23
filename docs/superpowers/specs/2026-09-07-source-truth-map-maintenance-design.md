@@ -2,7 +2,7 @@
 
 Date: 2026-09-07
 
-Status: implemented locally; map maintenance is optional. See the [implementation record](../archive/plans/2026-09-09-source-map-maintenance-implementation.md) for dated results.
+Status: implemented locally; map maintenance is optional.
 
 Scope simplified: 2026-09-09. Keep map commands and their focused tests available for maintenance without adding them to existing verification gates. The proposed Slice 2 preflight is withdrawn; this work does not introduce a replacement release process.
 
@@ -36,7 +36,7 @@ The following were checked locally on September 7 while preparing this specifica
 
 The September 9 reconciliation adds these boundaries:
 
-- The [corrected anchored map](../../../output/mindmaps/2026-09-09-corrected/patternlike-source-mindmap.with-anchors.md) contains eight branches, 38 topics, 83 claim bullets, and 129 file-and-line anchors across 100 files. Its [plain version](../../../output/mindmaps/2026-09-09-corrected/patternlike-source-mindmap.md) has the same claims. This is an architecture overview, not complete repository coverage or a replacement for the original 86-file hash receipt.
+- The [corrected anchored map](../../architecture/source-map/archive/2026-09-09-corrected/patternlike-source-mindmap.with-anchors.md) contains eight branches, 38 topics, 83 claim bullets, and 129 file-and-line anchors across 100 files. Its [plain version](../../architecture/source-map/archive/2026-09-09-corrected/patternlike-source-mindmap.md) has the same claims. This is an architecture overview, not complete repository coverage or a replacement for the original 86-file hash receipt.
 - The corrected Markdown does not record an explicit source baseline or complete file-hash manifest. September 9 review against the named HEAD does not establish which source bytes its author captured. Preserve that limitation when importing its useful additions.
 - Resolving an anchor does not prove the attached claim. Current routing, release harnesses, revision reasons, and portrait automation require the corrections in ST-09–ST-12; the corrected map also still needs the offline supply and shared-mechanics distinctions in ST-08.
 - The roadmap's four opportunity directions are proposed product and evaluation work. Current map prose must describe existing connections and gaps without claiming that stronger interpretation quality, a connected reader journey, clearer permission consequences, or fairer scheduling has been implemented or measured.

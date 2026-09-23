@@ -19,8 +19,8 @@ import {
 
 /**
  * A user's two identifiers. `userId` addresses rows; `cryptoSubject` addresses
- * ciphertext. They are deliberately not interchangeable — see
- * docs/superpowers/archive/specs/2026-08-01-stream0-decisions-design.md §0.2.
+ * ciphertext. They are deliberately not interchangeable: `userId` is a mutable
+ * public label, while `cryptoSubject` must never change once ciphertext exists.
  */
 export interface UserIdentity {
   userId: string;

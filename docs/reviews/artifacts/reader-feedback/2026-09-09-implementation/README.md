@@ -1,6 +1,6 @@
 # Reader feedback: local implementation evidence
 
-Date: 2026-09-09. Worktree: `codex/source-map-maintenance`. Scope: Slice 5A existing resonance on Today and Slice 5B categorical feedback client. [Implementation plan](../../../../superpowers/archive/plans/2026-09-09-reader-feedback-implementation.md). [Unfilled human-review worksheet](human-review-worksheet.md).
+Date: 2026-09-09. Worktree: `codex/source-map-maintenance`. Scope: Slice 5A existing resonance on Today and Slice 5B categorical feedback client. [Unfilled human-review worksheet](human-review-worksheet.md).
 
 These captures show the actual React application at `http://127.0.0.1:5173`, using fictional, contract-shaped responses intercepted at the browser API boundary. Every `/v1/` request, including feedback, check-in, Today preparation, and device-preference writes, was fulfilled by the temporary browser fixture. The request logs record those simulated requests; they are not evidence of real storage, granted permission, encryption, publication, or generation. The birth-correction check opens the existing form and returns without submitting it. No live account, provider call, production migration, deployment, participant contact, human quality score, or comprehension result is represented here.
 

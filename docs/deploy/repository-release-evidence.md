@@ -19,9 +19,9 @@ Then run from the repository root, choosing a new evidence filename:
 
 ```bash
 node scripts/pattern-release/release-evidence.mjs gate \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/local-gate.json
+  docs/reviews/artifacts/YYYY-MM-DD-release/local-gate.json
 node scripts/pattern-release/release-evidence.mjs verify \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/local-gate.json
+  docs/reviews/artifacts/YYYY-MM-DD-release/local-gate.json
 ```
 
 `gate` executes exactly `npm run ci:local`, streams its output, and records its
@@ -85,8 +85,8 @@ available, prepare a new input document:
 
 ```bash
 node scripts/pattern-release/release-reconciliation.mjs prepare \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/local-gate.json \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/reconciliation-input.json
+  docs/reviews/artifacts/YYYY-MM-DD-release/local-gate.json \
+  docs/reviews/artifacts/YYYY-MM-DD-release/reconciliation-input.json
 ```
 
 `prepare` calls the existing gate verifier; it does not rerun the gate. It binds
@@ -210,9 +210,9 @@ After the records exist, write a new reconciliation result:
 
 ```bash
 node scripts/pattern-release/release-reconciliation.mjs reconcile \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/local-gate.json \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/reconciliation-input.json \
-  docs/reviews/artifacts/2026-09-06-reading-assurance/reconciliation-result.json
+  docs/reviews/artifacts/YYYY-MM-DD-release/local-gate.json \
+  docs/reviews/artifacts/YYYY-MM-DD-release/reconciliation-input.json \
+  docs/reviews/artifacts/YYYY-MM-DD-release/reconciliation-result.json
 ```
 
 Exit 0 means `consistent_recorded_chain`, never deployment verification. A

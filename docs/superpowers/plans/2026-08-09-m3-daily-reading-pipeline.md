@@ -9,8 +9,8 @@
 > section describes something the implementation decided differently, the
 > section now says what the code does and why — the nine review corrections and
 > the implementation divergences are folded in rather than appended.
-> [`2026-08-09-m3-implementation-handoff.md`](../archive/plans/2026-08-09-m3-implementation-handoff.md)
-> remains the record of *how* that reconciliation happened.
+> `2026-08-09-m3-implementation-handoff.md`, now in Git history, records *how*
+> that reconciliation happened.
 
 **Goal:** one user, one local date, one published reading, traceable paragraph
 by paragraph to calculated facts and a reviewed editorial release — produced by

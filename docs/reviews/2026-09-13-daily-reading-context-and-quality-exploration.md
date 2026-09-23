@@ -10,7 +10,7 @@ This is a **source reading** of the constrained-model Daily path, looking for th
 Two existing documents cover adjacent ground and are deliberately not repeated here:
 
 - [Interpretation-quality baseline](../superpowers/specs/2026-09-08-interpretation-quality-baseline-design.md) assesses **Pattern** — the 60-fragment corpus, the 40 admitted ontology records, and chapter prose. It does not examine the Daily packet.
-- [Reading assurance corrections](../superpowers/archive/specs/2026-09-06-reading-assurance-design.md) hardened Daily **correctness** — the bounded factual grammar, role preservation, and claim support. It made wrong readings fail closed. It did not widen what a correct reading can know.
+- Reading assurance corrections hardened Daily **correctness** — the bounded factual grammar, role preservation, and claim support. It made wrong readings fail closed. It did not widen what a correct reading can know.
 
 The gap between them is this document's subject: a Daily reading can now be reliably *not wrong* while still being thin, and most of the reasons are upstream of the model.
 

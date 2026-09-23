@@ -128,6 +128,4 @@ Public activation conditions remain in
 and the [source-manual SOW](./pattern-ontology-source-manual-SOW.md): historical
 generation/account terms evidence, counsel review, attributable human review
 of every fragment for copying, stereotyping, protected-characteristic claims,
-safety and voice, plus the applicable release and lifecycle gates. The dated
-[reading assurance review](../docs/reviews/2026-09-06-reading-assurance.md)
-separates these open steps from local deterministic checks.
+safety and voice, plus the applicable release and lifecycle gates.

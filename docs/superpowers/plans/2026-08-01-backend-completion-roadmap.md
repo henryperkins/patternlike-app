@@ -175,7 +175,7 @@ service produces a `502 calc_failed` within the timeout rather than hanging.
 Timeout behaviour is covered by `apps/api/src/services/calc-client.test.ts` and
 by the `TRIGGER_CALC_TIMEOUT` sentinel in
 `apps/api/src/routes/birth.integration.test.ts`. Detailed plan:
-[`2026-08-26-birth-operational-guards.md`](../archive/plans/2026-08-26-birth-operational-guards.md)
+`2026-08-26-birth-operational-guards.md`
 Task 1.
 
 ### What is still open
@@ -462,7 +462,7 @@ birth profiles is never pruned, because no cron or queue consumer touches these
 tables.
 
 Detailed plan:
-[`2026-08-26-birth-operational-guards.md`](../archive/plans/2026-08-26-birth-operational-guards.md)
+`2026-08-26-birth-operational-guards.md`
 Tasks 2 and 3.
 
 > **`db/d1/0016_birth_calc_usage.sql` is applied remotely** (2026-08-27 ~06:35 UTC).
@@ -472,7 +472,7 @@ Tasks 2 and 3.
 
 **Item 1 (key rotation has no caller) is still open** and is the subject of a
 separate plan,
-[`2026-08-26-crypto-operator-control-plane.md`](../archive/plans/2026-08-26-crypto-operator-control-plane.md).
+`2026-08-26-crypto-operator-control-plane.md`.
 That plan leaves key rotation open. It does not own migration `0017`: that
 number is the applied Codex reading-provider migration. Its
 `0017_crypto_operations.sql` references are stale and must be renumbered with
