@@ -71,6 +71,23 @@ every `/v1` request answers `503 configuration_error`, in development too. The
 script never modifies an existing file; other local settings, such as the
 geocoder key, go in the same file.
 
+### Generated Worker artifacts
+
+`apps/api/src/generated/` contains build output. Regenerate it from its inputs:
+
+| After you edit | Run |
+| --- | --- |
+| Files under `contracts/` | `npm run generate:validators -w @patternlike/api` |
+| A file listed in `apps/api/pattern-creation-sources.json` | `npm run generate:pattern-source -w @patternlike/api` |
+
+API `pretest` and `prebuild` check both families for drift. Worker validators
+are compiled ahead of time; do not replace them with runtime Ajv compilation.
+See [Generated Worker validators](CLAUDE.md#generated-worker-validators).
+
+[`evals/promptfoo/`](evals/promptfoo/README.md) is optional operator tooling
+outside the npm workspaces and `ci:local`. Its Daily runs are exploration
+evidence and do not replace the merge gate.
+
 ### Birth → chart (local)
 
 ```bash
@@ -359,6 +376,43 @@ new user-owned table missing from that list — or from
 `services/deletion-manifest.ts` — leaks rows between suites or fails
 deletion tests.
 
+### Reader connections and categorical feedback
+
+Published Daily paragraphs can open the exact Pattern chapter or Timing pass
+they reference. Support is persisted at publication in
+`reader_relationship_supports` (migration `0030`); older readings have no
+backfilled connections. A relationship id does not grant access: opening a
+destination recomputes the authorized graph for the exact source edition.
+
+| Surface | Behavior |
+| --- | --- |
+| `GET /v1/readings/:id/relationship-source` | Resolve a paragraph's stored source coordinate. |
+| `GET /v1/readings/:id/relationships` | Return the bounded graph for that exact reading edition and paragraph. |
+| `GET /v1/readings/:id/relationship-target` | Recompute the graph before opening a destination. |
+| `GET /v1/timing/cycles/:id` | Open the exact Timing pass named by a connection. |
+| `GET /v1/readings/:id/feedback-options` | Return an opaque feedback grant-state tag. |
+| `POST /v1/readings/:id/feedback-events` | Echo that tag; a changed grant returns `409 feedback_use_changed` without writing an event. |
+
+These responses use `Cache-Control: private, no-store`. Support rows are
+non-portable and cascade from their source reading or Pattern document.
+Categorical feedback is separate from the older resonance-rating endpoint;
+events are encrypted and portable on account export. Same-key/same-body replay
+returns the original receipt without renewing permission. See the
+[relationship contract](contracts/reader-relationships-v1/) and
+[feedback contract](contracts/reading-feedback-v1/) for required coordinates.
+
+## Time Travel
+
+Time Travel persists scan receipts in `cycle_scan_receipts`; it does not write
+`cycle_instances` or `cycle_passes`. `TIME_TRAVEL_RECEIPT_EPOCH` is a required
+positive integer, currently `"2"` in both Wrangler blocks. Bump it before a
+calculation, ephemeris, ranking, or defect change that can alter `/v1/cycles`
+results, including Worker-side ranking changes that the calculation vintage
+cannot detect. `TIME_TRAVEL_DAILY_SCAN_LIMIT` is fixed at `"32"`; other values
+fail configuration validation. Life-event timeline permission is separate
+USR-09 consent, not the USR-06 Time Travel grant. See
+[Your Pattern and Time Travel](CLAUDE.md#your-pattern-and-time-travel-m4).
+
 ## Pattern portraits
 
 The account's `#pattern` surface opens the observatory by default for published
@@ -442,9 +496,13 @@ The Worker exposes the declared source SHA and Cloudflare version metadata
 independently at `/v1/meta`; a correctly shaped value is still a declaration to
 reconcile, not proof of what produced or serves a bundle. Constrained-model
 Daily publication writes a success-only, content-free receipt that binds its
-provider/job exchange to those release coordinates. The additive receipt
-migration must be applied before a compatible Worker; checking out this source
-does not apply it. Deterministic Daily publication requires no such receipt.
+provider/job exchange to those release coordinates and stores closed quality
+finding tokens in `qualitative_findings_json`, never candidate prose. Both
+`0029` (the receipt table) and `0034` (the findings column) must be present
+before a compatible Worker writes receipts. Checking out this source does not
+apply migrations; confirm the live ledger using the
+[release-attestation runbook](docs/deploy/release-attestation.md#migration-before-compatible-runtime).
+Deterministic Daily publication requires no such receipt.
 
 Treat each release layer as separate evidence: repository source support does
 not prove a migration was applied; an applied migration does not prove a Worker
@@ -463,12 +521,20 @@ by D1.
 
 | App | Serves | Config | Deploy |
 | --- | --- | --- | --- |
-| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` |
+| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml`, after correcting the target below | `fly deploy` from the repository root |
 
 > **Do not** run `fly deploy` from inside an app directory and do not pass
 > `--build-context`. The calc Dockerfile expects root-level workspace files.
 > `fly.web.toml` is the retired PWA deployment; using it would resurrect the
 > superseded `patternlike-app` service.
+
+The committed `fly.toml` currently names `patternlike-app` in `ams` while
+building the calculation image. Before an authorized calc deployment, restore
+`app = 'patternlike-calc'` and `primary_region = 'iad'`, and retain the
+`[[http_service.checks]]` `/health` block. `fly deploy -a patternlike-calc`
+overrides the app name only; it does not correct the region in the file.
+This mismatch came from Fly Launch commit `0ffb851` (PR #58); inspect generated
+Fly configuration before using it.
 
 ### Calc service auth
 

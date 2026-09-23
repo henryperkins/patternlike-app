@@ -3,6 +3,13 @@
 Selected by the owner on September 11, 2026. This document describes the local
 implementation and the required deployment order; it is not a deployment receipt.
 
+**Dated migration evidence:** the 2026-09-11 19:59 UTC entry in
+[`MIGRATIONS.json`](../../db/d1/MIGRATIONS.json) records `0033` applied in
+production (78 commands). Both committed Wrangler blocks still set
+`PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "0"`. Confirm the live migration ledger
+before the sequence below; the recorded apply does not establish current
+rollout state or authorize applying the migration again.
+
 V2 reserves the accepted Pattern's three-to-six-chapter count and creates one
 image job per chapter. Explicit automation consent also permits one mesh job per
 chapter. A ready result contains exactly that complete ordered set. The existing

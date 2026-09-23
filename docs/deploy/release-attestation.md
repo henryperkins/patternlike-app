@@ -64,7 +64,16 @@ or package deployment override is introduced by this port.
 
 ## Migration before compatible runtime
 
-`0029_daily_publication_receipts.sql` follows current migration 0028. It is
+**Dated evidence:** the 2026-09-11 ledger-correction note in
+[`MIGRATIONS.json`](../../db/d1/MIGRATIONS.json) records `0029` applied on
+2026-09-07. The [0034 apply receipt preserved in Git history](https://github.com/henryperkins/patternlike-app/blob/d53a05f07d38abf55a02c594bf5d908eba3d8db2/docs/reviews/2026-09-13-migration-0034-apply.md)
+records its apply on 2026-09-13 at 22:29:40 UTC. These are historical
+observations, not a fresh production query. Confirm `d1_migrations` before
+deciding an apply is needed; the `0034` column is also required by current
+constrained-model publication.
+
+The original `0029` sequence below applies to a database still missing that
+migration. `0029_daily_publication_receipts.sql` follows migration 0028. It is
 forward-only and additive, adds one table and two named indexes, and rewrites
 no prior rows. It is **not applied by source changes**. Both deterministic and
 model-backed publication batches read this table, so apply it before the
@@ -100,6 +109,15 @@ receipt coordinate and final job result. Constrained-model reservations require
 one receipt; deterministic V1 explicitly supplies `null` and requires zero.
 Missing schema, bad constraints, conflicts, and stale claims cannot commit a
 partial publication. Duplicate delivery preserves the first receipt.
+
+Migration `0034` adds `qualitative_findings_json`, a sorted, deduplicated
+array of closed tokens from `qualitativeFindings` in
+`apps/api/src/services/reading-quality.ts`: `reflection_is_not_a_question`,
+`lead_too_thin`, `context_supplied_but_unused`,
+`headline_repeats_a_recent_reading`, `lead_repeats_a_recent_reading`,
+`exclamation`, and `hype_vocabulary`. These observations do not reject
+publication and contain no candidate prose. Existing receipts default to `[]`;
+deterministic V1 still writes no receipt.
 
 Receipts retain only the technical column allowlist: no user id, crypto
 subject, prose, chart facts, local date, locale, consent, or provider request
