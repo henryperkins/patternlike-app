@@ -44,6 +44,7 @@ npm run db:local -w @patternlike/api
 node scripts/dev/seed-dev-user.mjs
 
 # API (terminal 2)
+node scripts/dev/write-dev-vars.mjs
 npm run dev:api
 
 # Web client (terminal 3)
@@ -62,6 +63,13 @@ callback, logout, and web-origin entries are registered for
 On a fresh local database, run the seed command afterward. It idempotently
 creates the local `users` row with its crypto subject and wrapped DEK. It does
 not create an `identities` row or grant account-processing consent.
+
+`node scripts/dev/write-dev-vars.mjs` creates `apps/api/.dev.vars` with random,
+local-only `CODEX_RUNNER_TOKEN` and `CODEX_PROVIDER_ARTIFACT_KEYRING` values.
+Committed configuration declares `PATTERN_PUBLISHER = "codex"`, so without them
+every `/v1` request answers `503 configuration_error`, in development too. The
+script never modifies an existing file; other local settings, such as the
+geocoder key, go in the same file.
 
 ### Birth → chart (local)
 

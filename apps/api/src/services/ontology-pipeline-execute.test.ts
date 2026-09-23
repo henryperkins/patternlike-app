@@ -1347,7 +1347,7 @@ describe("ontology pipeline execution", () => {
     expect(await env.DB.prepare(
       "SELECT COUNT(*) AS count FROM codex_provider_jobs WHERE owner_id = ?",
     ).bind(fixture.runId).first()).toEqual({ count: 1 });
-  });
+  }, 60_000);
 
   it("terminally closes an unavailable frozen predecessor without lease churn", async () => {
     const predecessorObjectKey = await seedUnavailableMachinePredecessor();

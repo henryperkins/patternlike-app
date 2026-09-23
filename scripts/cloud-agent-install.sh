@@ -3,13 +3,15 @@
 # Cloud Agent install phase for the Pattern-Like Astrology monorepo.
 #
 # Idempotent, non-interactive repository bootstrap run after checkout. It only
-# prepares durable state (dependencies, ephemeris data, the local D1 database,
-# and a seeded local-dev user); long-running dev servers live in `terminals`
-# in .cursor/environment.json, never here.
+# prepares durable state (dependencies and the repo-local .venv, ephemeris data,
+# the local D1 database, a seeded local-dev user, and local-only API settings);
+# long-running dev servers live in `terminals` in .cursor/environment.json,
+# never here.
 #
-# Safe to run repeatedly: npm ci is deterministic, the ephemeris download
-# re-verifies existing files by digest, the D1 migrations are IF NOT EXISTS, and
-# the dev-user seed uses INSERT OR IGNORE.
+# Safe to run repeatedly: pip skips satisfied requirements and an existing .venv
+# is reused, npm ci is deterministic, the ephemeris download re-verifies existing
+# files by digest, the D1 migrations are IF NOT EXISTS, the dev-user seed uses
+# INSERT OR IGNORE, and apps/api/.dev.vars is only ever created, never rewritten.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,11 +24,21 @@ if ! command -v python >/dev/null 2>&1; then
   sudo ln -sf "$(command -v python3)" /usr/local/bin/python
 fi
 
-# 2. Python contract-validation dependencies (JSON Schema + OpenAPI + fixtures).
-#    --break-system-packages installs into the user site on this externally
-#    managed interpreter; the modules only need to be importable by `python`.
-python -m pip install --user --break-system-packages \
-  jsonschema referencing pyyaml openapi-spec-validator
+# 2. Python dependencies: the contract validators plus the spec renderer's pins,
+#    the same set .github/workflows/ci.yml installs. They go into the user site
+#    for bare `python` (--break-system-packages, because this interpreter is
+#    externally managed) and into the repo-local .venv that scripts/ci-local.sh
+#    requires. The image has no ensurepip, so the venv's pip comes from get-pip.
+python_deps=(jsonschema referencing pyyaml openapi-spec-validator
+  -r spec-bundle/render_v0_5.requirements.txt)
+python -m pip install --user --break-system-packages "${python_deps[@]}"
+if [ ! -x .venv/bin/python ]; then
+  python3 -m venv --without-pip .venv
+fi
+if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
+  curl -fsS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python -
+fi
+.venv/bin/python -m pip install "${python_deps[@]}"
 
 # 3. Node workspace dependencies, pinned by package-lock.json.
 npm ci
@@ -42,5 +54,10 @@ npm run db:local -w @patternlike/api
 #    names an existing user but no longer creates one, so the local birth->chart
 #    curl flow and the PWA both need this row + wrapped DEK to exist.
 node scripts/dev/seed-dev-user.mjs
+
+# 7. Local-only CODEX_* settings, without which the `api` terminal answers every
+#    /v1 request with 503 configuration_error. Written only when
+#    apps/api/.dev.vars is absent, so a developer's own file is never touched.
+node scripts/dev/write-dev-vars.mjs
 
 echo "cloud-agent install complete"
