@@ -517,6 +517,25 @@ describe("historical timezone lookup", () => {
     return entered;
   }
 
+  it("keeps coordinate and timezone examples visible outside placeholders", async () => {
+    const user = userEvent.setup();
+    render(<Onboarding onSubmit={vi.fn()} />);
+
+    await reachLocationStep(user);
+
+    expect(screen.getByLabelText("Latitude"))
+      .toHaveAccessibleDescription("Example: 34.0522");
+    expect(screen.getByLabelText("Longitude"))
+      .toHaveAccessibleDescription("Example: -118.2437");
+    expect(screen.getByLabelText("IANA timezone"))
+      .toHaveAccessibleDescription(/Example: America\/Los_Angeles/);
+    expect(screen.queryByPlaceholderText("34.0522")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("-118.2437")).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("America/Los_Angeles"),
+    ).not.toBeInTheDocument();
+  });
+
   it("resolves the zone from the birthplace instead of asking the user to vouch for it", async () => {
     const user = userEvent.setup();
     const fetchMock = mockLookup(RESOLVED);

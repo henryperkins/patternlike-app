@@ -3,12 +3,12 @@ import { Icon, type IconName } from "./icons.js";
 
 export type ViewId = "today" | "history" | "pattern" | "timing" | "travel" | "privacy";
 
-const navigation: Array<{ id: ViewId; label: string; icon: IconName; stage?: string }> = [
-  { id: "today", label: "Today", icon: "today", stage: "M3" },
+const navigation: Array<{ id: ViewId; label: string; icon: IconName }> = [
+  { id: "today", label: "Today", icon: "today" },
   { id: "history", label: "History", icon: "history" },
   { id: "pattern", label: "Your pattern", icon: "pattern" },
-  { id: "timing", label: "Timing", icon: "timing", stage: "M3" },
-  { id: "travel", label: "Time travel", icon: "travel", stage: "M4" },
+  { id: "timing", label: "Timing", icon: "timing" },
+  { id: "travel", label: "Time travel", icon: "travel" },
   { id: "privacy", label: "Privacy", icon: "privacy" },
 ];
 
@@ -44,7 +44,6 @@ function NavItems({ activeView, mobile = false }: { activeView: ViewId; mobile?:
     >
       <Icon name={item.icon} className="nav-item__icon" />
       <span className="nav-item__label">{mobile && item.id === "pattern" ? "Pattern" : item.label}</span>
-      {item.stage && !mobile ? <span className="nav-item__stage">{item.stage}</span> : null}
     </a>
   ));
 }

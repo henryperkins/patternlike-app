@@ -1232,7 +1232,7 @@
       "kind": "source",
       "path": "apps/web/src/components/AppShell.tsx",
       "selector": {
-        "text": "const navigation: Array<{ id: ViewId; label: string; icon: IconName; stage?: string }> = ["
+        "text": "const navigation: Array<{ id: ViewId; label: string; icon: IconName }> = ["
       },
       "observed_at": null
     },

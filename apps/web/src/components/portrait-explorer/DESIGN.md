@@ -51,7 +51,6 @@ typography:
     lineHeight: 1.6
 rounded:
   square: "0px"
-  subtle: "2px"
 spacing:
   compact: "6px"
   small: "8px"
@@ -69,13 +68,13 @@ components:
     backgroundColor: "transparent"
     textColor: "{colors.ink}"
     typography: "{typography.control}"
-    rounded: "{rounded.subtle}"
+    rounded: "{rounded.square}"
     padding: "8px 13px"
   button-control-selected:
     backgroundColor: "{colors.forest}"
     textColor: "{colors.paper-light}"
     typography: "{typography.control}"
-    rounded: "{rounded.subtle}"
+    rounded: "{rounded.square}"
     padding: "8px 13px"
   button-scene:
     backgroundColor: "{colors.scene-control}"
@@ -183,7 +182,7 @@ On canvases below `520px` wide and `420px` tall, unselected visible objects use 
 
 ## Elevation & Depth
 
-Paper controls use fine borders and tonal selection. Scene labels have no drop shadow in this local surface. Architectural depth comes from geometry, rough stone and timber, metallic bronze, modeled water rings, environmental light, and cast shadows. The inherited image/expanded dialog retains modal elevation; that shadow is a dialog treatment, not a general card style.
+Paper controls use fine borders and tonal selection. Scene labels and dialogs have no drop shadow; the dialog is separated by its border and modal backdrop. Architectural depth comes from geometry, rough stone and timber, metallic bronze, modeled water rings, environmental light, and cast shadows.
 
 Daylight is the initial viewing condition. Dusk lowers the scene light and ambient contribution, changes the sky/fog, and brightens the modeled lanterns; it does not change natal facts. Roof cutaway starts open. Showing the roof restores opaque canopy geometry: picking and label placement respect visible occlusion, with native controls retaining access.
 
@@ -191,7 +190,7 @@ Daylight is the initial viewing condition. Dusk lowers the scene light and ambie
 
 ## Shapes
 
-The interface retains restrained rectangular controls and fine rules; environment controls and scene labels use the `subtle` radius. Account embedding keeps the inherited square controls except where the local observatory override applies. Circular chapter ordinals indicate sequence. The terrace, water court, display plinths, zodiac sectors, and armillary hoops use circular geometry as actual objects. Timber slats, rectangular canopy planes, and folio desks provide the contrasting straight forms.
+The interface retains square rectangular controls, scenes, labels, dialogs, and fine rules. Circular chapter ordinals indicate sequence. The terrace, water court, display plinths, zodiac sectors, and armillary hoops use circular geometry as actual objects. Timber slats, rectangular canopy planes, and folio desks provide the contrasting straight forms.
 
 ## Components
 
@@ -280,4 +279,4 @@ The signed-in chart session retains one portrait's fully verified image and mode
 
 Observed sources: `observatory.css`, `explorer.css`, `ObservatoryControls.tsx`, `SceneIcon.tsx`, `observatory-world.ts`, `zodiac-instrument.ts`, `PortraitScene.tsx`, `PortraitExplorer.tsx`, `SkyReader.tsx`, `ExplorerReader.tsx`, `content.ts`, and `../../lib/portrait-sky.ts`. The prior desktop, phone, chapter, and dusk captures establish the courtyard context; this zodiac update records the current local source. It does not establish production deployment, a live signed-in account flow, or performance on physical GPU hardware. The matching `.impeccable/design.json` carries motion, breakpoints, component snippets, and synthesized panel swatch ramps; those ramps do not add active UI tokens.
 
-Not canonized: inherited uppercase micro-labels and glyph adornments, the compact lighting target-size exception, and legacy dialog rounding remain implementation carryovers rather than new system rules.
+Not canonized: inherited uppercase micro-labels and glyph adornments, and the compact lighting target-size exception remain implementation carryovers rather than new system rules.

@@ -21,6 +21,7 @@
    */
   --ink-faint: #596962;
   --forest: #173f35;
+  --forest-deep: #0f3028;
   --forest-light: #dce7df;
   --cobalt: #234c9f;
   --coral: #c76043;
@@ -31,6 +32,12 @@
    * rules that paint a shape keep --coral.
    */
   --coral-ink: #a84528;
+  --night-surface: #091923;
+  --on-night: #e5e8e5;
+  --on-night-soft: #c2d1d7;
+  --night-outline: #879ca8;
+  --night-hover: #213b49;
+  --night-focus: #e9cf96;
   --line: #cec7b8;
   --line-dark: #9fa89f;
   --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
@@ -39,7 +46,7 @@
   --sidebar: 252px;
   /* Compact labels use tokens rather than one-off pixel values so the mobile
    * readability floor applies to the whole layer, including future labels. */
-  --label-xs: 8px;
+  --label-xs: 9px;
   --label-sm: 9px;
   --label-md: 10px;
 }
@@ -212,7 +219,7 @@ summary:focus-visible {
 .nav-item {
   position: relative;
   display: grid;
-  grid-template-columns: 24px 1fr auto;
+  grid-template-columns: 24px 1fr;
   align-items: center;
   gap: 13px;
   min-height: 48px;
@@ -254,13 +261,6 @@ summary:focus-visible {
 .nav-item__icon {
   width: 20px;
   height: 20px;
-}
-
-.nav-item__stage {
-  color: var(--ink-faint);
-  font-family: var(--mono);
-  font-size: var(--label-sm);
-  letter-spacing: 0.12em;
 }
 
 .sidebar__foot {
@@ -436,7 +436,7 @@ summary:focus-visible {
 }
 
 .button--primary:hover:not(:disabled) {
-  background: #0f3028;
+  background: var(--forest-deep);
 }
 
 .button--secondary {
@@ -683,7 +683,8 @@ summary:focus-visible {
   margin-bottom: 20px;
 }
 
-.field > span {
+.field > span,
+.field > label {
   color: var(--ink-soft);
   font-size: var(--label-md);
   font-weight: 750;
@@ -711,7 +712,7 @@ summary:focus-visible {
 }
 
 .field input::placeholder {
-  color: #9a9e96;
+  color: var(--ink-faint);
 }
 
 .field small {
@@ -1575,7 +1576,6 @@ summary:focus-visible {
 }
 
 .reading-save__retry {
-  min-height: 32px;
   color: var(--coral-ink);
   font-size: 12px;
 }
@@ -1828,7 +1828,7 @@ summary:focus-visible {
   margin: 0;
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.5;
@@ -1895,7 +1895,7 @@ summary:focus-visible {
   margin-bottom: 8px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-md);
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1992,6 +1992,7 @@ summary:focus-visible {
 
 .daily-check-in__detail-toggle {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   gap: 8px;
   margin-top: 12px;
@@ -2002,7 +2003,7 @@ summary:focus-visible {
   cursor: pointer;
   background: transparent;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-md);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2042,7 +2043,7 @@ summary:focus-visible {
   border-radius: 0;
   background: var(--paper-light);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .daily-check-in__field textarea {
@@ -3030,7 +3031,7 @@ summary:focus-visible {
 .source-row__fixed {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-md);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -3113,7 +3114,7 @@ summary:focus-visible {
   margin-top: 2px;
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-sm);
   line-height: 1.5;
 }
 
@@ -3176,7 +3177,7 @@ summary:focus-visible {
 
 .privacy-actions__buttons .button span {
   font-family: var(--mono);
-  font-size: var(--label-xs);
+  font-size: var(--label-md);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3224,6 +3225,9 @@ summary:focus-visible {
 
 .privacy-action__download,
 .privacy-action__retry {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   justify-self: start;
   margin-top: 10px;
   padding: 0;
@@ -3233,7 +3237,7 @@ summary:focus-visible {
   cursor: pointer;
   background: transparent;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-md);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-decoration: none;
@@ -3341,7 +3345,7 @@ summary:focus-visible {
   margin-top: 16px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -5821,12 +5825,6 @@ summary:focus-visible {
     padding: 20px 0 0;
   }
 
-  .daily-check-in__field input,
-  .daily-check-in__field select,
-  .daily-check-in__field textarea {
-    font-size: 16px;
-  }
-
   .reading-block,
   .reading-reflection,
   .reading-notice {
@@ -5995,10 +5993,6 @@ summary:focus-visible {
     padding-inline: 2px;
   }
 
-  .mobile-nav .nav-item {
-    font-size: 9px;
-  }
-
   .mobile-nav .nav-item__icon {
     width: 18px;
     height: 18px;
@@ -6155,10 +6149,10 @@ summary:focus-visible {
 }
 
 .place-autocomplete__consent {
-  border: 1px solid var(--line, #d8d3ca);
-  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-radius: 0;
   padding: 14px;
-  background: color-mix(in srgb, var(--paper, #fff) 92%, #f1eee7);
+  background: var(--paper-light);
 }
 
 .place-autocomplete__consent > p:first-child {
@@ -6174,10 +6168,10 @@ summary:focus-visible {
 }
 
 .place-autocomplete__results {
-  border: 1px solid var(--line, #d8d3ca);
-  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-radius: 0;
   overflow: hidden;
-  background: var(--paper, #fff);
+  background: var(--paper-light);
 }
 
 .place-autocomplete__results ul {
@@ -6187,7 +6181,7 @@ summary:focus-visible {
 }
 
 .place-autocomplete__results li + li {
-  border-top: 1px solid var(--line, #d8d3ca);
+  border-top: 1px solid var(--line);
 }
 
 .place-autocomplete__results button {
@@ -6208,7 +6202,7 @@ summary:focus-visible {
 }
 
 .place-autocomplete__results button span {
-  color: var(--muted, #67625b);
+  color: var(--ink-soft);
 }
 
 .place-autocomplete__attribution {

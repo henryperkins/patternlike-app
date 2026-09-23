@@ -518,14 +518,15 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
               }}
             />
             <div className="field-row">
-              <label className="field">
-                <span>Latitude</span>
+              <div className="field">
+                <label htmlFor="birth-latitude">Latitude</label>
                 <input
+                  id="birth-latitude"
                   type="number"
                   min="-90"
                   max="90"
                   step="any"
-                  placeholder="34.0522"
+                  aria-describedby="birth-latitude-example"
                   value={latitude}
                   onChange={(event) => {
                     setLatitude(event.target.value);
@@ -533,15 +534,17 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
                     setPlaceConfidence(null);
                   }}
                 />
-              </label>
-              <label className="field">
-                <span>Longitude</span>
+                <small id="birth-latitude-example">Example: 34.0522</small>
+              </div>
+              <div className="field">
+                <label htmlFor="birth-longitude">Longitude</label>
                 <input
+                  id="birth-longitude"
                   type="number"
                   min="-180"
                   max="180"
                   step="any"
-                  placeholder="-118.2437"
+                  aria-describedby="birth-longitude-example"
                   value={longitude}
                   onChange={(event) => {
                     setLongitude(event.target.value);
@@ -549,20 +552,22 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
                     setPlaceConfidence(null);
                   }}
                 />
-              </label>
+                <small id="birth-longitude-example">Example: -118.2437</small>
+              </div>
             </div>
-            <label className="field">
-              <span>IANA timezone</span>
+            <div className="field">
+              <label htmlFor="birth-timezone">IANA timezone</label>
               <input
+                id="birth-timezone"
                 type="text"
-                placeholder="America/Los_Angeles"
+                aria-describedby="birth-timezone-help birth-timezone-example"
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
                 required
                 spellCheck="false"
                 readOnly={zoneIsDerived}
               />
-              <small>
+              <small id="birth-timezone-help">
                 {!zoneIsDerived
                   ? "Without coordinates this zone is used exactly as entered, and nothing can check it against a place."
                   : zone
@@ -572,7 +577,8 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
                       // the same claim this lookup exists to stop making.
                       "The birthplace coordinates decide the zone. This is your browser's guess until the lookup answers."}
               </small>
-            </label>
+              <small id="birth-timezone-example">Example: America/Los_Angeles</small>
+            </div>
 
             {zoneIsDerived ? (
               <div className="zone-resolution" aria-live="polite">

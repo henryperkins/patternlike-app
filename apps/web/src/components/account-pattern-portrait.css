@@ -2,7 +2,7 @@
   margin: 1.5rem 0 2rem;
   padding: clamp(1rem, 3vw, 1.75rem);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 0;
   background: var(--paper-light);
 }
 

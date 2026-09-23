@@ -14,6 +14,12 @@ colors:
   line: "#cec7b8"
   line-dark: "#9fa89f"
   focus: "#234c9f"
+  night-surface: "#091923"
+  on-night: "#e5e8e5"
+  on-night-soft: "#c2d1d7"
+  night-outline: "#879ca8"
+  night-hover: "#213b49"
+  night-focus: "#e9cf96"
 typography:
   headline:
     fontFamily: "Iowan Old Style, Palatino Linotype, Book Antiqua, Palatino, Georgia, serif"
@@ -52,9 +58,9 @@ Sources: [preview entry](../../pattern-portrait.html), [composition](pattern-por
 
 ## Colors
 
-Paper is the page field; lighter and deeper paper support controls and hover states. Ink carries headings and prose, with softer ink for instructions and uncertainty. Forest fills primary actions and the active presentation control. Pale forest marks the selected chapter row; fine graphite rules divide the composition. Focus cobalt remains reserved for keyboard focus.
+Paper is the page field; lighter and deeper paper support controls and hover states. Ink carries headings and prose, with softer ink for instructions and uncertainty. Forest fills primary actions and the active presentation control. Pale forest marks the selected chapter row; fine graphite rules divide the composition. Focus Cobalt remains reserved for keyboard focus on paper.
 
-The sculpture’s base material color comes from the input images. Coral provides restrained emphasis for the selected image’s attributed region, and the selected chapter number uses the darker coral text token. Selection does not replace or remove geometry. These colors communicate interaction, with no implied strength, personality score, or relationship scale. Source thumbnails retain their generated appearance.
+Portrait Night is a bounded dark feature field behind the sculpture and its attached selection bar. Night Ink and Soft Night Ink carry text, Night Outline and Night Hover operate its local control, and Portrait Night Focus replaces cobalt only there because it remains visible against the dark field. The sculpture’s base material color comes from the input images. Coral provides restrained emphasis for the selected image’s attributed region, and the selected chapter number uses the darker coral text token. Selection does not replace or remove geometry. These colors communicate interaction, with no implied strength, personality score, or relationship scale. Source thumbnails retain their generated appearance.
 
 ## Typography
 
@@ -91,7 +97,7 @@ The source images show a door, notebook, metronome, and lantern. Their names and
 - **Chapter object note:** A fine rule above and below separates the source image’s object name and brief rationale from the published summary and expression controls. View the whole sculpture reveals and focuses the stage while preserving the selected chapter and current expression. It is disabled until graphics and images are ready. This note explains the source metaphor without rewriting any published chapter text.
 - **Sculpture controls:** Drag turns the sculpture. Rotate left/right, zoom in/out, and Reset view provide native button alternatives; controls are disabled until graphics and the image-derived model are ready. Zoom is bounded and uses explicit controls, while vertical touch scrolling remains available. Reset also clears the selected chapter. Camera framing eases toward selection, with rendering only on demand. Reduced motion makes camera and selection-scroll transitions immediate; inherited CSS suppresses smooth scrolling and prolonged transitions.
 - **Input attribution:** Neutral image indices associate surface regions with source images and reader chapters. Emphasis and camera orientation help inspect a contribution without separating the sculpture into objects. Attribution is a navigation convention, not a claim that a region reconstructs its source object exactly.
-- **Focus and targets:** Interactive elements inherit a two-pixel cobalt focus outline with a three-pixel offset. Controls are at least `44px` high, primary reading actions `48px`, and chapter rows `62px`. A skip link reaches the main content; native chapter buttons provide keyboard access independently of the canvas. Reference images have descriptive alternative text.
+- **Focus and targets:** Interactive elements on paper inherit a two-pixel cobalt focus outline with a three-pixel offset; the dark portrait stage uses the same geometry in Portrait Night Focus. Controls are at least `44px` high, primary reading actions `48px`, and chapter rows `62px`. A skip link reaches the main content; native chapter buttons provide keyboard access independently of the canvas. Reference images have descriptive alternative text.
 - **Loading and fallback:** Image loading and graphics initialization leave chapter buttons and the reader available. A missing, invalid, blank, failed, or stale image prevents construction of the four-image sculpture and produces a status message. Unavailable WebGL, initialization/render errors, and context loss likewise preserve the reading. No failure substitutes a stock model. Loading document data has its own text state; unavailable or empty documents remove the previous portrait and reading. A document revision change remounts the ready surface, clearing selection and renderer state.
 - **Preview scenarios:** A collapsed disclosure contains native controls for exact/approximate/unknown accuracy, loading/removal, and replacement/restoration of the fictional sample. These controls and the fictional-content notice belong to the preview.
 

@@ -25,10 +25,10 @@
 .sky-today-link, .sky-intro-link { display:block; width:fit-content; min-height:44px; padding:10px 0; font-size:13px; text-underline-offset:4px; }
 .sky-reader .sky-map-note { font-size:12px; color:var(--ink-soft, #4e625b); margin-top:22px; }
 .sky-sign-label { position:absolute; top:0; left:0; pointer-events:none; font-family:var(--serif, Georgia, serif); font-size:13px; color:#17312a; background:#faf8f2e8; padding:2px 5px; white-space:nowrap; }
-.portrait-explorer .sky-body-label { position:absolute; top:0; left:0; pointer-events:auto; min-height:44px; padding:7px 10px; color:#fffaf0; background:#153c33f2; border:1px solid #99aa8f; border-radius:2px; font-size:12px; white-space:nowrap; }
+.portrait-explorer .sky-body-label { position:absolute; top:0; left:0; pointer-events:auto; min-height:44px; padding:7px 10px; color:#fffaf0; background:#153c33f2; border:1px solid #99aa8f; border-radius:0; font-size:12px; white-space:nowrap; }
 .portrait-explorer .sky-body-label[data-selected="true"] { background:#f0e7d2; color:#17312a; }
 .observatory-explorer .explorer-workspace { grid-template-columns:minmax(0, 1.85fr) minmax(300px, 1fr); gap:clamp(24px, 3vw, 46px); }
-.observatory-explorer .explorer-scene { height:clamp(390px, calc(100dvh - 365px), 590px); border-radius:3px; background:#536a60; }
+.observatory-explorer .explorer-scene { height:clamp(390px, calc(100dvh - 365px), 590px); border-radius:0; background:#536a60; }
 .observatory-explorer .explorer-reader { max-height:calc(100dvh - 178px); }
 .observatory-explorer .explorer-chapter-meta { font-size:.75rem; color:var(--ink-soft, #4e625b); margin:0 0 18px; }
 .observatory-explorer .explorer-scene-toolbar svg { vertical-align:middle; }
@@ -43,7 +43,7 @@
 .observatory-environment, .observatory-workbench { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
 .observatory-environment { justify-content:space-between; }
 .observatory-light { display:flex; align-items:center; gap:2px; background:var(--paper-deep, #e5dfd1); padding:3px; }
-.observatory-explorer .observatory-controls button { font-size:.75rem; border-radius:2px; padding:8px 13px; border:1px solid var(--explorer-rule); min-height:44px; }
+.observatory-explorer .observatory-controls button { font-size:.75rem; border-radius:0; padding:8px 13px; border:1px solid var(--explorer-rule); min-height:44px; }
 .observatory-explorer .observatory-light button { border-color:transparent; min-height:38px; }
 .observatory-explorer .observatory-controls button[aria-pressed="true"] { color:var(--paper-light, #faf8f2); background:var(--forest, #173f35); }
 .observatory-workbench { margin-top:10px; }
@@ -51,7 +51,7 @@
 .observatory-itinerary { display:flex; flex-direction:column; margin:8px 0 20px; }
 .observatory-itinerary span { padding:11px 0; font-size:.8rem; border-bottom:1px solid var(--explorer-rule); }
 .observatory-explorer .explorer-chapters { padding:10px 0; }
-.observatory-explorer .explorer-chapter-label, .observatory-explorer .explorer-annotation { border-radius:2px; box-shadow:none; }
+.observatory-explorer .explorer-chapter-label, .observatory-explorer .explorer-annotation { border-radius:0; box-shadow:none; }
 .observatory-explorer .explorer-annotation { max-width:min(240px, calc(100% - 16px)); border-color:var(--forest, #173f35); color:var(--explorer-ink); background:var(--explorer-paper); overflow-wrap:anywhere; }
 .observatory-explorer .explorer-annotation .explorer-label-title { font-size:.8rem; font-weight:600; line-height:1.45; margin-bottom:5px; }
 .explorer-annotation-source { display:block; font-size:.75rem; line-height:1.45; }

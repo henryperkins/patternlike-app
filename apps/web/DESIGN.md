@@ -16,11 +16,17 @@ colors:
   panel-surface: "rgba(250, 248, 242, 0.72)"
   on-surface: "#17312a"
   on-surface-soft: "#4e625b"
-  on-surface-faint: "#7a8781"
+  on-surface-faint: "#596962"
   outline: "#cec7b8"
   outline-strong: "#9fa89f"
   on-primary: "#fffdf6"
   on-dark: "#f5f0e4"
+  night-surface: "#091923"
+  on-night: "#e5e8e5"
+  on-night-soft: "#c2d1d7"
+  night-outline: "#879ca8"
+  night-hover: "#213b49"
+  night-focus: "#e9cf96"
 typography:
   display-lg:
     fontFamily: "Iowan Old Style, Palatino Linotype, Book Antiqua, Palatino, Georgia, serif"
@@ -188,7 +194,8 @@ The palette reads as ink and annotation on drafting paper: Observatory Green est
 
 ### Tertiary
 
-- **Focus Cobalt** (`focus`): keyboard focus rings only. It is functional accessibility infrastructure, not a decorative brand accent.
+- **Focus Cobalt** (`focus`): keyboard focus rings on paper surfaces only. It is functional accessibility infrastructure, not a decorative brand accent.
+- **Portrait Night Focus** (`night-focus`): the equivalent keyboard ring on the portrait's dark feature field, where Focus Cobalt does not provide sufficient contrast.
 
 ### Neutral
 
@@ -202,6 +209,9 @@ The palette reads as ink and annotation on drafting paper: Observatory Green est
 - **Faint Ink Green** (`on-surface-faint`): metadata, helper text, and de-emphasized states.
 - **Graphite Rule** (`outline`) and **Strong Graphite Rule** (`outline-strong`): dividers, container borders, and hover reinforcement.
 - **Button Paper** (`on-primary`) and **Dark-Surface Paper** (`on-dark`): text on Observatory Green.
+- **Portrait Night** (`night-surface`): the bounded WebGL portrait stage and its attached selection bar.
+- **Portrait Night Ink** (`on-night`) and **Soft Portrait Night Ink** (`on-night-soft`): primary and supporting text inside that stage.
+- **Portrait Night Rule** (`night-outline`) and **Portrait Night Hover** (`night-hover`): the stage's control boundary and hover fill.
 
 ### Named Rules
 
@@ -209,7 +219,9 @@ The palette reads as ink and annotation on drafting paper: Observatory Green est
 
 **The Paper Before White Rule.** Build hierarchy with warm paper tones and transparency. Pure white is not the default canvas.
 
-**The Focus Is Functional Rule.** Focus Cobalt exists to make keyboard location unmistakable and must not compete as a second decorative accent.
+**The Focus Is Functional Rule.** Focus Cobalt makes keyboard location unmistakable on paper. Portrait Night Focus performs the same job only on the dark portrait field; neither is a decorative accent.
+
+**The Night Is an Instrument Rule.** The portrait night palette belongs to the WebGL stage and its attached selection bar. It does not replace Drafting Paper, Observatory Green, or the square paper controls around the stage.
 
 ## Typography
 
@@ -229,8 +241,8 @@ The palette reads as ink and annotation on drafting paper: Observatory Green est
 - **Reading Lead** (400, up to `26px`, `1.42` line height): the primary interpretive paragraph in a daily chapter.
 - **Body** (400, generally `13px` to `15px`, `1.5` to `1.65` line height): controls, helper copy, and secondary explanation.
 - **Body Serif** (400, generally `17px`, `1.62` line height): reflective or explanatory prose that deserves a slower reading pace.
-- **Label** (750-800, `8px` to `10px`, generous tracking, uppercase): eyebrows, field labels, chips, and compact state names.
-- **Evidence** (500, `8px` to `10px`, monospaced): identifiers, contract versions, evidence lanes, and reproducibility details.
+- **Label** (750-800, `10px`, rising to `11px` in compact navigation, generous tracking, uppercase): eyebrows, field labels, chips, and compact state names.
+- **Evidence** (500, `9px`, rising to `11px` on narrow screens, monospaced): identifiers, contract versions, evidence lanes, and reproducibility details.
 
 ### Named Rules
 
@@ -265,6 +277,8 @@ The system is flat and structural. It does not use drop shadows for cards, menus
 Rectangular controls, fields, panels, chips, drawers, and data regions are square (`0px`). Desktop navigation permits only a nearly imperceptible corner (`2px`) so the active field reads as selected rather than pill-shaped. Circles are reserved for orbital marks, radio indicators, status dots, and spinners—elements whose meaning depends on a point, cycle, or continuous state.
 
 Borders are visible but quiet: one-pixel Graphite Rules define most containers, while Strong Graphite Rules mark hover or editable boundaries. Large solid silhouettes use Observatory Green rather than rounded cards or clipping effects.
+
+The portrait's dark feature field is also square. Its distinct palette changes contrast, not the system's shape or elevation language.
 
 ### Named Rules
 
@@ -308,8 +322,12 @@ Components are square, deliberate, and restrained. Each one states its role thro
 ### Navigation
 
 - **Desktop:** fixed paper rail with `48px` rows, restrained line icons, and compact sans-serif labels. Active items use Washed Observatory Green, Observatory Green text, and a narrow Signal Coral edge marker.
-- **Mobile:** fixed paper header and five-column bottom navigation. The active marker moves to the top edge; labels and icons stack vertically without becoming pills.
+- **Mobile:** fixed paper header and six-column bottom navigation. The active marker moves to the top edge; labels and icons stack vertically without becoming pills.
 - **Feedback:** hover adds a very light Observatory Green wash; focus uses the global Focus Cobalt outline.
+
+### Portrait Night Stage
+
+The optional portrait visualization uses Portrait Night as one bounded feature field with high-contrast Night Ink, a Night Rule around its local action, and Portrait Night Focus for keyboard location. The stage, selection bar, dialog, labels, and controls remain square and shadowless; geometry supplies spatial depth.
 
 ### Accuracy Selector
 
