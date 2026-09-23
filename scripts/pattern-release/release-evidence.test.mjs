@@ -119,6 +119,27 @@ test("the gate parser requires the complete final summary and all fourteen disti
   ]) assert.equal(evidence.parseCiSummary(log).passed, false);
 });
 
+test("the committed CI script emits a success summary accepted by the release recorder", () => {
+  const root = repository();
+  try {
+    mkdirSync(join(root, "scripts"));
+    writeFileSync(join(root, "scripts/ci-local.sh"), readFileSync(join(REPO_ROOT, "scripts/ci-local.sh")));
+    mkdirSync(join(root, ".venv/bin"), { recursive: true });
+    writeFileSync(join(root, ".venv/bin/python"), "#!/bin/sh\nprintf 'Python 3.12.3\\n'\n", { mode: 0o755 });
+    // Stub the expensive lanes, keeping the committed runner and summary real.
+    const command = [
+      "npm() { if [ \"$1\" = \"-v\" ]; then printf '10.9.8\\n'; fi; return 0; }",
+      "export -f npm",
+      "exec bash scripts/ci-local.sh",
+    ].join("\n");
+    const result = spawnSync("bash", ["-c", command], { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const parsed = evidence.parseCiSummary(result.stdout);
+    assert.equal(parsed.passed, true, result.stdout);
+    assert.equal(parsed.lanes.length, 14);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 function prepareGate(root, { mutate = false, partial = false, exit = 0 } = {}) {
   const files = {
     "package.json": JSON.stringify({ scripts: { "ci:local": "node fixture-gate.cjs" } }),

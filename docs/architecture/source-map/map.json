@@ -820,14 +820,18 @@
           "leaves": [
             {
               "id": "leaf-plan-write-and-verify-1",
-              "text": "Each delivery claims its stage before a planner, writer, or semantic verifier pass, and commands cap attempts at 2, 3, and 2. An invalid plan retries the planner while planner attempts remain and otherwise fails as plan_invalid; candidate-validation, semantic, and correctable publication-safety failures return to the writer with a correction document while writer attempts remain.",
+              "text": "Each delivery claims its stage before a planner, writer, or semantic verifier pass, and commands cap attempts at 2, 3, and 2. An invalid plan retries the planner while planner attempts remain and otherwise fails as plan_invalid; candidate-validation, semantic, and correctable publication-safety failures return to the writer with a correction document while writer attempts remain. Correction documents accumulate sanitized, deduplicated findings from earlier attempts; retained history must match the frozen plan hash and carry an earlier positive attempt number.",
               "evidence_ids": [
                 "evidence-b4-execute-claim-stage",
                 "evidence-b4-enqueue-attempt-caps",
                 "evidence-b4-execute-plan-retry",
                 "evidence-b4-execute-deterministic-correction",
                 "evidence-b4-execute-semantic-correction",
-                "evidence-b4-execute-safety-correction"
+                "evidence-b4-execute-safety-correction",
+                "evidence-b4-correction-history-guards",
+                "evidence-b4-correction-history-projection",
+                "evidence-b4-correction-history-deduplication",
+                "evidence-b4-correction-history-reuse"
               ]
             },
             {
@@ -1577,13 +1581,15 @@
             },
             {
               "id": "leaf-committed-production-switches-2",
-              "text": "New constrained-model Daily readings and Pattern passes pin Codex with gpt-5.6-sol at xhigh reasoning, and configuration naming another Daily or Pattern publisher is refused. OpenAI Responses adapters remain in source; the parked ontology pipeline can still select one (see Pattern generation and ontology).",
+              "text": "New constrained-model Daily readings and Pattern passes pin Codex with gpt-5.6-sol at xhigh reasoning, and configuration naming another Daily or Pattern publisher is refused. OpenAI Responses adapters remain in source; the parked ontology pipeline can still select one (see Pattern generation and ontology). Pattern writer prompt 1.0.5 adds claim-grounding and cumulative-correction guidance; the request builder retains the older instructions for writer pins 1.0.1 through 1.0.3 and the offline writer pin.",
               "evidence_ids": [
                 "evidence-b6-daily-publisher-refusal",
                 "evidence-b6-daily-model-pins-code",
                 "evidence-b6-pattern-publisher-refusal",
                 "evidence-b6-pattern-model-pins-code",
-                "evidence-b6-ontology-openai-branch"
+                "evidence-b6-ontology-openai-branch",
+                "evidence-b6-pattern-writer-grounding-policy",
+                "evidence-b6-pattern-writer-historical-policies"
               ]
             },
             {
@@ -2262,14 +2268,12 @@
             },
             {
               "id": "leaf-release-assurance-tooling-5",
-              "text": "scripts/ci-local.sh prints its ALL STEPS PASSED line with a mis-encoded dash, while parseCiSummary in release-evidence.mjs accepts only a real em dash, so it does not accept the gate's actual success line. A receipt from a passing run then fails with gate_summary_incomplete, which also blocks reconciliation; the release-evidence test uses a hand-written summary with the real dash.",
+              "text": "scripts/ci-local.sh emits the success line required by parseCiSummary in release-evidence.mjs. The parser also requires all fourteen expected passing lanes in order and a toolchain line; an incomplete receipt summary fails with gate_summary_incomplete. A regression runs the committed CI script with stubbed npm commands and checks that its real success summary is accepted.",
               "evidence_ids": [
-                "evidence-b8-ci-local-misencoded-success",
+                "evidence-b8-ci-local-success",
                 "evidence-b8-parse-ci-summary-em-dash",
-                "evidence-b8-receipt-summary-from-parser",
                 "evidence-b8-gate-summary-incomplete",
-                "evidence-b8-reconciliation-requires-verified-gate",
-                "evidence-b8-release-evidence-test-summary"
+                "evidence-b8-ci-summary-integration-test"
               ]
             }
           ]
@@ -8188,7 +8192,7 @@
       "kind": "source",
       "path": "apps/api/src/services/pattern-publisher.ts",
       "selector": {
-        "text": "export const OPENAI_PATTERN_PLANNER_MODEL = \"gpt-5.6-sol\";\nexport const OPENAI_PATTERN_PLANNER_REASONING = \"xhigh\" as const;\n/**\n * `1.0.1` adds `PLAN_CLOSURE_RULES` -- the closure properties\n * `validatePatternPlan` enforces -- to the planner policy. See the comment\n * above `PLAN_CLOSURE_RULES` in `pattern-prompt.ts`.\n */\nexport const OPENAI_PATTERN_PLANNER_PROMPT_VERSION = \"1.0.1\";\nexport const OPENAI_PATTERN_PLANNER_TIMEOUT_MS = 120_000;\nexport const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 32000;\n\nexport const OPENAI_PATTERN_WRITER_MODEL = \"gpt-5.6-sol\";\nexport const OPENAI_PATTERN_WRITER_REASONING = \"xhigh\" as const;\n/**\n * `1.0.3` aligns every prose field with the universal publication safety gate,\n * including uncertainty disclosures and citation scope. See `WRITER_POLICY` in\n * `pattern-prompt.ts`; the pin moves with the text because provenance that\n * names one version for two different prompts is provenance that proves\n * nothing.\n */\nexport const OPENAI_PATTERN_WRITER_PROMPT_VERSION = \"1.0.3\";\nexport const OPENAI_PATTERN_WRITER_TIMEOUT_MS = 120_000;\nexport const OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = 32000;\n\nexport const OPENAI_PATTERN_VERIFIER_MODEL = \"gpt-5.6-sol\";\nexport const OPENAI_PATTERN_VERIFIER_REASONING = \"xhigh\" as const;"
+        "text": "export const OPENAI_PATTERN_PLANNER_MODEL = \"gpt-5.6-sol\";\nexport const OPENAI_PATTERN_PLANNER_REASONING = \"xhigh\" as const;\n/**\n * `1.0.1` adds `PLAN_CLOSURE_RULES` -- the closure properties\n * `validatePatternPlan` enforces -- to the planner policy. See the comment\n * above `PLAN_CLOSURE_RULES` in `pattern-prompt.ts`.\n */\nexport const OPENAI_PATTERN_PLANNER_PROMPT_VERSION = \"1.0.1\";\nexport const OPENAI_PATTERN_PLANNER_TIMEOUT_MS = 120_000;\nexport const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 32000;\n\nexport const OPENAI_PATTERN_WRITER_MODEL = \"gpt-5.6-sol\";\nexport const OPENAI_PATTERN_WRITER_REASONING = \"xhigh\" as const;\n/**\n * `1.0.5` adds explicit claim grounding and cumulative correction guidance\n * without changing the validation policy. See the versioned writer policies in\n * `pattern-prompt.ts`; the pin moves with the text because provenance that\n * names one version for two different prompts is provenance that proves\n * nothing.\n */\nexport const OPENAI_PATTERN_WRITER_PROMPT_VERSION = \"1.0.5\";\nexport const OPENAI_PATTERN_WRITER_TIMEOUT_MS = 120_000;\nexport const OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = 32000;\n\nexport const OPENAI_PATTERN_VERIFIER_MODEL = \"gpt-5.6-sol\";\nexport const OPENAI_PATTERN_VERIFIER_REASONING = \"xhigh\" as const;"
       },
       "observed_at": null
     },
@@ -10470,11 +10474,11 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b8-ci-local-misencoded-success",
+      "id": "evidence-b8-ci-local-success",
       "kind": "source",
       "path": "scripts/ci-local.sh",
       "selector": {
-        "text": "green \"ALL STEPS PASSED â€” safe to merge on local evidence.\""
+        "text": "green \"ALL STEPS PASSED — safe to merge on local evidence.\""
       },
       "observed_at": null
     },
@@ -10483,16 +10487,7 @@
       "kind": "source",
       "path": "scripts/pattern-release/release-evidence.mjs",
       "selector": {
-        "text": "const finalSuccess = /^ALL STEPS PASSED — safe to merge on local evidence\\.\\s*$/m.test(tail);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b8-receipt-summary-from-parser",
-      "kind": "source",
-      "path": "scripts/pattern-release/release-evidence.mjs",
-      "selector": {
-        "text": "summary: parseCiSummary(outputTail),"
+        "text": "export function parseCiSummary(output) {\n  const clean = output.replace(/\\u001b\\[[0-9;]*m/g, \"\");\n  const index = clean.lastIndexOf(\" SUMMARY \");\n  const tail = index < 0 ? \"\" : clean.slice(index);\n  const parsed = [...tail.matchAll(/^\\s*(pass|FAIL)\\s+(.+?)\\s*$/gm)].map((match) => ({ name: match[2], result: match[1] }));\n  const toolchainMatch = tail.match(/^node\\s+(v\\d+\\.\\d+\\.\\d+)\\s+npm\\s+(\\d+\\.\\d+\\.\\d+)\\s+python\\s+(\\d+\\.\\d+\\.\\d+)\\s*$/m);\n  const toolchain = toolchainMatch ? { node: toolchainMatch[1], npm: toolchainMatch[2], python: toolchainMatch[3] } : null;\n  const lanes = parsed.filter((item) => CI_LANES.includes(item.name));\n  const finalSuccess = /^ALL STEPS PASSED — safe to merge on local evidence\\.\\s*$/m.test(tail);\n  const passed = finalSuccess && toolchain !== null && parsed.length === CI_LANES.length\n    && parsed.every((item, index) => item.name === CI_LANES[index] && item.result === \"pass\");\n  return { passed, final_success: finalSuccess, toolchain, lanes };\n}"
       },
       "observed_at": null
     },
@@ -10502,15 +10497,6 @@
       "path": "scripts/pattern-release/release-evidence.mjs",
       "selector": {
         "text": "|| summary.lanes.some((item, index) => item.name !== CI_LANES[index] || item.result !== \"pass\")) problems.push(\"gate_summary_incomplete\");"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b8-release-evidence-test-summary",
-      "kind": "source",
-      "path": "scripts/pattern-release/release-evidence.test.mjs",
-      "selector": {
-        "text": "\"ALL STEPS PASSED — safe to merge on local evidence.\"].join(\"\\n\");"
       },
       "observed_at": null
     },
@@ -10808,6 +10794,69 @@
       "path": "scripts/source-map/snapshot.mjs",
       "selector": {
         "text": "if (files[DEFINITION] && !equal({ path: DEFINITION, ...files[DEFINITION].identity }, snapshot.identity.definition)) problems.push(problem(\"definition_changed\", DEFINITION));\n    for (const p of TOOLING) if (files[p] && !equal(files[p].identity, snapshot.identity.tooling_files[p])) problems.push(problem(\"tooling_changed\", p));\n    for (const p of expectedSources) if (files[p] && !equal(files[p].identity, snapshot.identity.referenced_files[p])) problems.push(problem(\"source_changed\", p));"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-correction-history-guards",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-packet.ts",
+      "selector": {
+        "text": "  if (previous) {\n    if (previous.preserve.plan_hash !== plan.plan_hash) {\n      throw new Error(\"correction history plan mismatch\");\n    }\n    if (previous.schema_version !== \"0.7.0\" || !Number.isInteger(previous.attempt) ||\n      previous.attempt < 1 || previous.attempt >= attempt) {\n      throw new Error(\"correction history attempt mismatch\");\n    }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-correction-history-projection",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-packet.ts",
+      "selector": {
+        "text": "    for (const item of previous.items) {\n      if (!CORRECTION_CODE_SHAPE.test(item.code) ||\n        (item.origin !== \"deterministic\" && item.origin !== \"semantic\")) continue;\n      items.push({\n        code: item.code,\n        origin: item.origin,\n        target_key: safeKey(item.target_key),\n        feature_aliases: safeAliases(item.feature_aliases).filter((alias) => assignedAliases.has(alias)),\n        ontology_rule_ids: item.ontology_rule_ids.filter((id) => authorizedOntologyRuleIds.has(id)),\n      });\n    }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-correction-history-deduplication",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-packet.ts",
+      "selector": {
+        "text": "  const seen = new Set<string>();\n  const distinctItems = items.filter((item) => {\n    const identity = JSON.stringify({\n      ...item,\n      feature_aliases: [...new Set(item.feature_aliases)].sort(),\n      ontology_rule_ids: [...new Set(item.ontology_rule_ids)].sort(),\n    });\n    if (seen.has(identity)) return false;\n    seen.add(identity);\n    return true;\n  });"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-pattern-writer-grounding-policy",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-prompt.ts",
+      "selector": {
+        "text": "// Version 1.0.5 strengthens authoring guidance, not the acceptance policy.\n// Keep historical 1.0.3 and offline 1.0.4 instruction bytes unchanged.\nconst WRITER_GROUNDING_GUIDANCE = [\n  \"Ground every claim in the cited records for that specific prose unit. Preserve each record's conditions, alternatives and limits beside the claim they qualify, not only in a later tension or closing note.\",\n  \"Possibility words such as may do not authorize an unsupported mechanism, feeling, duration, comparison or personal outcome. Use the narrowest supported relationship. Omit an example or practical suggestion that needs an additional unsupported premise.\",\n  \"Each prose unit needs nonempty feature_aliases and ontology_rule_ids. A rule authorized for the chapter is not automatically supported by every alias in that chapter: cite only rules supported by this unit's own aliases, including every dependency of a derived synthesis. Leave derived_synthesis_ids empty when none is supported.\",\n  \"Copy exact ontology record ids. Required tension, resource and counter-expression identifiers describe plan obligations; they are not additional ontology records to cite.\",\n  \"Do not repeat a prohibited claim as a quotation or to deny it. Express the permitted interpretation and its limits in different wording, without diagnosis, prediction, fate, guarantee or inevitability language.\",\n].join(\"\\n\");\n\nexport const PATTERN_WRITER_CORRECTION_POLICY = [\n  BASE_WRITER_CORRECTION_POLICY,\n  WRITER_GROUNDING_GUIDANCE,\n  \"Correction items accumulate failures from earlier attempts against this same frozen plan. Avoid reintroducing any of them. Earlier section keys locate the earlier draft, not proof that a reorganized section currently fails. Check the entire rewritten document against all constraints, not only the latest finding.\",\n].join(\"\\n\\n\");"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-pattern-writer-historical-policies",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-prompt.ts",
+      "selector": {
+        "text": "  if (pass === \"writer\" && pin.writer_prompt_version === PATTERN_OFFLINE_WRITER_PROMPT_VERSION) {\n    instructions = options.correction\n      ? PATTERN_OFFLINE_WRITER_CORRECTION_POLICY\n      : PATTERN_OFFLINE_WRITER_POLICY;\n  } else if (pass === \"writer\" && [\"1.0.1\", \"1.0.2\", \"1.0.3\"].includes(pin.writer_prompt_version)) {\n    instructions = options.correction ? BASE_WRITER_CORRECTION_POLICY : WRITER_POLICY;\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b8-ci-summary-integration-test",
+      "kind": "source",
+      "path": "scripts/pattern-release/release-evidence.test.mjs",
+      "selector": {
+        "text": "test(\"the committed CI script emits a success summary accepted by the release recorder\", () => {\n  const root = repository();\n  try {\n    mkdirSync(join(root, \"scripts\"));\n    writeFileSync(join(root, \"scripts/ci-local.sh\"), readFileSync(join(REPO_ROOT, \"scripts/ci-local.sh\")));\n    mkdirSync(join(root, \".venv/bin\"), { recursive: true });\n    writeFileSync(join(root, \".venv/bin/python\"), \"#!/bin/sh\\nprintf 'Python 3.12.3\\\\n'\\n\", { mode: 0o755 });\n    // Stub the expensive lanes, keeping the committed runner and summary real.\n    const command = [\n      \"npm() { if [ \\\"$1\\\" = \\\"-v\\\" ]; then printf '10.9.8\\\\n'; fi; return 0; }\",\n      \"export -f npm\",\n      \"exec bash scripts/ci-local.sh\",\n    ].join(\"\\n\");\n    const result = spawnSync(\"bash\", [\"-c\", command], { cwd: root, encoding: \"utf8\" });\n    assert.equal(result.status, 0, result.stdout + result.stderr);\n    const parsed = evidence.parseCiSummary(result.stdout);\n    assert.equal(parsed.passed, true, result.stdout);\n    assert.equal(parsed.lanes.length, 14);\n  } finally { rmSync(root, { recursive: true, force: true }); }\n});"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-correction-history-reuse",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-execute.ts",
+      "selector": {
+        "text": "          const correction = buildCorrectionDocument(\n            plan,\n            { deterministic: candidate.failures },\n            planned.next.writer_attempts,\n            (await getWriterCorrectionAt(\n              env, identity, coordinate.generationId, coordinate.stageGeneration, coordinate.attempt,\n            ))?.value,\n          );"
       },
       "observed_at": null
     }

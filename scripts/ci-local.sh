@@ -160,7 +160,7 @@ for i in "${!STEP_NAMES[@]}"; do
 done
 echo
 if [ "$FAILED" -eq 0 ]; then
-  green "ALL STEPS PASSED â€” safe to merge on local evidence."
+  green "ALL STEPS PASSED — safe to merge on local evidence."
 else
   red "AT LEAST ONE STEP FAILED â€” do not merge."
 fi
