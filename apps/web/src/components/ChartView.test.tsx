@@ -70,6 +70,22 @@ describe("ChartView location qualifications", () => {
     expect(screen.queryByText("technique_specific")).not.toBeInTheDocument();
   });
 
+  it("does not present a noon-epoch Moon when birth time is unknown", () => {
+    render(<ChartView chart={{
+      ...chart([]),
+      positions: [{ body: "moon", longitude_deg: 102.3, sign: "cancer" }],
+      uncertainty: {
+        accuracy: "unknown",
+        window: null,
+        suppressed_features: [{ feature_class: "moon_time_sensitive", reason: "unknown_birth_time" }],
+        qualified_features: [],
+        user_facing_summary: "Birth time was not supplied.",
+      },
+    }} onUnauthorized={vi.fn()} />);
+    expect(screen.getAllByText("Birth time unknown").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Cancer 12\.3 deg/i)).not.toBeInTheDocument();
+  });
+
   it("omits the list when no location feature is qualified", () => {
     render(<ChartView chart={chart([
       { feature_id: "moon", qualification: "low_confidence_moon" },

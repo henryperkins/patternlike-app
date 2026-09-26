@@ -225,6 +225,18 @@ export interface ActiveOntology {
 }
 
 /**
+ * Corpus fragments are cited only when the reader's confirmed locale is the
+ * ontology locale. A near match such as `en-GB` still fails publication after
+ * the provider is paid, so callers must refuse it before enqueue.
+ */
+export function patternLocaleServesReader(
+  ontology: ActiveOntology,
+  readerLocale: string,
+): boolean {
+  return ontology.locale === readerLocale;
+}
+
+/**
  * A Pattern may be generated from a public machine-pipeline ontology, or from
  * an authored one.
  *

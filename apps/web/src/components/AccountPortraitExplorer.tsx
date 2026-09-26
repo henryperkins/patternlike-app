@@ -2,8 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { PatternPortraitExplorerResponse, PatternResponseV7, PatternStatePattern } from "@patternlike/shared";
 import { ApiError, downloadPatternPortraitExplorer, getPatternPortraitExplorer, getPatternPortraitImage, getPatternPortraitModel } from "../lib/api-client.js";
 import { bindingsFor, validateExplorerResponse, verifyPortraitDownloadBlob, verifyImage } from "../lib/account-portrait.js";
-import { selectReaderReadiness } from "../lib/reader-readiness.js";
-import { ReaderReadiness, useReaderScope } from "./ReaderReadiness.js";
 import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument, type PortraitObjectBinding } from "../lib/pattern-portrait.js";
 import type { PortraitSky } from "../lib/portrait-sky.js";
@@ -22,8 +20,6 @@ interface Props {
 }
 interface LoadedPortrait { identity: string; bindings: PortraitObjectBinding[]; bundle: PortraitMeshBundle; }
 export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthorized, children, sky, initialChapterIndex, defaultOpen }: Props) {
-  const accountScope = useReaderScope();
-  const [observedAt, setObservedAt] = useState<number | null>(null);
   const requestGeneration = useRef(0);
   const sourceMatches = patternMatchesDocument(pattern, document);
   const canRender = sourceMatches && document.core_chapters.length >= 3 && document.core_chapters.length <= 6;
@@ -43,6 +39,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
   const [assetError, setAssetError] = useState(false);
   const [assetAttempt, setAssetAttempt] = useState(0);
   const [downloading, setDownloading] = useState(false);
+  const [failureKind, setFailureKind] = useState<"status" | "download" | null>(null);
   const statusRequest = useRef<AbortController | null>(null);
   const assetRequest = useRef<AbortController | null>(null);
   const downloadRequest = useRef<AbortController | null>(null);
@@ -65,9 +62,12 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
     closeExplorer(); discardArtifacts();
   }, [closeExplorer, discardArtifacts]);
   const refresh = useCallback(() => setAttempt((value) => value + 1), []);
-  const report = useCallback((cause: unknown) => {
+  const report = useCallback((cause: unknown, kind: "status" | "download" = "status") => {
     if (cause instanceof ApiError && cause.status === 401) { returnToReading(); onUnauthorized(); }
-    else setError(cause instanceof Error ? withRequestId(cause.message, cause instanceof ApiError ? cause.requestId : null) : "Your portrait could not be loaded.");
+    else {
+      setFailureKind(kind);
+      setError(cause instanceof Error ? withRequestId(cause.message, cause instanceof ApiError ? cause.requestId : null) : "Your portrait could not be loaded.");
+    }
   }, [onUnauthorized, returnToReading]);
   useEffect(() => {
     if (!artworkEligible) return;
@@ -76,12 +76,12 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
     void getPatternPortraitExplorer(controller.signal).then((next) => {
       if (controller.signal.aborted || generation !== requestGeneration.current) return;
       validateExplorerResponse(next, chartId, document);
-      setObservedAt(Date.now());
       if (session.verified && session.verified.identity !== JSON.stringify(next)) session.verified = null;
       if (next.status !== "ready") discardArtifacts();
       else if (artifactIdentity.current && artifactIdentity.current !== JSON.stringify(next)) discardArtifacts();
       setResponse((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
       setError(null);
+      setFailureKind(null);
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return;
       setResponse(null); discardArtifacts();
@@ -157,6 +157,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
   const download = async () => {
     if (!saved || downloadRequest.current) return;
     const controller = new AbortController(); downloadRequest.current = controller; setDownloading(true); setError(null);
+    setFailureKind(null);
     try {
       const blob = await downloadPatternPortraitExplorer({ chart_id: chartId, pattern_id: document.pattern_id, generated_at: document.generated_at }, controller.signal);
       controller.signal.throwIfAborted();
@@ -165,7 +166,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
       const url = URL.createObjectURL(blob); ownedUrls.current.add(url);
       const anchor = globalThis.document.createElement("a"); anchor.href = url; anchor.download = "pattern-portrait-complete.json"; anchor.click();
       window.setTimeout(() => { if (ownedUrls.current.delete(url)) URL.revokeObjectURL(url); }, 1000);
-    } catch (cause) { if (!controller.signal.aborted) report(cause); }
+    } catch (cause) { if (!controller.signal.aborted) report(cause, "download"); }
     finally { if (downloadRequest.current === controller) downloadRequest.current = null; if (!controller.signal.aborted) setDownloading(false); }
   };
 
@@ -187,18 +188,30 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
     pendingFocus.current = false;
   }, [open, showingExplorer, initialChapterIndex]);
 
-  const scope = { ...accountScope, chartId, source: `${document.pattern_id}:${document.generated_at}` };
-  const artwork = selectReaderReadiness({ scope, requestGeneration: requestGeneration.current, now: Date.now(), chapterCount: document.core_chapters.length,
-    artwork: response && observedAt !== null ? { scope, requestGeneration: requestGeneration.current, observedAt, evidence: "known", value: response } : null }).artwork;
+  const artworkStatus = response?.status === "generating"
+    ? "Artwork is being prepared."
+    : response?.status === "failed"
+      ? response.retryable ? "Artwork could not be finished. You can check again." : "Optional artwork could not be finished. Your complete reading remains available."
+      : response?.status === "not_started"
+        ? "Optional artwork has not been created. Your complete reading remains available."
+        : response && response.status !== "ready"
+          ? "Optional artwork is unavailable. Your complete reading remains available."
+          : null;
+  const canCheckArtwork = response?.retryable === true || response?.status === "generating";
   if (!canRender) return <>{children}</>;
   return <>
     {!open && <button type="button" className="button button--primary" onClick={() => { pendingFocus.current = true; openExplorer(); }}>Explore your 3D portrait</button>}
     <div ref={contentElement} tabIndex={-1}>{showingExplorer ? <PortraitExplorer source={source} objectBindings={verified?.bindings} meshBundle={verified?.bundle} navigation={navigation} sky={sky?.chartId === chartId ? sky : null} /> : children}</div>
-    {artwork.code !== "ready" && <ReaderReadiness presentation={artwork} onAction={artworkEligible ? () => refresh() : undefined} />}
-    {error && <div className="account-portrait__status" role="alert"><p>{error}</p><button type="button" onClick={refresh}>Retry artwork</button></div>}
+    {response && artworkStatus ? (
+      <p className="account-portrait__status">
+        {artworkStatus}
+        {canCheckArtwork ? <button type="button" onClick={() => refresh()}>Check again</button> : null}
+      </p>
+    ) : null}
+    {error && <div className="account-portrait__status" role="alert"><p>{error}</p><button type="button" onClick={failureKind === "download" ? () => void download() : refresh}>{failureKind === "download" ? "Retry download" : "Retry artwork"}</button></div>}
     {open && saved && !verified && (assetError
       ? <p className="account-portrait__status" role="alert">Your saved artwork could not be loaded. Reading stations are shown instead. <button type="button" onClick={() => setAssetAttempt((value) => value + 1)}>Retry portrait loading</button></p>
       : <p className="account-portrait__status" role="status">Loading your saved artwork.</p>)}
-    {saved && <div className="account-portrait__utility"><button type="button" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download complete portrait"}</button></div>}
+    {saved && <div className="account-portrait__utility"><button type="button" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download complete portrait"}</button><p>The download is a JSON file and can be up to 48 MB.</p></div>}
   </>;
 }

@@ -104,7 +104,7 @@
 .explorer-complete article { padding:30px 0; border-top:1px solid var(--explorer-rule); }
 .explorer-complete h2 { font-size:32px; }
 .explorer-complete h3 { font-size:22px; margin-top:28px; }
-.explorer-complete p { line-height:1.9; }
+.explorer-complete p { max-width:68ch; font-family:var(--serif, Georgia, serif); font-size:19px; line-height:1.6; }
 .explorer-dialog { color:#213d37; background:#f6f5ed; border:1px solid #c1c9b1; border-radius:0; padding:28px; width:min(680px,calc(100% - 32px)); max-height:calc(100dvh - 32px); overflow:auto; }
 .explorer-dialog::backdrop { background:#0b2115b8; }
 .explorer-dialog-heading { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; }
@@ -235,13 +235,17 @@
  .explorer-embedded .explorer-comparison { grid-template-columns:1fr; }
 }
 @container portrait (max-width:539px) {
+ .explorer-embedded .explorer-reader-shell { order:-1; }
  .explorer-embedded .explorer-chapters { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .explorer-title > p { display:none; }
  .explorer-embedded .explorer-reader [data-reader-heading] { font-size:30px; }
  .explorer-embedded .explorer-title h2 { font-size:28px; }
 }
-@container portrait (max-width:319px) {
+@container portrait (max-width:289px) {
  .explorer-embedded .explorer-scene-toolbar { grid-template-columns:repeat(3,44px); }
+}
+@media (max-height:480px) {
+ .explorer-embedded-bar, .explorer-mobile-modes { position:static; }
 }
 
 /* Expanded controls and chapter selection share the available dialog height. */
@@ -265,5 +269,6 @@
 @media (forced-colors:active) {
  .portrait-explorer :focus-visible, .portrait-explorer .explorer-scene :focus-visible { outline-color:Highlight; }
  .explorer-chapters button[aria-pressed="true"] { outline:2px solid Highlight; outline-offset:-3px; font-weight:700; }
+ .portrait-explorer [aria-pressed="true"] { outline:2px solid Highlight; outline-offset:2px; }
  .explorer-facets button[aria-selected="true"] { border-bottom-color:Highlight; }
 }

@@ -116,7 +116,7 @@ describe("automated account portrait delivery", () => {
     await userEvent.type(screen.getByLabelText(/Type DELETE PATTERN to confirm/), "DELETE PATTERN");
     vi.mocked(getPatternState).mockResolvedValue({ ...state, state: "deleted", pattern: null });
     await userEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
-    await screen.findByRole("heading", { name: "This Pattern was deleted and cannot be regenerated for this chart." });
+    await screen.findByRole("heading", { name: "This Pattern was deleted and cannot be written again for this chart." });
     expect(session.verified).toBeNull();
     expect(session.memory.snapshot).toBeNull();
     expect(session.memory.history.entries.size).toBe(0);
