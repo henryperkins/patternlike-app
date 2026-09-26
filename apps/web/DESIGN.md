@@ -345,7 +345,7 @@ A model-written reading closes its editorial column with one sans-serif line at 
 
 ### Consent Terms
 
-Both surfaces that ask for or review AI-synthesis consent render one shared block: a three-cell processor/purpose/policy grid stacking below `700px`, a rule-marked list of the categories the server declared, and the qualifying paragraphs. The category list uses a short Graphite Rule per row rather than a bullet glyph — the instrument grid marks a row, it does not decorate it. The consent panel in Context & privacy takes the permission ledger's own `24px` spacing and `30px` padding so the two read as one column of controls.
+Both surfaces that ask for or review AI-synthesis consent render one shared block: a processor, generation service, purpose, and policy grid (`auto-fit`, two columns below `960px`), a rule-marked list of the categories the server declared, and the qualifying paragraphs. The category list uses a short Graphite Rule per row rather than a bullet glyph — the instrument grid marks a row, it does not decorate it. The consent panel in Context & privacy takes the permission ledger's own `24px` spacing and `30px` padding so the two read as one column of controls.
 
 ### Named Rules
 

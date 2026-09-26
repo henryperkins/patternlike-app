@@ -66,3 +66,13 @@ This records the engineering scope and does not attest that the previous copy
 was accurate. A future change to permitted processing or categories requires
 its own consent-policy assessment and any required fresh grant; current-account
 privacy assertions still require the external evidence listed above.
+
+## Pattern page disclosure correction — 2026-09-26
+
+Pattern consent policy `1.1.0` stays in place. The Pattern page copy now states
+the standing grant, automatic generation after a birth correction, artwork
+withdrawal, 30-day provider-copy retention, and that calculated positions can
+reconstruct birth details. No processor, purpose, data category, provider
+route, retention implementation, or authorization rule changes. The grant is
+not rewritten, withdrawn, or forced through a reset. Longitude values sent to
+the provider are unchanged.

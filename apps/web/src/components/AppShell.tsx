@@ -55,7 +55,7 @@ export function AppShell({ activeView, chartStatus, children }: AppShellProps) {
         Skip to content
       </a>
 
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Account">
         <a className="wordmark" href="#pattern" aria-label="Pattern Like home">
           <span className="wordmark__mark" aria-hidden="true">
             <span />

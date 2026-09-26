@@ -17,6 +17,11 @@ interface PreferenceConfirmProps {
   /** Re-run the Today fetch. The answer will usually be "not generated yet". */
   onSaved: () => void;
   onUnauthorized: () => void;
+  /** Pattern renders the language form in place instead of sending the reader to Today. */
+  embedded?: boolean;
+  initialValue?: string;
+  body?: string;
+  savedMessage?: string;
 }
 
 const COPY = {
@@ -45,12 +50,16 @@ export function PreferenceConfirm({
   requestId,
   onSaved,
   onUnauthorized,
+  embedded = false,
+  initialValue,
+  body,
+  savedMessage,
 }: PreferenceConfirmProps) {
   const copy = COPY[kind];
   const fieldId = useId();
   const listId = useId();
   const [value, setValue] = useState(() =>
-    kind === "timezone" ? systemTimezone() : systemLocale(),
+    initialValue ?? (kind === "timezone" ? systemTimezone() : systemLocale()),
   );
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -116,17 +125,9 @@ export function PreferenceConfirm({
     }
   };
 
-  return (
-    <section className="today-gate page-enter">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
-        </div>
-      </header>
-
-      <form className="today-gate__form panel" onSubmit={submit} noValidate>
-        <p className="today-gate__body">{copy.body}</p>
+  const form = (
+      <form className={embedded ? "pattern-locale-confirm" : "today-gate__form panel"} onSubmit={submit} noValidate>
+        <p className="today-gate__body">{body ?? copy.body}</p>
 
         <label htmlFor={fieldId}>{copy.label}</label>
         <input
@@ -164,7 +165,7 @@ export function PreferenceConfirm({
               ? // Not a promise of a reading. A preference change affects only
                 // commands enqueued afterwards, and a day already reserved never
                 // moves — so the honest next screen is "not ready yet".
-                "Saved. Your reading will be generated for your next local day."
+                (savedMessage ?? "Saved. Your reading will be generated for your next local day.")
               : ""}
         </p>
 
@@ -172,6 +173,19 @@ export function PreferenceConfirm({
           <small className="today-gate__request">Request {requestId}</small>
         ) : null}
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <section className="today-gate page-enter">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">{copy.eyebrow}</p>
+          <h1>{copy.title}</h1>
+        </div>
+      </header>
+      {form}
     </section>
   );
 }

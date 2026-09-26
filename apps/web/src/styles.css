@@ -353,6 +353,19 @@ summary:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
+.chart-page__header {
+  margin-top: 48px;
+}
+
+.chart-page__header h2 {
+  margin: 15px 0 0;
+  font-family: var(--serif);
+  font-size: clamp(32px, 4vw, 56px);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
 .page-header h1,
 .onboarding__intro h1,
 .error-page h1,
@@ -412,13 +425,20 @@ summary:focus-visible {
   justify-content: center;
   gap: 12px;
   padding: 0 20px;
-  border: 1px solid transparent;
+  color: var(--ink);
+  background: var(--paper-light);
+  border: 1px solid var(--line-dark);
   border-radius: 0;
   cursor: pointer;
   font-size: 12px;
   font-weight: 750;
   letter-spacing: 0.035em;
+  text-decoration: none;
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+a.button {
+  text-decoration: none;
 }
 
 .button:not(:disabled):active {
@@ -2869,7 +2889,7 @@ summary:focus-visible {
 
 .ai-consent-facts {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   margin: 0 0 26px;
   border: 1px solid var(--line);
 }
@@ -4083,8 +4103,34 @@ summary:focus-visible {
   text-wrap: balance;
 }
 
-.pattern-chapters__failure p,
-.pattern-chapters__empty p {
+.pattern-chapters__failure > p,
+.pattern-chapters__empty > p {
+  max-width: 65ch;
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pattern-progress {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pattern-progress li {
+  margin-top: 6px;
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+
+.pattern-progress li[aria-current="step"] {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+}
+
+.pattern-progress__help {
   max-width: 65ch;
   margin: 12px 0 0;
   color: var(--ink-soft);
@@ -4116,6 +4162,7 @@ summary:focus-visible {
   margin-top: 34px;
   padding-top: 30px;
   border-top: 1px solid var(--forest);
+  overflow-wrap: break-word;
 }
 
 .pattern-chapter h3 {
@@ -4162,6 +4209,7 @@ summary:focus-visible {
 }
 
 .pattern-chapter__list ul {
+  max-width: 68ch;
   margin: 0;
   padding: 0;
   border-bottom: 1px solid var(--line);
@@ -4169,7 +4217,6 @@ summary:focus-visible {
 }
 
 .pattern-chapter__list li {
-  max-width: 68ch;
   padding: 11px 0;
   border-top: 1px solid var(--line);
   color: var(--ink-soft);
@@ -4330,6 +4377,7 @@ summary:focus-visible {
   margin-top: 34px;
   padding-top: 24px;
   border-top: 1px solid var(--line-dark);
+  overflow-wrap: break-word;
 }
 
 .pattern-signatures h3 {
@@ -4343,6 +4391,18 @@ summary:focus-visible {
   margin-top: 18px;
 }
 
+.pattern-signatures h4,
+.pattern-signatures p {
+  font-family: var(--serif);
+  font-weight: 500;
+}
+
+.pattern-signatures p {
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
 .pattern-provenance,
 .pattern-delete p {
   max-width: 65ch;
@@ -4350,6 +4410,11 @@ summary:focus-visible {
   color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.7;
+  overflow-wrap: break-word;
+}
+
+.pattern-provenance__id {
+  overflow-wrap: anywhere;
 }
 
 .pattern-regeneration {
@@ -5492,6 +5557,10 @@ summary:focus-visible {
 }
 
 @media (max-width: 960px) {
+  html {
+    scroll-padding-block: var(--mobile-header) calc(var(--mobile-nav) + env(safe-area-inset-bottom));
+  }
+
   :root {
     --mobile-header: 68px;
     --mobile-nav: 70px;
@@ -5904,13 +5973,19 @@ summary:focus-visible {
     padding-inline: 18px;
   }
 
-  .evidence-grid,
-  .ai-consent-facts {
+  .evidence-grid {
     grid-template-columns: 1fr;
   }
 
-  .ai-consent-facts > div {
+  .ai-consent-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-consent-facts > div:nth-child(2n) {
     border-right: none;
+  }
+
+  .ai-consent-facts > div {
     border-bottom: 1px solid var(--line);
   }
 

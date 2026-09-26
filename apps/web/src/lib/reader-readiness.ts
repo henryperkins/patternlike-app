@@ -45,12 +45,12 @@ export const READER_OBSERVATION_MAX_AGE_MS = 60_000;
 export const READER_COPY: Record<ReadinessReason, string> = {
   ready: "Your reading is available.", chart_required: "Add a birth chart before a Pattern can be written.",
   locale_required: "Confirm your content language to generate a Pattern.", timezone_required: "Confirm your scheduling time zone.",
-  consent_required: "Generate my Pattern", available: "Generate my Pattern",
+  consent_required: "Before your Pattern is written", available: "Your Pattern can be written",
   organizing_evidence: "Organizing the evidence", writing: "Writing your Pattern", checking_claims: "Checking the draft",
   preparing: "Preparing your reading.", failed: "This Pattern could not be finished.",
-  deleted: "This Pattern was deleted and cannot be regenerated for this chart.", withdrawn: "The interpretation basis for this Pattern was withdrawn.",
-  observation_unavailable: "Current status could not be checked. Reload status before starting more work.",
-  stale_observation: "This status needs to be refreshed before starting more work.", scope_mismatch: "This status no longer matches the current account, chart, or edition.",
+  deleted: "This Pattern was deleted and cannot be written again for this chart.", withdrawn: "The meanings used to write this Pattern were withdrawn.",
+  observation_unavailable: "Current status could not be checked.",
+  stale_observation: "This status needs to be checked again.", scope_mismatch: "This status no longer matches the current account, chart, or edition.",
   unsupported_artwork: "Saved artwork supports Patterns with three to six chapters. Your complete reading remains available.",
   automation_disabled: "Automatic artwork is paused. Saved artwork and your reading remain available.",
   artwork_unavailable: "Optional artwork is unavailable. Your complete reading remains available.",
@@ -116,6 +116,11 @@ export function selectReaderReadiness(input: ReaderReadinessInput): Record<Reade
         case "available": pattern = make("pattern", state.consent?.status === "granted" ? "can_start" : "needs_permission", "available", observation, state.consent?.status === "granted" ? [{ type: "start_generation" }] : reload); break;
         case "organizing_evidence": case "writing": case "checking_claims": pattern = make("pattern", "working", state.state, observation, reload); break;
         case "failed": {
+          if (state.consent && state.consent.status !== "granted") {
+            const canConsent = state.generation?.retryable === true;
+            pattern = make("pattern", "needs_permission", "failed", observation, canConsent ? [{ type: "review_consent" }, ...reload] : reload);
+            break;
+          }
           const canRetry = state.generation?.retryable === true && state.consent?.status === "granted";
           pattern = make("pattern", canRetry ? "retryable_failure" : "unavailable", "failed", observation, canRetry ? [{ type: "retry_generation" }, ...reload] : reload); break;
         }

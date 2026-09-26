@@ -30,6 +30,10 @@ function declarationValues(source: string, property: string): string[] {
 }
 
 describe("web design contracts", () => {
+  it("gives the base button a readable ink and paper default", () => {
+    expect(styles).toMatch(/\.button\s*{[^}]*color:\s*var\(--ink\);[^}]*background:\s*var\(--paper-light\);/s);
+  });
+
   it("keeps evidence and label type on the documented 9px and 10px steps", () => {
     expect(styles).toMatch(/--label-xs:\s*9px;/);
     expect(styles).toMatch(/--label-sm:\s*9px;/);

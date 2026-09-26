@@ -188,8 +188,12 @@
 @media (max-width:359px) {
   .observatory-explorer .explorer-chapters { grid-template-columns:repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); }
 }
-@container portrait (max-width:319px) {
+@container portrait (max-width:289px) {
   .observatory-explorer.explorer-embedded .explorer-chapters { grid-template-columns:repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); }
+}
+@media (max-height:480px) {
+  .observatory-explorer .explorer-mobile-modes,
+  .observatory-explorer .explorer-embedded-bar { position:static; }
 }
 @media (forced-colors:active) {
   .observatory-explorer .explorer-scene .explorer-annotation:focus-visible { outline-color:Highlight; }

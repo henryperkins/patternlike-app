@@ -118,8 +118,9 @@ describe("PatternExperience", () => {
       await act(async () => { await Promise.resolve(); });
       expect(screen.getByRole("button", { name: "Generate my Pattern" })).toBeEnabled();
       await act(async () => { await vi.advanceTimersByTimeAsync(60_001); });
-      expect(screen.queryByRole("button", { name: "Generate my Pattern" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Generate my Pattern" })).toBeEnabled();
+      expect(screen.queryByText(/needs to be checked again/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
       expect(capturedFor(GENERATIONS)).toHaveLength(0);
       unmount();
     } finally { vi.useRealTimers(); }
@@ -132,7 +133,7 @@ describe("PatternExperience", () => {
     }) }, [PATTERN]: { status: 200, body: generated } });
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     await screen.findByRole("heading", { name: "A standing emphasis" });
-    expect(screen.queryByRole("button", { name: "Try the update again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try the replacement again" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
   });
   it("rechecks consent before a previously opened replacement confirmation can submit", async () => {
@@ -143,7 +144,7 @@ describe("PatternExperience", () => {
     const responses = { [STATE]: { status: 200, body: initial }, [PATTERN]: { status: 200, body: generated } };
     apiResponses(responses);
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Review Pattern update" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Review replacement" }));
     await userEvent.type(screen.getByLabelText(/Type REGENERATE MY PATTERN/), "REGENERATE MY PATTERN");
     responses[STATE] = { status: 200, body: { ...initial, consent } };
     await userEvent.click(screen.getByRole("button", { name: "Replace my Pattern" }));
@@ -184,7 +185,7 @@ describe("PatternExperience", () => {
     });
 
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
-    expect(await screen.findByText("Current status could not be checked. Reload status before starting more work.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Current status could not be checked." })).toBeInTheDocument();
     expect(screen.queryByText("Why this?")).toBeNull();
     expect(screen.queryByText("Holding a line under pressure")).toBeNull();
   });
@@ -205,8 +206,8 @@ describe("PatternExperience", () => {
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     expect(await screen.findByRole("button", { name: /Generate my Pattern/i })).toBeInTheDocument();
     expect(screen.getByText(/Birth date, time, place, and coordinates are not sent/i)).toBeInTheDocument();
-    expect(screen.getByText(/A successful Pattern is not a rerollable reading/i)).toBeInTheDocument();
-    expect(screen.getByText("Deleting your Pattern is permanent.")).toBeInTheDocument();
+    expect(screen.getByText(/A Pattern is written once for a chart/i)).toBeInTheDocument();
+    expect(screen.getByText(/30-day deletion schedule/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Generate my Pattern/i }));
     const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
@@ -283,7 +284,7 @@ describe("PatternExperience", () => {
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
-    const review = screen.getByRole("button", { name: "Review Pattern update" });
+    const review = screen.getByRole("button", { name: "Review replacement" });
     expect(review).toBeInTheDocument();
     expect(capturedFor(GENERATIONS).filter((request) => request.method === "POST")).toEqual([]);
 
@@ -337,10 +338,11 @@ describe("PatternExperience", () => {
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Updating your Pattern");
+    expect(screen.getByRole("heading", { name: "Replacing your Pattern" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Replacing your Pattern");
     expect(screen.getByRole("status")).toHaveTextContent("Writing your Pattern");
     expect(screen.getByText(/current Pattern stays readable until the replacement succeeds/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Review Pattern update" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review replacement" })).toBeNull();
   });
 
   it("retains the current Pattern after a failed source update and offers a confirmed retry", async () => {
@@ -376,7 +378,7 @@ describe("PatternExperience", () => {
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
     expect(screen.getByText(/The update did not finish. Your current Pattern was not changed/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Try the update again" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try the replacement again" }));
     expect(screen.getByLabelText(/Type REGENERATE MY PATTERN to confirm/i)).toBeInTheDocument();
   });
 
@@ -410,8 +412,8 @@ describe("PatternExperience", () => {
     ["chart_required", "Add a birth chart before a Pattern can be written."],
     ["locale_confirmation_required", "Confirm your content language to generate a Pattern."],
     ["ontology_unavailable", "Pattern generation is not available right now."],
-    ["deleted", "This Pattern was deleted and cannot be regenerated for this chart."],
-    ["withdrawn", "The interpretation basis for this Pattern was withdrawn."],
+    ["deleted", "This Pattern was deleted and cannot be written again for this chart."],
+    ["withdrawn", "The meanings used to write this Pattern were withdrawn."],
   ] as const)("names the %s state in a heading a screen reader reaches", async (state, title) => {
     mockApiResponses({
       [`GET ${STATE}`]: { status: 200, body: stateDoc({ state, consent: null }) },
@@ -446,9 +448,16 @@ describe("PatternExperience", () => {
 
       render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
-      const status = await screen.findByRole("status");
-      expect(status).toBeInTheDocument();
-      expect(status.textContent).toBeTruthy();
+      expect(await screen.findByRole("heading", { name: {
+        organizing_evidence: "Organizing the evidence",
+        writing: "Writing your Pattern",
+        checking_claims: "Checking the draft",
+      }[state] })).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent({
+        organizing_evidence: "Organizing the evidence",
+        writing: "Writing your Pattern",
+        checking_claims: "Checking the draft",
+      }[state]);
     },
   );
 
@@ -542,7 +551,7 @@ describe("PatternExperience", () => {
 
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     await userEvent.click(
-      await screen.findByRole("button", { name: /Generate my Pattern/i }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
 
     const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
@@ -553,6 +562,93 @@ describe("PatternExperience", () => {
       reason: "failed_attempt_retry",
     });
   });
+
+  it("keeps Generate mounted and labeled while the request is in flight", async () => {
+    const gate = deferred();
+    mockApiResponses({
+      [`GET ${STATE}`]: { status: 200, body: stateDoc({ state: "available", consent: { ...consent, status: "granted" } }) },
+      [`POST ${GENERATIONS}`]: {
+        status: 202,
+        gate: gate.promise,
+        body: {
+          schema_version: "0.9.0",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+          generation: { generation_id: "pgen_inflight", stage: "organizing_evidence" },
+        },
+      },
+    });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Generate my Pattern" }));
+    expect(await screen.findByRole("button", { name: "Starting your Pattern…" })).toBeDisabled();
+    await act(async () => gate.release());
+  });
+
+  it("confirms a publishable language on the Pattern page", async () => {
+    const responses: Record<string, MockResponse> = {
+      "/v1/pattern-portrait/automation": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
+      "/v1/pattern-portrait/explorer": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
+      [STATE]: { status: 200, body: stateDoc({ state: "locale_confirmation_required", consent: null }) },
+      "PUT /v1/preferences/locale": { status: 200, body: { locale: "en-US", source: "user_confirmed" } },
+    };
+    apiResponses(responses);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    expect(await screen.findByRole("button", { name: /Confirm language/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Confirm language" })).not.toBeInTheDocument();
+    responses[STATE] = { status: 200, body: stateDoc() };
+    await userEvent.click(screen.getByRole("button", { name: /Confirm language/i }));
+    expect(await screen.findByRole("button", { name: "Generate my Pattern" })).toBeInTheDocument();
+    expect(capturedFor("/v1/preferences/locale")[0]?.body).toMatchObject({ locale: "en-US", source: "user_confirmed" });
+  });
+
+  it("sends birth correction to Privacy", async () => {
+    mockApiResponses({ [STATE]: { status: 200, body: stateDoc({ state: "chart_required", consent: null, chart: null }) } });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    expect(await screen.findByRole("link", { name: "Open birth details" })).toHaveAttribute("href", "#privacy");
+  });
+
+  it("accepts a lowercase deletion confirmation", async () => {
+    mockApiResponses({
+      [STATE]: { status: 200, body: stateDoc({
+        state: "ready",
+        consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+        pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy },
+      }) },
+      [PATTERN]: { status: 200, body: generated },
+    });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Delete this Pattern/i }));
+    await userEvent.type(screen.getByLabelText(/Type DELETE PATTERN to confirm/i), "delete pattern");
+    expect(screen.getByRole("button", { name: /Confirm deletion/i })).toBeEnabled();
+  });
+
+  it("reuses an idempotency key after a transport failure and replaces it after a server answer", async () => {
+    const responses: Record<string, MockResponse> = {
+      "/v1/pattern-portrait/automation": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
+      "/v1/pattern-portrait/explorer": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
+      [STATE]: { status: 200, body: stateDoc({ state: "available", consent: { ...consent, status: "granted" } }) },
+      [`POST ${GENERATIONS}`]: { status: 503, unreachable: true, body: null },
+    };
+    apiResponses(responses);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    const generate = await screen.findByRole("button", { name: "Generate my Pattern" });
+    await userEvent.click(generate);
+    await waitFor(() => expect(capturedFor(GENERATIONS)).toHaveLength(1));
+    const first = capturedFor(GENERATIONS)[0]?.headers.get("idempotency-key");
+    await userEvent.click(screen.getByRole("button", { name: "Generate my Pattern" }));
+    await waitFor(() => expect(capturedFor(GENERATIONS)).toHaveLength(2));
+    expect(capturedFor(GENERATIONS)[1]?.headers.get("idempotency-key")).toBe(first);
+    responses[`POST ${GENERATIONS}`] = {
+      status: 409,
+      body: { error: { code: "idempotency_key_reused", message: "Idempotency-Key was already used for a different Pattern action", request_id: "req_reused" } },
+    };
+    await userEvent.click(screen.getByRole("button", { name: "Generate my Pattern" }));
+    expect((await screen.findAllByText(/already sent with different details/i)).length).toBeGreaterThan(0);
+    expect(capturedFor(GENERATIONS)).toHaveLength(3);
+    expect(capturedFor(GENERATIONS)[2]?.headers.get("idempotency-key")).toBe(first);
+    await userEvent.click(screen.getByRole("button", { name: "Generate my Pattern" }));
+    await waitFor(() => expect(capturedFor(GENERATIONS)).toHaveLength(4));
+    expect(capturedFor(GENERATIONS)[3]?.headers.get("idempotency-key")).not.toBe(first);
+  });
 });
 
 
@@ -562,7 +658,7 @@ describe("Pattern reader revision matching", () => {
   it("does not expose an old chart's reading when the active chart differs", async () => {
     mockApiResponses({ [STATE]: { status: 200, body: readyState() }, [PATTERN]: { status: 200, body: generated } });
     render(<PatternExperience chartId="new-chart" onUnauthorized={noop} />);
-    expect(await screen.findByText(/no longer matches/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/birth chart changed/i)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
     expect(capturedFor(PATTERN)).toHaveLength(0);
   });
@@ -570,7 +666,7 @@ describe("Pattern reader revision matching", () => {
   it("rejects a document fetched after the state revision changed", async () => {
     mockApiResponses({ [STATE]: { status: 200, body: readyState() }, [PATTERN]: { status: 200, body: { ...generated, pattern_id: "other-pattern" } } });
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
-    expect(await screen.findByText(/no longer matches/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/no longer matches/i)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Delete this Pattern/i })).toBeNull();
   });
@@ -584,7 +680,7 @@ describe("Pattern reader revision matching", () => {
     view.rerender(<PatternExperience chartId="replacement-chart" onUnauthorized={noop} />);
     expect(signal.aborted).toBe(true);
     await act(async () => gate.release());
-    expect(await screen.findByText(/no longer matches/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/birth chart changed/i)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
   });
 
