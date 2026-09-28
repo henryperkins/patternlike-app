@@ -24,7 +24,6 @@ import { patternAiRoutes } from "./routes/pattern-ai.js";
 import { timeTravelRoutes } from "./routes/time-travel.js";
 import { lifeEventRoutes } from "./routes/life-events.js";
 import { deletionStatusRoutes, privacyRoutes } from "./routes/privacy.js";
-import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { internalPatternRoutes } from "./routes/internal-pattern.js";
@@ -96,9 +95,6 @@ api.route("/", portraitMeshRoutes);
 api.route("/", timeTravelRoutes);
 api.route("/", lifeEventRoutes);
 api.route("/", privacyRoutes);
-// Last, deliberately. Hono answers with the first matching registration, so a
-// real route always shadows a stub rather than the other way round.
-api.route("/", stubRoutes);
 
 // Internal service-to-service API, behind the service token rather than the
 // consumer auth stub. Paths inside these routers are relative to the /internal

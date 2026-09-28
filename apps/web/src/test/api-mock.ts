@@ -54,7 +54,10 @@ export function deferred(): { promise: Promise<void>; release: () => void } {
   return { promise, release };
 }
 
-/** Mirrors the shape apps/api/src/routes/stubs.ts actually returns. */
+/**
+ * The 501 `not_implemented` envelope the API's placeholder routes once returned.
+ * The API mounts none now; this exercises the client's defensive handling.
+ */
 export function notImplemented(feature: string, requestId: string): MockResponse {
   return {
     status: 501,
