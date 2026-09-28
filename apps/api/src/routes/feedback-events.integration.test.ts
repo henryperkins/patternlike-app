@@ -31,8 +31,8 @@ async function seedReading() {
     evidence_header: {
       schema_version: "0.5.0", reading_id: READING, revision: 1, revision_reason: "initial", generated_at: `${DATE}T12:00:00Z`,
       generation_input_id: `gin_sha256_${"ab".repeat(32)}`, input_manifest_hash: HASH, content_hash: HASH, provider_response_hash: HASH,
-      calculation: { chart_contract_id: "calc-contract-launch", cycle_policy_version: "1.4.0", daily_sky_policy_version: "1.0.0", ephemeris_data_version: "swisseph-2.10.03", container_digest: HASH, tzdb_version: "2026a", local_day_resolution_policy_version: "1.0.0" },
-      model: { provider: "codex", model: "gpt-5.6-sol", prompt_version: "1.0.3", selection_policy_version: "1.1.0", validation_policy_version: "1.0.0", provider_request_id: "thread_feedback_fixture", input_tokens: 100, output_tokens: 50 },
+      calculation: { chart_contract_id: "calc-contract-launch", cycle_policy_version: "1.6.0", daily_sky_policy_version: "1.0.0", ephemeris_data_version: "swisseph-2.10.03", container_digest: HASH, tzdb_version: "2026a", local_day_resolution_policy_version: "1.0.0" },
+      model: { provider: "codex", model: "gpt-5.6-sol", prompt_version: "1.1.0", selection_policy_version: "1.1.0", validation_policy_version: "1.2.0", provider_request_id: "thread_feedback_fixture", input_tokens: 100, output_tokens: 50 },
       validation: { status: "passed", policy_version: "1.0.0", checks: [{ code: "grounding", passed: true }] },
     },
     invalidation: null,
@@ -117,14 +117,14 @@ async function copyFeedbackEvents(
   await env.DB.batch(statements);
 }
 
-function prepareFeedbackContext(context: ConstrainedContextLoad, anchor: Date, selectionVersion = "1.4.0") {
+function prepareFeedbackContext(context: ConstrainedContextLoad, anchor: Date, selectionVersion = "1.6.0") {
   const calculation = {
     policy_id: "feedback-fixture", policy_version: "1.0.0", orb_policy_id: null, orb_policy_version: null,
     request_digest: HASH, response_digest: HASH, container_digest: HASH, ephemeris_data_version: "swisseph-2.10.03",
   };
   return prepareConstrainedReadingInput({
-    schema_version: "0.5.0", prompt_version: selectionVersion === "1.4.0" ? "1.0.4" : "1.0.3",
-    output_schema: "daily-reading-v5", selection_policy_version: selectionVersion, validation_policy_version: "1.0.0",
+    schema_version: "0.5.1", prompt_version: selectionVersion === "1.6.0" ? "1.1.1" : "1.1.0",
+    output_schema: "daily-reading-v5", selection_policy_version: selectionVersion, validation_policy_version: "1.2.0",
     context_max_bytes: 98304, target_local_date: "2028-03-21", target_timezone: "Etc/UTC", locale: "en-US",
     generation_anchor: anchor.toISOString(), revision: 1, domain_preference: null,
     consent_categories: ["birth_accuracy_and_uncertainty", "calculated_natal_facts", "reading_feedback"],
@@ -455,7 +455,7 @@ describe("exact-edition categorical feedback", () => {
           event.grant.consent_version += 1;
         }
       });
-const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.4.0", anchor });
+const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.6.0", anchor });
       expect(loaded.signals.map((signal) => signal.signal_id)).toEqual([eligible.receipt.id]);
       expect(prepareFeedbackContext(loaded, anchor).selected_context.map((pin) => pin.signal_id)).toEqual([eligible.receipt.id]);
       expect(await loadReadingFeedbackEventExports(env, IDENTITY_A, anchor)).toHaveLength(21);
@@ -476,13 +476,13 @@ const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { sel
 
     expect((await loadRetainedReadingFeedbackEvents(env, IDENTITY_A, anchor)).map((event) => event.receipt.id))
       .toEqual(ids.slice(0, 100));
-    const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.4.0", anchor });
+    const loaded = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.6.0", anchor });
     const prepared = prepareFeedbackContext(loaded, anchor);
     expect(prepared.selected_context.map((pin) => pin.signal_id)).toEqual(ids.slice(0, 20));
     expect(JSON.stringify(prepared.request)).not.toContain("rfe_bounded_");
 
-    const incumbent = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.3.0", anchor });
-    const oldPacket = prepareFeedbackContext(incumbent, anchor, "1.3.0");
+    const incumbent = await loadConstrainedContext(env, IDENTITY_A, "2028-03-21", { selectionVersion: "1.5.0", anchor });
+    const oldPacket = prepareFeedbackContext(incumbent, anchor, "1.5.0");
     expect(incumbent.signals.map((signal) => signal.signal_id)).toEqual(legacyIds);
     expect([...new Set(oldPacket.selected_context.map((pin) => pin.signal_id))]).toEqual(legacyIds);
     expect(prepared.selected_facts).toEqual(oldPacket.selected_facts);

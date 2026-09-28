@@ -16,7 +16,7 @@
  */
 
 import {
-  M5_SCHEMA_VERSION,
+  DAILY_GENERATION_SCHEMA_VERSION,
   M5_SUPPORTED_USES,
   isM5SupportedUse,
   type AiConsentDataCategory,
@@ -37,9 +37,9 @@ import {
   GENERATED_PARAGRAPH_ROLES,
 } from "@patternlike/shared";
 
-import { uncertaintyDisclosureRepresentable } from "./claim-support.js";
+import { buildUncertaintyDisclosurePlan, normalizeDailyUncertainty } from "./uncertainty-disclosure.js";
 import { partitionContext, factSuppressionReason } from "./eligibility.js";
-import { localDayMidpoint, projectUncertainty } from "./identity.js";
+import { localDayMidpoint } from "./identity.js";
 import { computePhase } from "./phase.js";
 import { compareScored, scoreFact } from "./ranking.js";
 import { jcsCanonicalize } from "./jcs.js";
@@ -55,6 +55,8 @@ import {
   PARAGRAPH_MAX_CHARS,
   REFLECTION_MAX_CHARS,
   SELECTION_POLICY_ID,
+  SELECTION_POLICY_VERSION,
+  VALIDATION_POLICY_VERSION,
   CATEGORIZED_FEEDBACK_SELECTION_VERSION,
   type ConstrainedContextContent,
   type ConstrainedContextRef,
@@ -926,8 +928,22 @@ function daysBetween(earlier: string, later: string): number {
 export function prepareConstrainedReadingInput(
   input: ConstrainedReadingInput,
 ): PreparedConstrainedReadingInput {
+  if (input.schema_version !== DAILY_GENERATION_SCHEMA_VERSION ||
+    (input.selection_policy_version !== SELECTION_POLICY_VERSION && input.selection_policy_version !== CATEGORIZED_FEEDBACK_SELECTION_VERSION) ||
+    input.validation_policy_version !== VALIDATION_POLICY_VERSION) {
+    throw new ConstrainedInputError("unsupported constrained input policy");
+  }
   const rejections: Rejection[] = [];
-  const uncertainty = projectUncertainty(input.chart.uncertainty);
+  let uncertainty;
+  try {
+    uncertainty = normalizeDailyUncertainty(input.chart.uncertainty);
+  } catch (error) {
+    throw new ConstrainedInputError(error instanceof Error ? error.message : "unsupported uncertainty input");
+  }
+  const uncertaintyDisclosure = buildUncertaintyDisclosurePlan(uncertainty);
+  if (uncertaintyDisclosure.disclosures.map((entry) => entry.statement).join(" ").length > PARAGRAPH_MAX_CHARS) {
+    throw new ConstrainedInputError("unsupported uncertainty disclosure length");
+  }
 
   // Two disagreeing copies of one decision is how an unknown-time chart
   // acquires an exact-time reading.
@@ -997,11 +1013,11 @@ export function prepareConstrainedReadingInput(
   );
   const composition = buildComposition(
     facts,
-    uncertainty.suppressed_features.length > 0 || uncertainty.qualified_features.length > 0,
+    uncertaintyDisclosure.disclosures.length > 0,
   );
 
   const request: ReadingGenerationRequest = {
-    schema_version: M5_SCHEMA_VERSION,
+    schema_version: DAILY_GENERATION_SCHEMA_VERSION,
     prompt_version: input.prompt_version,
     selection_policy_version: input.selection_policy_version,
     output_schema: input.output_schema,
@@ -1009,42 +1025,13 @@ export function prepareConstrainedReadingInput(
     locale: input.locale,
     birth_time_accuracy: input.chart.effective_accuracy,
     suppressed_features: suppressedFeatures,
+    uncertainty_disclosure: uncertaintyDisclosure,
     domain_preference: input.domain_preference,
     facts: facts.map(toRequestFact),
     context: [],
     prior_readings: [],
     composition,
   };
-
-  // A mandatory disclosure the grammar cannot express is refused here, before
-  // the provider is paid. `uncertainty_note_required` is forced by a surviving
-  // qualification as well as by a suppression, but the accepted disclosure
-  // forms are built only from `suppressed_features` and the approximate-time
-  // sentence, so a chart carrying only qualifications — which calc-stub emits
-  // for `birthplace` and `birth_instant` at every accuracy — demands a note
-  // that no candidate can satisfy. Left to run, every attempt is rejected
-  // `unsupported_uncertainty_disclosure`, and `publisher_output_invalid`
-  // automatically replaces the command until the generation cap is spent.
-  //
-  // This is a stop-gap that stops the spend, not a repair: the qualification
-  // still goes undisclosed, exactly as it already does on approximate and
-  // unknown-time charts, where the note names only the birth time. The fix is
-  // a versioned provider projection that can carry qualification classes and
-  // disclose them.
-  if (
-    composition.uncertainty_note_required &&
-    !uncertaintyDisclosureRepresentable(
-      request.birth_time_accuracy,
-      request.suppressed_features,
-    )
-  ) {
-    throw new ConstrainedInputError(
-      "this chart requires an uncertainty disclosure that the accepted disclosure " +
-        `forms cannot express: birth_time_accuracy is ${request.birth_time_accuracy} ` +
-        "with no suppressed feature, and the note is required by " +
-        `${uncertainty.qualified_features.length} qualified feature(s)`,
-    );
-  }
 
   let bytes = packetBytes(request);
   if (bytes > input.context_max_bytes) {
@@ -1200,7 +1187,7 @@ export function prepareConstrainedReadingInput(
   };
 
   const common = {
-    schema_version: M5_SCHEMA_VERSION,
+    schema_version: DAILY_GENERATION_SCHEMA_VERSION,
     selection_policy_id: SELECTION_POLICY_ID,
     selection_policy_version: input.selection_policy_version,
     validation_policy_version: input.validation_policy_version,
@@ -1232,6 +1219,7 @@ export function prepareConstrainedReadingInput(
     cycle_scan: calculation(input.cycle_scan),
     daily_sky: calculation(input.daily_sky),
     composition,
+    uncertainty_disclosure: uncertaintyDisclosure,
     ...selection,
   };
 

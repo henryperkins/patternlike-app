@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPortraitAutomation, setPortraitAutomation } from "../lib/api-client.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 
@@ -11,8 +11,96 @@ beforeEach(() => {
   vi.mocked(getPortraitAutomation).mockResolvedValue(preference);
   vi.mocked(setPortraitAutomation).mockResolvedValue({ ...preference, enabled: true });
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("automatic portrait permission", () => {
+  it.each(["disabled", "unknown"] as const)("does not save after stale permission refresh becomes %s and disallows enablement", async (grantStatus) => {
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    const choice = await screen.findByRole("checkbox");
+    vi.mocked(getPortraitAutomation).mockResolvedValue({ ...preference, available: false,
+      state: { supported_protocols: ["v1"], generation_available: false, grant_status: grantStatus, grant_policy_version: null, allowed_actions: [] } });
+    clock.mockReturnValue(start + 60_001);
+    await userEvent.click(choice);
+    await waitFor(() => expect(screen.queryByRole("checkbox")).not.toBeInTheDocument());
+    expect(getPortraitAutomation).toHaveBeenCalledTimes(2);
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+    expect(screen.queryByText("Automatic artwork is on.")).not.toBeInTheDocument();
+    if (grantStatus === "unknown") expect(screen.getByRole("button", { name: "Check again" })).toBeEnabled();
+  });
+
+  it("withdraws the legacy grant after refreshing stale permission", async () => {
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    const legacy = { schema_version: "portrait-automation/v2" as const, legacy_enabled: true, available: false, chart_id: "chart-current", enabled: false, consent_policy_version: "2.0.0" as const };
+    vi.mocked(getPortraitAutomation).mockResolvedValue(legacy);
+    vi.mocked(setPortraitAutomation).mockResolvedValue({ ...legacy, legacy_enabled: false });
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    const stop = await screen.findByRole("button", { name: "Stop four-chapter automatic artwork" });
+    clock.mockReturnValue(start + 60_001);
+    await userEvent.click(stop);
+    expect(setPortraitAutomation).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, consent_policy_version: "1.1.0" }), expect.any(String), expect.any(AbortSignal));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Stop four-chapter automatic artwork" })).not.toBeInTheDocument());
+  });
+
+  it("requires a new choice when a stale legacy withdrawal refresh finds an adaptive grant", async () => {
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    const legacy = { schema_version: "portrait-automation/v2" as const, legacy_enabled: true, available: false, chart_id: "chart-current", enabled: false, consent_policy_version: "2.0.0" as const };
+    vi.mocked(getPortraitAutomation).mockResolvedValueOnce(legacy).mockResolvedValue({ ...legacy, legacy_enabled: false, enabled: true });
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    const stop = await screen.findByRole("button", { name: "Stop four-chapter automatic artwork" });
+    clock.mockReturnValue(start + 60_001);
+    await userEvent.click(stop);
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+    expect(await screen.findByRole("checkbox")).toBeChecked();
+  });
+
+  it("locks a stale permission refresh and aborts it when the chart changes", async () => {
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    let release!: (value: typeof preference) => void;
+    vi.mocked(getPortraitAutomation).mockResolvedValueOnce(preference).mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+    const unauthorized = vi.fn();
+    const changed = vi.fn();
+    const view = render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={unauthorized} onChanged={changed} />);
+    const choice = await screen.findByRole("checkbox");
+    clock.mockReturnValue(start + 60_001);
+    await userEvent.click(choice);
+    expect(choice).toBeDisabled();
+    const signal = vi.mocked(getPortraitAutomation).mock.calls[1][0];
+    vi.mocked(getPortraitAutomation).mockResolvedValue({ ...preference, chart_id: "chart-next" });
+    view.rerender(<PortraitAutomationControl chartId="chart-next" onUnauthorized={unauthorized} onChanged={changed} />);
+    await waitFor(() => expect(screen.getByRole("checkbox")).toBeEnabled());
+    expect(signal?.aborted).toBe(true);
+    await act(async () => release(preference));
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("shows unknown permission with a reload action when the grant store is unavailable", async () => {
+    vi.mocked(getPortraitAutomation).mockResolvedValue({ ...preference, available: false,
+      state: { supported_protocols: ["v1", "v2"], generation_available: false, grant_status: "unknown", grant_policy_version: null, allowed_actions: [] } });
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    await screen.findByText(/Automatic artwork permission could not be checked/);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(getPortraitAutomation).toHaveBeenCalledTimes(2);
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+  });
+
+  it("respects the allowed actions when generation is operational but enablement is not permitted", async () => {
+    vi.mocked(getPortraitAutomation).mockResolvedValue({ ...preference,
+      state: { supported_protocols: ["v1", "v2"], generation_available: true, grant_status: "disabled", grant_policy_version: null, allowed_actions: [] } });
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    const choice = await screen.findByRole("checkbox");
+    expect(choice).toBeDisabled();
+    await userEvent.click(choice);
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+  });
+
   it("requires a read-only status reload after an ambiguous save before another mutation", async () => {
     vi.mocked(setPortraitAutomation).mockRejectedValue(new Error("Network outcome unknown"));
     render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);

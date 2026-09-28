@@ -12,7 +12,7 @@
 # Usage:
 #   scripts/ci-local.sh              # lockfile checked with `npm ci --dry-run`
 #   scripts/ci-local.sh --clean      # full `npm ci`, exactly as Workers Builds does
-#   scripts/ci-local.sh --skip-ephe  # skip the ephemeris download (needs network)
+#   scripts/ci-local.sh --skip-ephe  # exploratory only; skips a required lane and exits nonzero
 #
 # Exit code is 0 only when every required step passed.
 
@@ -95,83 +95,81 @@ esac
 # Step runner. Runs everything rather than stopping at the first failure, so one
 # run tells you the whole story.
 # ---------------------------------------------------------------------------
-STEP_NAMES=()
-STEP_RESULTS=()
+SUMMARY_TOOL="scripts/pattern-release/ci-summary.mjs"
+LANE_CONFIG="$(node "$SUMMARY_TOOL" lanes)" || exit 2
+declare -A LANE_NAMES
+while IFS=$'\t' read -r id name; do
+  LANE_NAMES["$id"]="$name"
+done <<< "$LANE_CONFIG"
+STEP_RECORDS=()
 FAILED=0
 
 run_step() {
-  local name="$1"; shift
+  local name="${LANE_NAMES[$1]}"; shift
   bold ""
-  bold "──── ${name}"
+  bold "---- ${name}"
   "$@" 2>&1 | sed 's/^/  /'
   local rc=${PIPESTATUS[0]}
-  STEP_NAMES+=("$name")
   if [ "$rc" -eq 0 ]; then
-    STEP_RESULTS+=("pass"); green "  ✓ ${name}"
+    STEP_RECORDS+=($'pass\t'"$name"); green "  PASS ${name}"
   else
-    STEP_RESULTS+=("FAIL"); red "  ✗ ${name} (exit ${rc})"; FAILED=1
+    STEP_RECORDS+=($'FAIL\t'"$name"); red "  FAIL ${name} (exit ${rc})"; FAILED=1
   fi
 }
 
-bold "Local CI — mirrors .github/workflows/ci.yml"
+bold "Local CI - mirrors .github/workflows/ci.yml"
 echo "  node    $(node -v)   (.nvmrc ${WANT_NODE})"
 echo "  npm     $(npm -v)"
 echo "  python  ${HAVE_PY#Python }${PY_NOTE:+   [${PY_NOTE}]}"
 echo "  commit  $(git rev-parse --short HEAD)  $(git rev-parse --abbrev-ref HEAD)"
 
 # ---- job: contracts -------------------------------------------------------
-run_step "contracts: npm run test:contracts" npm run test:contracts
+run_step contracts npm run test:contracts
 
 # ---- job: monorepo --------------------------------------------------------
 if [ "$CLEAN_INSTALL" -eq 1 ]; then
-  run_step "monorepo: npm ci" npm ci
+  run_step install npm ci
 else
   # Workers Builds runs `npm clean-install`, which fails on a lockfile that
   # disagrees with package.json. This proves that would succeed without paying
   # for a full reinstall.
-  run_step "monorepo: npm ci --dry-run (lockfile agrees with package.json)" \
-    npm ci --dry-run
+  run_step install npm ci --dry-run
 fi
 
 if [ "$SKIP_EPHE" -eq 0 ]; then
-  run_step "monorepo: ephemeris download" \
-    npm run ephe:download -w @patternlike/calc-stub
+  run_step ephemeris npm run ephe:download -w @patternlike/calc-stub
 else
-  yellow "  … skipped ephemeris download (--skip-ephe)"
+  yellow "  SKIP ephemeris download (--skip-ephe); incomplete local gate"
+  STEP_RECORDS+=($'skip\t'"${LANE_NAMES[ephemeris]}")
+  FAILED=1
 fi
 
-run_step "monorepo: npm run typecheck" npm run typecheck
-run_step "monorepo: test @patternlike/shared"          npm run test -w @patternlike/shared
-run_step "monorepo: test @patternlike/reading-engine"  npm run test -w @patternlike/reading-engine
-run_step "monorepo: test @patternlike/calc-stub"       npm run test -w @patternlike/calc-stub
-run_step "monorepo: test @patternlike/ontology-signer" npm run test -w @patternlike/ontology-signer
-run_step "monorepo: test @patternlike/api"             npm run test -w @patternlike/api
-run_step "monorepo: test @patternlike/web"             npm run test -w @patternlike/web
-run_step "monorepo: npm run build" npm run build
+run_step typecheck npm run typecheck
+run_step shared npm run test -w @patternlike/shared
+run_step reading-engine npm run test -w @patternlike/reading-engine
+run_step calc-stub npm run test -w @patternlike/calc-stub
+run_step ontology-signer npm run test -w @patternlike/ontology-signer
+run_step api npm run test -w @patternlike/api
+run_step web npm run test -w @patternlike/web
+run_step build npm run build
 
 # ---- beyond ci.yml --------------------------------------------------------
 # ci.yml's monorepo job never listed these, so they shipped with no CI coverage.
 # Reported separately so the "same as CI" claim above stays exactly true.
 bold ""
-bold "══ Beyond ci.yml (workspaces the workflow never listed) ══"
-run_step "extra: test @patternlike/pattern-engine" npm run test -w @patternlike/pattern-engine
-run_step "extra: test @patternlike/codex-runner"   npm run test -w @patternlike/codex-runner
-run_step "extra: npm run test:content"             npm run test:content
+bold "== Beyond ci.yml (workspaces and maintenance checks) =="
+run_step pattern-engine npm run test -w @patternlike/pattern-engine
+run_step codex-runner npm run test -w @patternlike/codex-runner
+run_step content npm run test:content
+run_step source-map-tests npm run test:source-map
+run_step source-map-current npm run map:check:current
 
 # ---- summary --------------------------------------------------------------
 bold ""
-bold "════════════════════ SUMMARY ════════════════════"
+bold "==== SUMMARY ===="
 echo "commit  $(git rev-parse --short HEAD) on $(git rev-parse --abbrev-ref HEAD)"
-echo "node    $(node -v)   npm $(npm -v)   python ${HAVE_PY#Python }"
 [ -n "$PY_NOTE" ] && yellow "note    ${PY_NOTE}"
-echo
-for i in "${!STEP_NAMES[@]}"; do
-  printf '  %-6s %s\n' "${STEP_RESULTS[$i]}" "${STEP_NAMES[$i]}"
-done
-echo
-if [ "$FAILED" -eq 0 ]; then
-  green "ALL STEPS PASSED — safe to merge on local evidence."
-else
-  red "AT LEAST ONE STEP FAILED — do not merge."
-fi
+# Plain ASCII and one shared formatter keep the actual producer and receipt
+# consumer aligned. A missing, reordered, duplicated, or skipped lane fails.
+node "$SUMMARY_TOOL" format "$(node -v)" "$(npm -v)" "${HAVE_PY#Python }" "${STEP_RECORDS[@]}" || FAILED=1
 exit "$FAILED"

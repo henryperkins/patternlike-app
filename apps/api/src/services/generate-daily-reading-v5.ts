@@ -18,6 +18,7 @@ import {
   DAILY_SKY_POLICY_VERSION,
   LOCAL_DAY_RESOLUTION_POLICY_VERSION,
   M5_SCHEMA_VERSION,
+  DAILY_GENERATION_SCHEMA_VERSION,
   TRANSIT_ORB_POLICY_ID,
   TRANSIT_ORB_POLICY_VERSION,
   canonicalJson,
@@ -165,7 +166,7 @@ function parseChart(row: ChartRow): ChartSnapshot | null {
 
 function supportedCommand(command: GenerateDailyReadingCommandV2): boolean {
   return (
-    command.schema_version === M5_SCHEMA_VERSION &&
+    command.schema_version === DAILY_GENERATION_SCHEMA_VERSION &&
     command.output_schema === "daily-reading-v5" &&
     command.assembly_mode === "constrained_model" &&
     command.chart.contract_id === CALC_CONTRACT_ID &&
@@ -551,7 +552,7 @@ export async function generateDailyReadingV5(
   let prepared;
   try {
     prepared = prepareConstrainedReadingInput({
-      schema_version: M5_SCHEMA_VERSION,
+      schema_version: DAILY_GENERATION_SCHEMA_VERSION,
       prompt_version: command.publisher.prompt_version,
       output_schema: command.output_schema,
       selection_policy_version: command.publisher.selection_policy_version,

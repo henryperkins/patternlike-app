@@ -34,6 +34,7 @@ export interface PortraitInvocationOptions {
   /** Explicit local inspection hook; the production poller never retains originals. */
   onVerifiedImage?: (bytes: Buffer) => Promise<void>;
 }
+export type PortraitCompatibilityOptions = Pick<PortraitInvocationOptions, "codexBin" | "tempRoot" | "env" | "signal">;
 export class PortraitError extends Error {
   constructor(readonly code: CodexPortraitFailure["code"], readonly fatal = false) { super(code); }
 }
@@ -86,6 +87,39 @@ export async function requireCleanHostInstructions(home: string): Promise<void> 
   }
 }
 
+async function requirePortraitHost(binary: string, env: NodeJS.ProcessEnv, home: string): Promise<void> {
+  await requireCleanHostInstructions(home);
+  const version = await inspectCli(binary, ["--version"], env);
+  if (version !== `codex-cli ${PORTRAIT_CODEX_CLI_VERSION}`) throw new PortraitError("generation_failed", true);
+  const auth = await inspectCli(binary, ["login", "status"], env);
+  if (!/^Logged in using ChatGPT\s*$/.test(auth)) throw new PortraitError("authentication_failed", true);
+}
+
+/** Local readiness only: no claim, chapter text, thread or model turn is needed. */
+export async function checkPortraitCompatibility(options: PortraitCompatibilityOptions): Promise<boolean> {
+  const env = buildCodexChildEnvironment(options.env ?? process.env);
+  const home = env.CODEX_HOME ?? (env.HOME ? join(env.HOME, ".codex") : "");
+  if (!isAbsolute(home) || options.signal?.aborted) return false;
+  let directory: string | null = null;
+  let compatible = false;
+  try {
+    await requirePortraitHost(options.codexBin, env, home);
+    if (options.signal?.aborted) return false;
+    const parent = options.tempRoot ?? tmpdir();
+    await mkdir(parent, { recursive: true, mode: 0o700 });
+    directory = await mkdtemp(join(parent, "patternlike-portrait-preflight-"));
+    await chmod(directory, 0o700);
+    await writeFile(join(directory, "instructions.txt"), INSTRUCTIONS, { mode: 0o600 });
+    await appServer({ codexBin: options.codexBin, signal: options.signal }, directory, env, home, () => undefined);
+    compatible = !options.signal?.aborted;
+  } catch { compatible = false; }
+  if (directory) {
+    try { await rm(directory, { recursive: true, force: true }); }
+    catch { compatible = false; }
+  }
+  return compatible;
+}
+
 export function isolatedMcpConfiguration(value: unknown, instructionsFile: string, imageGeneration = true): Record<string, { enabled: false; required: false }> {
   if (!record(value) || value.model_provider !== "openai" || value.forced_login_method !== "chatgpt"
     || value.web_search !== "disabled" || !Array.isArray(value.notify) || value.notify.length !== 0
@@ -101,8 +135,9 @@ export function isolatedMcpConfiguration(value: unknown, instructionsFile: strin
   return Object.fromEntries(names.map((name) => [name, { enabled: false, required: false }]));
 }
 
-function appServer(options: PortraitInvocationOptions, cwd: string, env: NodeJS.ProcessEnv, home: string, ownThread: (id: string) => void): Promise<NativeResult> {
+function appServer(options: PortraitCompatibilityOptions & { claim?: CodexPortraitClaim }, cwd: string, env: NodeJS.ProcessEnv, home: string, ownThread: (id: string) => void): Promise<NativeResult | null> {
   return new Promise((resolveValue, reject) => {
+    const claim = options.claim;
     const instructionsFile = join(cwd, "instructions.txt");
     const args = ["app-server", "--stdio", "-c", 'model_provider="openai"', "-c", 'forced_login_method="chatgpt"',
       "-c", 'web_search="disabled"', "-c", "notify=[]", "-c", 'instructions=""', "-c", 'developer_instructions=""',
@@ -114,6 +149,7 @@ function appServer(options: PortraitInvocationOptions, cwd: string, env: NodeJS.
     let pending = ""; let bytes = 0; let threadId = ""; let turnId = "";
     let image: Record<string, any> | null = null; let metadata: { label: string; rationale: string } | null = null;
     let result: NativeResult | null = null; let error: PortraitError | null = null;
+    let configurationVerified = false;
     let stopping = false; let killTimer: NodeJS.Timeout | undefined;
     let mcpConfiguration: Record<string, { enabled: false; required: false }> | null = null;
     const send = (message: unknown) => child.stdin.write(`${JSON.stringify(message)}\n`);
@@ -123,7 +159,7 @@ function appServer(options: PortraitInvocationOptions, cwd: string, env: NodeJS.
       child.stdin.end(); child.kill("SIGTERM");
       killTimer = setTimeout(() => child.kill("SIGKILL"), 1_000); killTimer.unref();
     };
-    const timeout = setTimeout(() => stop(new PortraitError("generation_failed")), options.claim.timeout_ms); timeout.unref();
+    const timeout = setTimeout(() => stop(new PortraitError("generation_failed")), claim?.timeout_ms ?? 10_000); timeout.unref();
     const abort = () => stop(new PortraitError("generation_failed"));
     options.signal?.addEventListener("abort", abort, { once: true });
     if (options.signal?.aborted) abort();
@@ -150,25 +186,27 @@ function appServer(options: PortraitInvocationOptions, cwd: string, env: NodeJS.
         if (!mcpConfiguration || (requirements !== null && (!record(requirements)
           || requirements.additionalDeveloperInstructions || requirements.hooks
           || (requirements.chatgptBaseUrl && requirements.chatgptBaseUrl !== CHATGPT_BASE_URL)))) throw new PortraitError("generation_failed", true);
-        send({ id: 2, method: "thread/start", params: { model: options.claim.model, modelProvider: "openai", cwd,
+        if (!claim) { configurationVerified = true; stop(); return; }
+        send({ id: 2, method: "thread/start", params: { model: claim.model, modelProvider: "openai", cwd,
           approvalPolicy: "never", sandbox: "read-only", ephemeral: true, baseInstructions: INSTRUCTIONS, developerInstructions: "",
-          config: { model_reasoning_effort: options.claim.reasoning_effort, forced_login_method: "chatgpt", mcp_servers: mcpConfiguration } } });
+          config: { model_reasoning_effort: claim.reasoning_effort, forced_login_method: "chatgpt", mcp_servers: mcpConfiguration } } });
         return;
       }
       if (message.id === 2 && record(message.result)) {
+        if (!claim) throw new PortraitError("generation_failed");
         const response = message.result;
-        if (threadId || !THREAD.test(response.thread?.id ?? "") || response.model !== options.claim.model || response.modelProvider !== "openai"
+        if (threadId || !THREAD.test(response.thread?.id ?? "") || response.model !== claim.model || response.modelProvider !== "openai"
           || response.sandbox?.type !== "readOnly" || response.approvalPolicy !== "never") throw new PortraitError("generation_failed");
         threadId = response.thread.id; ownThread(threadId);
         send({ id: 6, method: "mcpServerStatus/list", params: { threadId, limit: 257, detail: "toolsAndAuthOnly" } });
         return;
       }
       if (message.id === 6 && record(message.result)) {
-        if (!threadId || message.result.nextCursor !== null || !Array.isArray(message.result.data)
+        if (!claim || !threadId || message.result.nextCursor !== null || !Array.isArray(message.result.data)
           || message.result.data.length > 256 || message.result.data.some((server: unknown) => !record(server)
             || server.runtimeStatus !== "disabled" || !record(server.tools) || Object.keys(server.tools).length !== 0)) throw new PortraitError("generation_failed", true);
-        send({ id: 3, method: "turn/start", params: { threadId, input: [{ type: "text", text: options.claim.prompt, text_elements: [] }],
-          model: options.claim.model, effort: options.claim.reasoning_effort, outputSchema: METADATA_SCHEMA } });
+        send({ id: 3, method: "turn/start", params: { threadId, input: [{ type: "text", text: claim.prompt, text_elements: [] }],
+          model: claim.model, effort: claim.reasoning_effort, outputSchema: METADATA_SCHEMA } });
         return;
       }
       if (message.id === 3 && record(message.result)) {
@@ -219,7 +257,7 @@ function appServer(options: PortraitInvocationOptions, cwd: string, env: NodeJS.
     });
     child.once("close", () => {
       clearTimeout(timeout); if (killTimer) clearTimeout(killTimer); options.signal?.removeEventListener("abort", abort);
-      if (error) reject(error); else if (result) resolveValue(result); else reject(new PortraitError("generation_failed"));
+      if (error) reject(error); else if (result || configurationVerified) resolveValue(result); else reject(new PortraitError("generation_failed"));
     });
     send({ id: 1, method: "initialize", params: { clientInfo: { name: "patternlike_portrait_runner", version: "0.2.0" }, capabilities: {} } });
   });
@@ -266,13 +304,10 @@ export async function runPortraitInvocation(options: PortraitInvocationOptions):
   let threadId = "";
   let outcome: PortraitInvocationOutcome;
   try {
-    await requireCleanHostInstructions(home);
+    await requirePortraitHost(options.codexBin, env, home);
     await writeFile(join(directory, "instructions.txt"), INSTRUCTIONS, { mode: 0o600 });
-    const version = await inspectCli(options.codexBin, ["--version"], env);
-    if (version !== `codex-cli ${PORTRAIT_CODEX_CLI_VERSION}`) throw new PortraitError("generation_failed", true);
-    const auth = await inspectCli(options.codexBin, ["login", "status"], env);
-    if (!/^Logged in using ChatGPT\s*$/.test(auth)) throw new PortraitError("authentication_failed", true);
     const native = await appServer(options, directory, env, home, (id) => { threadId = id; });
+    if (!native) throw new PortraitError("generation_failed");
     const bytes = decodePortraitBase64(native.image, MAX_IMAGE_BYTES);
     if (!bytes) throw new PortraitError("image_invalid");
     await verifiedNativeFile(native, home, bytes);

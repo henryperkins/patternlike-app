@@ -23,6 +23,7 @@ import {
   MAX_FEEDBACK_RECORDS,
   MAX_PRIOR_READINGS,
   SELECTION_POLICY_VERSION,
+  VALIDATION_POLICY_VERSION,
   type ConstrainedContextSignalInput,
   type ConstrainedContextSourceInput,
   type ConstrainedReadingInput,
@@ -39,7 +40,7 @@ import type { NormalizedCycle } from "./types.js";
 
 test("categorical feedback keeps exact private targets in frozen pins and aliases the provider projection", () => {
   const input = baseInput({
-    selection_policy_version: "1.4.0", prompt_version: "1.0.4",
+    selection_policy_version: "1.6.0", prompt_version: "1.1.1",
     context_sources: [source("USR-12", ["repetition_control"])],
     context_signals: [signal("rfe_private", "USR-12", ["repetition_control"], "2026-07-29T10:00:00Z", {
       category: "reading_feedback", content: { kind: "structured", value: {
@@ -56,7 +57,7 @@ test("categorical feedback keeps exact private targets in frozen pins and aliase
   assert.equal(packet.includes("rfe_private"), false);
   assert.match(packet, /target_ref/);
   assert.equal(JSON.stringify(prepared.selected_context).includes("rdg_private"), true);
-  const incumbent = prepareConstrainedReadingInput({ ...input, selection_policy_version: "1.3.0", prompt_version: "1.0.3" });
+  const incumbent = prepareConstrainedReadingInput({ ...input, selection_policy_version: "1.5.0", prompt_version: "1.1.0" });
   assert.deepEqual(prepared.selected_facts, incumbent.selected_facts);
   assert.notEqual(prepared.identity_canonical, incumbent.identity_canonical);
 });
@@ -249,11 +250,11 @@ function baseInput(
   overrides: Partial<ConstrainedReadingInput> = {},
 ): ConstrainedReadingInput {
   return {
-    schema_version: "0.5.0",
+    schema_version: "0.5.1",
     prompt_version: "1.0.0",
     output_schema: "daily-reading-v5",
     selection_policy_version: SELECTION_POLICY_VERSION,
-    validation_policy_version: "1.0.0",
+    validation_policy_version: VALIDATION_POLICY_VERSION,
     context_max_bytes: 98304,
     target_local_date: "2026-07-30",
     target_timezone: "America/Chicago",
@@ -1091,25 +1092,13 @@ test("the identity carries no raw context text and no source secret", () => {
 test("a changed selection policy version changes the identity", () => {
   const a = prepareConstrainedReadingInput(baseInput());
   const b = prepareConstrainedReadingInput(
-    baseInput({ selection_policy_version: "1.0.1" }),
+    baseInput({ selection_policy_version: "1.6.0" }),
   );
   assert.notEqual(a.identity_canonical, b.identity_canonical);
 });
 
 // ---------------------------------------------------------------------------
-// Unrepresentable mandatory disclosure
-//
-// `claim-support.ts` accepts exactly two disclosure shapes: the fixed
-// approximate-time sentence, and a suppression sentence naming a feature class
-// that is actually present in `suppressed_features`. calc-stub's
-// `buildUncertainty()` emits location qualifications (`birthplace`,
-// `birth_instant` / `technique_specific`) at EVERY accuracy, and a surviving
-// qualification forces the note. A chart that carries only qualifications
-// therefore demands a note no accepted sentence can express, and every
-// candidate is rejected `unsupported_uncertainty_disclosure` -- after the
-// provider has already been paid, and with `publisher_output_invalid`
-// automatically replacing the command until the generation cap is spent.
-// Refuse before the call instead.
+// Typed disclosure plan for every supported stored uncertainty reason.
 // ---------------------------------------------------------------------------
 
 type Uncertainty = ConstrainedReadingInput["chart"]["uncertainty"];
@@ -1117,14 +1106,14 @@ type Uncertainty = ConstrainedReadingInput["chart"]["uncertainty"];
 const LOCATION_QUALIFIED = [
   { feature_id: "birthplace", qualification: "technique_specific" },
   { feature_id: "birth_instant", qualification: "technique_specific" },
-] as unknown as Uncertainty["qualified_features"];
+] satisfies Uncertainty["qualified_features"];
 
 const UNKNOWN_TIME_SUPPRESSED = [
   { feature_class: "houses", feature_id: null, reason: "unknown_birth_time" },
   { feature_class: "angles", feature_id: null, reason: "unknown_birth_time" },
   { feature_class: "angle_transits", feature_id: null, reason: "unknown_birth_time" },
   { feature_class: "moon_time_sensitive", feature_id: null, reason: "unknown_birth_time" },
-] as unknown as Uncertainty["suppressed_features"];
+] satisfies Uncertainty["suppressed_features"];
 
 function chartWith(
   accuracy: ConstrainedReadingInput["chart"]["effective_accuracy"],
@@ -1145,26 +1134,27 @@ function chartWith(
   };
 }
 
-test("an exact chart whose only uncertainty is a location qualification fails closed before the provider call", () => {
-  assert.throws(
-    () =>
-      prepareConstrainedReadingInput(
-        baseInput(chartWith("exact", [] as unknown as Uncertainty["suppressed_features"], LOCATION_QUALIFIED)),
-      ),
-    (error: unknown) =>
-      error instanceof ConstrainedInputError &&
-      /uncertainty disclosure/i.test(error.message),
-  );
+test("an exact chart with stored location and civil-time qualifications remains eligible and exact", () => {
+  const prepared = prepareConstrainedReadingInput(baseInput(chartWith("exact", [], LOCATION_QUALIFIED)));
+  assert.equal(prepared.request.birth_time_accuracy, "exact");
+  assert.deepEqual(prepared.request.suppressed_features, []);
+  assert.equal(prepared.request.composition.uncertainty_note_required, true);
+  assert.deepEqual(prepared.request.uncertainty_disclosure.disclosures, [
+    { kind: "qualification", feature_id: "birth_instant", qualification: "technique_specific",
+      statement: "The time-zone mapping of your local birth time needs confirmation." },
+    { kind: "qualification", feature_id: "birthplace", qualification: "technique_specific",
+      statement: "Your birthplace needs confirmation." },
+  ]);
 });
 
 test("a representable mandatory disclosure still prepares", () => {
-  // Approximate time: the fixed approximate sentence is always available.
+  // Approximate time: all surviving qualifications are carried with the accuracy.
   assert.ok(
     prepareConstrainedReadingInput(
-      baseInput(chartWith("approximate", [] as unknown as Uncertainty["suppressed_features"], LOCATION_QUALIFIED)),
+      baseInput(chartWith("approximate", [], LOCATION_QUALIFIED)),
     ).request.composition.uncertainty_note_required,
   );
-  // Unknown time: a suppression sentence can name an actually suppressed class.
+  // Unknown time: every suppression and surviving qualification is carried.
   assert.ok(
     prepareConstrainedReadingInput(
       baseInput(chartWith("unknown", UNKNOWN_TIME_SUPPRESSED, LOCATION_QUALIFIED)),
@@ -1173,8 +1163,38 @@ test("a representable mandatory disclosure still prepares", () => {
   // No uncertainty at all: no note is required, so nothing has to be expressible.
   assert.equal(
     prepareConstrainedReadingInput(
-      baseInput(chartWith("exact", [] as unknown as Uncertainty["suppressed_features"], [] as unknown as Uncertainty["qualified_features"])),
+      baseInput(chartWith("exact", [], [])),
     ).request.composition.uncertainty_note_required,
     false,
   );
+});
+
+test("unsupported stored uncertainty reasons fail closed instead of being omitted", () => {
+  for (const qualified of [
+    [{ feature_id: "birthplace", qualification: "approximate_only" }],
+    [{ feature_id: "birth_instant", qualification: "historical_zone_guess" }],
+    [{ feature_id: "unknown_feature", qualification: "technique_specific" }],
+  ]) {
+    assert.throws(() => prepareConstrainedReadingInput(baseInput(chartWith(
+      "approximate", [], qualified as Uncertainty["qualified_features"],
+    ))), /unsupported.*uncertainty/i);
+  }
+  assert.throws(() => prepareConstrainedReadingInput(baseInput(chartWith("unknown", [{
+    feature_class: "houses", feature_id: null, reason: "unknown_reason",
+  }] as unknown as Uncertainty["suppressed_features"], []))), /unsupported.*uncertainty/i);
+});
+
+test("disclosure identities preserve all stored reasons and ignore only ordering", () => {
+  const first = prepareConstrainedReadingInput(baseInput(chartWith("exact", [], LOCATION_QUALIFIED)));
+  const reordered = prepareConstrainedReadingInput(baseInput(chartWith("exact", [], [...LOCATION_QUALIFIED].reverse())));
+  const fewerReasons = prepareConstrainedReadingInput(baseInput(chartWith("exact", [], LOCATION_QUALIFIED.slice(0, 1))));
+  assert.deepEqual(first.request, reordered.request);
+  assert.equal(first.identity_canonical, reordered.identity_canonical);
+  assert.notEqual(first.identity_canonical, fewerReasons.identity_canonical);
+  assert.deepEqual(JSON.parse(first.identity_canonical).uncertainty_disclosure, first.request.uncertainty_disclosure);
+});
+
+test("pre-disclosure compiler policies are refused instead of reinterpreted", () => {
+  assert.throws(() => prepareConstrainedReadingInput(baseInput({ selection_policy_version: "1.3.0" })), /unsupported.*policy/i);
+  assert.throws(() => prepareConstrainedReadingInput(baseInput({ validation_policy_version: "1.1.1" })), /unsupported.*policy/i);
 });

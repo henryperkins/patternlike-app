@@ -1,0 +1,13 @@
+{
+  "supported_protocols": [
+    "v1",
+    "v2"
+  ],
+  "generation_available": false,
+  "grant_status": "enabled",
+  "grant_policy_version": "2.0.0",
+  "allowed_actions": [
+    "enable",
+    "disable"
+  ]
+}

@@ -266,9 +266,9 @@ describe("reading provider owner admission", () => {
   it("keeps an incumbent frozen command executable after opting new commands into categorical feedback", async () => {
     const { jobId } = await reserveClaimed();
     const original = (await loadCurrentDailyOwner(enabledEnv(), jobId))!.command;
-    const current = enabledEnv({ CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1", OPENAI_READING_PROMPT_VERSION: "1.0.4" });
+    const current = enabledEnv({ CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1", OPENAI_READING_PROMPT_VERSION: "1.1.1" });
     expect(await readingProviderOwnerIsCurrent(current, providerJob({ ownerId: jobId }))).toBe(true);
-    expect(await readingProviderOwnerIsCurrent(current, providerJob({ ownerId: jobId, promptVersion: "1.0.4" }))).toBe(false);
+    expect(await readingProviderOwnerIsCurrent(current, providerJob({ ownerId: jobId, promptVersion: "1.1.1" }))).toBe(false);
     expect((await loadCurrentDailyOwner(current, jobId))!.command).toEqual(original);
   });
 

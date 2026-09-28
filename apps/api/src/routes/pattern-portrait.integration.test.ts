@@ -341,6 +341,14 @@ it("leaves every stored portrait and its objects alone when 0033 is not applied"
     await env.DB.batch(restore("pattern_portrait_jobs",jobs,["id","portrait_id","user_id","chapter_index","source_sha256","status","attempts","lease_hash","lease_expires_at","retry_at","failure_code","completion_hash","image_asset_id","sample_asset_id","created_at","updated_at","completed_at"]));
     await env.DB.batch(restore("pattern_portrait_assets",assets,["id","portrait_id","user_id","job_id","role","object_key","plaintext_sha256","byte_length","created_at","cleanup_at","deleted_at"]));
 
+    await env.DB.prepare("INSERT INTO portrait_automation_grants(id,user_id,chart_id,chart_fingerprint_hash,policy_version,enabled,created_at,updated_at) VALUES('legacy-grant',?,?,?,'1.1.0',1,?,?)")
+      .bind(USER_A, chartId, rows[0]!.chart_fingerprint_hash, document.generated_at, document.generated_at).run();
+    const permission = await user("/v1/pattern-portrait/automation");
+    expect(await permission.json()).toMatchObject({ enabled: true, available: false, state: { grant_status: "enabled", allowed_actions: ["disable"] } });
+    const stopped = await user("/v1/pattern-portrait/automation", { chart_id: chartId, enabled: false, consent_policy_version: "1.1.0", confirm: "DISABLE AUTOMATIC PORTRAITS" }, USER_A, { method: "PUT" });
+    expect(stopped.status).toBe(200);
+    expect(await stopped.json()).toMatchObject({ enabled: false, state: { grant_status: "disabled" } });
+
     await maintainPortraits(enabledEnv());
 
     const after=await env.DB.prepare("SELECT status FROM pattern_portraits WHERE id = ?").bind(portrait.portrait_id).first<{status:string}>();
@@ -364,6 +372,9 @@ it("keeps account deletion working before 0026 when portrait rollout is absent",
   await env.DB.batch([...triggers.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants','pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
   try {
     const disabled=Object.defineProperty(Object.create(env),"PATTERN_PORTRAIT_ENABLED",{value:undefined});
+    const permission = await user("/v1/pattern-portrait/automation");
+    expect(await permission.json()).toMatchObject({ available: false, state: { grant_status: "unknown", allowed_actions: [] } });
+    expect((await user("/v1/pattern-portrait/automation", { chart_id: chartId, enabled: false, consent_policy_version: "1.1.0", confirm: "DISABLE AUTOMATIC PORTRAITS" }, USER_A, { method: "PUT" })).status).toBe(503);
     const response=await app.fetch(new Request("https://api.test/v1/account",{method:"DELETE",headers:{"x-user-id":USER_A,"content-type":"application/json","idempotency-key":"portrait-premigration-delete"},body:JSON.stringify({confirm:"DELETE"})}),disabled);
     expect(response.status).toBe(202);const accepted=await response.json() as {job_id:string};
     expect(await processDeletionMessage(disabled,{kind:"privacy",job_id:accepted.job_id,job_type:"delete_account"})).toBe("ack");
@@ -437,6 +448,33 @@ const adaptiveRequest = () => ({ ...request(), consent_policy_version: "2.0.0", 
 const machinePath = "/codex-provider/v1/portraits";
 
 describe("adaptive artwork v2", () => {
+  it("separates disabled new reservations from retries of accepted v2 work", async () => {
+    expect((await adaptive("/v1/pattern-portrait-generations", adaptiveRequest())).status).toBe(202);
+    await env.DB.prepare("UPDATE pattern_portrait_jobs SET status='failed',failure_code='generation_refused' WHERE chapter_index=0").run();
+    await env.DB.prepare("UPDATE pattern_portraits SET status='failed'").run();
+    const response = await adaptive("/v1/pattern-portrait", undefined, "0");
+    expect(await response.json()).toMatchObject({ status: "failed", retryable: true,
+      capabilities: { generation_available: false, allowed_actions: ["retry"] } });
+    expect((await adaptive("/v1/pattern-portrait-generations", adaptiveRequest(), "0")).status).toBe(202);
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_jobs").first()).toEqual({ n: 4 });
+  });
+
+  it("offers no generation action when the required Pattern permission has expired", async () => {
+    await env.DB.prepare("UPDATE consents SET expires_at='2000-01-01T00:00:00.000Z' WHERE user_id=? AND kind='pattern_generation'").bind(USER_A).run();
+    const response = await adaptive("/v1/pattern-portrait");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ capabilities: { generation_available: true, allowed_actions: [] } });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_jobs").first()).toEqual({ n: 0 });
+  });
+
+  it.each([3, 4, 6])("does not offer an unsupported v2 reservation for %i chapters", async (count) => {
+    await replaceChapterCount(count);
+    const read = await adaptive("/v1/pattern-portrait", undefined, "0");
+    expect(read.status).toBe(200);
+    expect(await read.json()).toMatchObject({ status: "unavailable", capabilities: { supported_protocols: ["v1", "v2"], generation_available: false, allowed_actions: [] } });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_jobs").first()).toEqual({ n: 0 });
+  });
+
   it.each([3, 4, 5, 6])("creates and downloads all %i chapter images, retaining pending work when admission stops", async (count) => {
     await replaceChapterCount(count);
     const start = await adaptive("/v1/pattern-portrait-generations", adaptiveRequest());

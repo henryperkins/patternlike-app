@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/daily-uncertainty-v1/generation-command.schema.json",
+  "title": "GenerateDailyReading Command v2, Daily uncertainty successor 0.5.1",
+  "description": "Preserves encrypted command/retry semantics while widening the normalized Daily uncertainty input to the exact supported stored pairs. New prompt, selection and validation policy tuples bind the new input plan; frozen 0.5.0 commands are unsupported.",
+  "$defs": {
+    "chartPinV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "fingerprint",
+        "profile_version",
+        "contract_id",
+        "contract_version",
+        "container_digest",
+        "effective_accuracy",
+        "uncertainty"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "uncertainty": {
+          "$ref": "uncertainty.schema.json#/$defs/dailyUncertaintyInput"
+        }
+      }
+    },
+    "generateDailyReadingCommandV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_version",
+        "schema_version",
+        "generation_id",
+        "generation_input_id",
+        "input_manifest_hash",
+        "reading_id",
+        "reading_key",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "reservation_reason",
+        "command_generation",
+        "target_local_date",
+        "target_timezone",
+        "timezone_source",
+        "timezone_revision",
+        "day_start_at",
+        "day_end_at",
+        "anchor_at",
+        "anchor_resolution",
+        "tzdb_version",
+        "local_day_resolution_policy_version",
+        "generation_anchor",
+        "locale",
+        "locale_source",
+        "locale_updated_at",
+        "domain_preference",
+        "output_schema",
+        "assembly_mode",
+        "ai_consent",
+        "chart",
+        "cycle_scan",
+        "daily_sky",
+        "context",
+        "prior_readings",
+        "publisher"
+      ],
+      "properties": {
+        "command_version": {
+          "type": "string",
+          "const": "v2"
+        },
+        "schema_version": {
+          "const": "0.5.1"
+        },
+        "generation_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId",
+          "description": "Opaque handle for this generation attempt lineage. Never sent to the provider."
+        },
+        "generation_input_id": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/generationInputId",
+          "description": "Recomputed after the claim by running the same pure entry point over the reconstructed inputs. A mismatch is generation_input_id_mismatch, a terminal integrity defect \u2014 not a newer answer."
+        },
+        "input_manifest_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "reading_key": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/readingKeyV5"
+        },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/readingRevision"
+        },
+        "revision_reason": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/revisionReason"
+        },
+        "supersedes_reading_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ]
+        },
+        "reservation_reason": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/reservationReason"
+        },
+        "command_generation": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/commandGeneration"
+        },
+        "replaces_job_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ]
+        },
+        "command_replacement_reason": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/commandReplacementReasonV2"
+            }
+          ]
+        },
+        "target_local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate",
+          "description": "Explicit rather than derived: the scheduler reserves TOMORROW's edition before the local day begins, and re-deriving 'today' at execution would give a pre-generated command a different day than the one it was built for."
+        },
+        "target_timezone": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone",
+          "description": "users.timezone, the present-day scheduling zone. Never crosses the provider boundary."
+        },
+        "timezone_source": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/timezoneSource"
+        },
+        "timezone_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "day_start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "day_end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Half-open: the local day is [day_start_at, day_end_at), spanning 23, 24, or 25 hours."
+        },
+        "anchor_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Local noon. The stable factual anchor of the day, and the instant every anchor-sampled sky fact was computed at."
+        },
+        "anchor_resolution": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/anchorResolution"
+        },
+        "tzdb_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local_day_resolution_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/localDayResolutionPolicyVersion"
+        },
+        "generation_anchor": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "The freeze instant, written before the command's first attempt and never recomputed from a clock. Published as the reading's generated_at, so a retry reports the same instant. Distinct from anchor_at: a pre-generated edition is frozen BEFORE its local day starts."
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "locale_source": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/localeSource"
+        },
+        "locale_updated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "domain_preference": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ],
+          "description": "Preserved when a stored preference exists. The current product has no writer, so null is the honest value rather than an invented default."
+        },
+        "output_schema": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/outputSchemaName"
+        },
+        "assembly_mode": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/assemblyMode"
+        },
+        "ai_consent": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/aiConsentPin"
+        },
+        "chart": {
+          "$ref": "#/$defs/chartPinV5"
+        },
+        "cycle_scan": {
+          "$ref": "https://patternlike.app/contracts/m5/generation-command.schema.json#/$defs/cycleScanPinV2"
+        },
+        "daily_sky": {
+          "$ref": "https://patternlike.app/contracts/m5/generation-command.schema.json#/$defs/dailySkyPinV2"
+        },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m5/generation-command.schema.json#/$defs/contextPinV2"
+          }
+        },
+        "prior_readings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 7,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m5/generation-command.schema.json#/$defs/priorReadingPin"
+          }
+        },
+        "publisher": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/publisherConfigPin"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "command_generation": {
+                "const": 1
+              }
+            },
+            "required": [
+              "command_generation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "replaces_job_id": {
+                "type": "null"
+              },
+              "command_replacement_reason": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "replaces_job_id": {
+                "type": "string"
+              },
+              "command_replacement_reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revision_reason": {
+                "const": "initial"
+              }
+            },
+            "required": [
+              "revision_reason"
+            ]
+          },
+          "then": {
+            "properties": {
+              "revision": {
+                "const": 1
+              },
+              "supersedes_reading_id": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "revision": {
+                "minimum": 2
+              },
+              "supersedes_reading_id": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "description": "Generation is withheld while either preference is an unowned server default, so a frozen command can never carry one.",
+          "properties": {
+            "timezone_source": {
+              "not": {
+                "const": "default_unconfirmed"
+              }
+            },
+            "locale_source": {
+              "not": {
+                "const": "default_unconfirmed"
+              }
+            }
+          }
+        }
+      ],
+      "$comment": "Cross-field rules enforced in code and pinned by fixtures: reading_key's date and revision segments must match target_local_date and revision; chart.effective_accuracy must equal chart.uncertainty.accuracy; day_start_at < day_end_at with day_start_at <= anchor_at < day_end_at; ai_consent.categories must be in the frozen display order; and every context allowed_use must lie in the M5 subset."
+    }
+  },
+  "$ref": "#/$defs/generateDailyReadingCommandV2"
+}

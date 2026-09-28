@@ -13,8 +13,13 @@ Evidence status has a narrow meaning:
 | `recorded` | A dated prior report or operator declaration is retained with its source and scope; it was not freshly observed by this tool. |
 | `unverified` | The evidence is absent. No default value or partial observation closes the gap. |
 
-Use the Node major in `.nvmrc` and a real per-worktree `.venv`. Freeze the source
-after implementation, source-fingerprint generation, and focused verification.
+Use the Node major in `.nvmrc` and a real per-worktree `.venv`, including
+`openapi-spec-validator` and `pyyaml`. Missing required OpenAPI dependencies
+fail before contract-package validation; skipped validation cannot produce
+release evidence. Freeze the source after implementation, source-fingerprint
+generation, focused verification, and review of a new source-map capture.
+Set `docs/architecture/source-map/current.json` to the reviewed immutable
+snapshot and run `npm run map:check:current` before the complete gate.
 Then run from the repository root, choosing a new evidence filename:
 
 ```bash
@@ -25,11 +30,18 @@ node scripts/pattern-release/release-evidence.mjs verify \
 ```
 
 `gate` executes exactly `npm run ci:local`, streams its output, and records its
-actual exit code. It requires the final success text and all 14 distinct lanes
-in the expected order, including the ephemeris and three extra lanes. An
+actual exit code. Its producer and parser share the ASCII summary formatter
+and ordered lane definitions in `scripts/pattern-release/ci-summary.mjs`.
+It requires one complete terminal `PATTERNLIKE_CI_SUMMARY_V1_BEGIN` through
+`PATTERNLIKE_CI_SUMMARY_V1_END` block, the exact
+`PATTERNLIKE_CI_SUMMARY_V1_PASSED` token, and all 16 distinct lanes in the
+expected order, including the ephemeris and five extra lanes. The extra lanes
+include `test:source-map` and `map:check:current`. An
 incomplete summary, failed lane, nonzero exit, changed source, missing build
 artifact set, or missing identity source fails the evidence result. It never
-passes by counting arbitrary `pass` strings in test output. Capture the streamed
+passes by counting arbitrary `pass` strings in test output. Duplicate, reordered,
+unknown, malformed, and skipped summary entries also fail. `--skip-ephe` records
+`skip` and exits nonzero; it is exploratory, not release evidence. Capture the streamed
 log in an operator scratch directory if needed; the JSON keeps only its SHA-256,
 the known lane results, and the toolchain versions, never raw test output.
 Paste the actual summary into a PR before any later authorized merge.
@@ -229,5 +241,5 @@ runtime dependencies, or independently establish live lifecycle outcomes.
 The focused `release-reconciliation.test.mjs` fixtures construct a synthetic
 repository and execute its small fake gate child to exercise the receipt
 boundary. Its complete sample is explicitly synthetic test data; it is not a
-repository release record or account observation. The real 14-lane gate remains
+repository release record or account observation. The real 16-lane gate remains
 the responsibility of the final frozen source run.

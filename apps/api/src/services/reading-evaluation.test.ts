@@ -52,8 +52,8 @@ describe("the evaluation corpus", () => {
       validation_policy_version: VALIDATION_POLICY_VERSION,
       evaluation_policy_version: EVALUATION_POLICY_VERSION,
     });
-    expect(corpus.corpus_version).toBe("1.2.0");
-    expect(corpus.base.prompt_version).toBe("1.0.3");
+    expect(corpus.corpus_version).toBe("1.3.0");
+    expect(corpus.base.prompt_version).toBe("1.1.0");
   });
 
   it("covers every profile shape the design names", () => {
@@ -104,7 +104,7 @@ describe("the evaluation corpus", () => {
     }
     for (const profile of Object.keys(corpus.profiles)) {
       expect(corpus.cases.some((entry) => entry.profile === profile
-        && entry.id.endsWith(".accept.relational") && entry.expect === "accept"), profile).toBe(true);
+        && (entry.id.endsWith(".accept.relational") || entry.id.endsWith(".accept.disclosure")) && entry.expect === "accept"), profile).toBe(true);
     }
   });
 

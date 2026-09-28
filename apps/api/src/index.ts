@@ -42,9 +42,11 @@ import { placeRoutes } from "./routes/places.js";
 import { cryptoOperatorAuth } from "./middleware/crypto-operator-auth.js";
 import { internalCryptoRoutes } from "./routes/internal-crypto.js";
 import { feedbackEventRoutes } from "./routes/feedback-events.js";
+import { privateResponsePolicy } from "./middleware/private-response.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
+app.use("*", privateResponsePolicy);
 app.route("/", healthRoutes);
 
 // Session exchange is unauthenticated by necessity — it is what mints the
@@ -67,13 +69,6 @@ app.route("/", deletionStatusRoutes);
 // Authenticated product API. configGuard runs first so no surface serves on a
 // development-shaped configuration in a non-development environment.
 const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
-// Relationship coordinates and unavailable results are private even when a
-// request is refused before its read handler (configuration/account/consent).
-api.use("*", async (c, next) => {
-  if (/^\/v1\/readings\/[^/]+\/(?:relationship-source|relationships|relationship-target|feedback-options|feedback-events)$/.test(c.req.path)
-    || /^\/v1\/timing\/cycles\/[^/]+$/.test(c.req.path)) c.header("Cache-Control", "private, no-store");
-  await next();
-});
 api.use("*", configGuard);
 api.use("*", authenticate);
 api.use("*", accountStateGate);
@@ -109,7 +104,6 @@ internal.route("/", internalOntologyPipelineRoutes);
 internal.route("/", internalPatternReplayRoutes);
 
 const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
-admin.use("*", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
 admin.use("*", configGuard);
 admin.use("*", adminAuth);
 admin.route("/", adminRuntimeHealthRoutes);

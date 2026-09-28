@@ -17,11 +17,19 @@ export function portraitChapterCount(response: PatternPortraitResponse): number 
   return response.schema_version === PORTRAIT_V2_SCHEMA_VERSION ? response.chapter_count : 4;
 }
 export function validateResponse(response: PatternPortraitResponse, chartId: string, document: PatternResponseV7): void {
-  if (!response || !closed(response, response.schema_version === PORTRAIT_V2_SCHEMA_VERSION ? [...responseKeys, "chapter_count"] : responseKeys)
+  if (!response || !closed(response, response.schema_version === PORTRAIT_V2_SCHEMA_VERSION ? [...responseKeys, "chapter_count"] : responseKeys, ["capabilities"])
     || ![PORTRAIT_SCHEMA_VERSION, PORTRAIT_V2_SCHEMA_VERSION].includes(response.schema_version)
     || !["unavailable", "not_started", "generating", "failed", "ready"].includes(response.status)
     || !Array.isArray(response.chapters) || !Number.isInteger(response.completed_chapters)
     || response.completed_chapters < 0 || typeof response.retryable !== "boolean") throw new Error("This constellation format is not supported.");
+  const capabilities = response.capabilities;
+  if (capabilities && (!closed(capabilities, ["supported_protocols", "generation_available", "allowed_actions"])
+    || !Array.isArray(capabilities.supported_protocols) || capabilities.supported_protocols.some(protocol => !["v1", "v2"].includes(protocol))
+    || typeof capabilities.generation_available !== "boolean" || !Array.isArray(capabilities.allowed_actions)
+    || capabilities.allowed_actions.some(action => !["create", "retry"].includes(action))
+    || (!capabilities.generation_available && capabilities.allowed_actions.includes("create"))
+    || (capabilities.allowed_actions.includes("create") && response.status !== "not_started")
+    || (capabilities.allowed_actions.includes("retry") && (response.status !== "failed" || !response.retryable)))) throw new Error("This constellation format is not supported.");
   const count = portraitChapterCount(response);
   if (response.schema_version === PORTRAIT_V2_SCHEMA_VERSION && count === null) {
     if (response.status !== "unavailable" || response.document_revision !== null || response.completed_chapters !== 0
@@ -142,4 +150,3 @@ export async function verifyImage(blob: Blob, expectedHash: string, signal: Abor
   if (hash !== expectedHash.toLowerCase()) throw new Error("A chapter image did not match its saved reference.");
   return blob;
 }
-

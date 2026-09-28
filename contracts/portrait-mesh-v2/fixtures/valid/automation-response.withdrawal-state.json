@@ -1,0 +1,20 @@
+{
+  "schema_version": "portrait-automation/v2",
+  "available": false,
+  "chart_id": "chart-fictional",
+  "enabled": true,
+  "legacy_enabled": false,
+  "consent_policy_version": "2.0.0",
+  "state": {
+    "supported_protocols": [
+      "v1",
+      "v2"
+    ],
+    "generation_available": false,
+    "grant_status": "enabled",
+    "grant_policy_version": "2.0.0",
+    "allowed_actions": [
+      "disable"
+    ]
+  }
+}

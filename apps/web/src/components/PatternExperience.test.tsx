@@ -110,7 +110,7 @@ describe("PatternExperience", () => {
     expect(screen.queryByRole("heading", { name: "A standing emphasis" })).not.toBeInTheDocument();
     await act(async () => held.release());
   });
-  it("expires a generation control without waiting for another render or status request", async () => {
+  it("keeps generation available as its observation ages while artwork permission needs a separate retry", async () => {
     vi.useFakeTimers();
     try {
       mockApiResponses({ [STATE]: { status: 200, body: stateDoc({ state: "available", consent: { ...consent, status: "granted" } }) } });
@@ -120,7 +120,8 @@ describe("PatternExperience", () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(60_001); });
       expect(screen.getByRole("button", { name: "Generate my Pattern" })).toBeEnabled();
       expect(screen.queryByText(/needs to be checked again/i)).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(screen.getByText(/Automatic artwork permission could not be checked/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Check again" })).toBeEnabled();
       expect(capturedFor(GENERATIONS)).toHaveLength(0);
       unmount();
     } finally { vi.useRealTimers(); }

@@ -189,6 +189,91 @@ async function preference(enabled = true) {
   });
 }
 describe("explicit portrait automation", () => {
+  it("reports unknown permission for missing grant columns without a successful withdrawal", async () => {
+    await preference();
+    await env.DB.prepare("ALTER TABLE portrait_automation_grants RENAME COLUMN policy_version TO missing_policy_version").run();
+    try {
+      const read = await adaptiveUser("/v1/pattern-portrait/automation");
+      expect(await read.json()).toMatchObject({ available: false, state: { grant_status: "unknown", allowed_actions: [] } });
+      expect((await preference(false)).status).toBe(503);
+      expect(await env.DB.prepare("SELECT enabled FROM portrait_automation_grants").first()).toEqual({ enabled: 1 });
+    } finally {
+      await env.DB.prepare("ALTER TABLE portrait_automation_grants RENAME COLUMN missing_policy_version TO policy_version").run();
+    }
+  });
+
+  it("withholds withdrawal when its cancellation trigger is missing", async () => {
+    await preference();
+    const trigger = await env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='portrait_automation_withdraw'").first<{ sql: string }>();
+    await env.DB.prepare("DROP TRIGGER portrait_automation_withdraw").run();
+    try {
+      expect(await adaptiveUser("/v1/pattern-portrait/automation").then(response => response.json())).toMatchObject({ state: { grant_status: "enabled", generation_available: false, allowed_actions: [] } });
+      expect((await preference(false)).status).toBe(503);
+      expect(await env.DB.prepare("SELECT enabled FROM portrait_automation_grants").first()).toEqual({ enabled: 1 });
+    } finally { await env.DB.prepare(trigger!.sql).run(); }
+  });
+
+  it("fences withdrawal when the account becomes unwritable after its ownership read", async () => {
+    await preference();
+    await maintainPortraitMeshes(enabledEnv());
+    const database = new Proxy(env.DB, { get(target, property) {
+      if (property === "batch") return async (statements: D1PreparedStatement[]) => {
+        await target.prepare("UPDATE users SET crypto_write_fence='rotation-in-progress' WHERE id=?").bind(USER_A).run();
+        return target.batch(statements);
+      };
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    try {
+      const stopped = await app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+        method: "PUT", headers: { "x-user-id": USER_A, "content-type": "application/json" }, body: JSON.stringify(automation(false)),
+      }), Object.defineProperty(enabledEnv(), "DB", { value: database }));
+      expect(stopped.status).toBe(409);
+      expect(await env.DB.prepare("SELECT enabled FROM portrait_automation_grants").first()).toEqual({ enabled: 1 });
+      expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_jobs WHERE status='pending'").first()).toEqual({ n: 4 });
+    } finally { await env.DB.prepare("UPDATE users SET crypto_write_fence=NULL WHERE id=?").bind(USER_A).run(); }
+  });
+
+  it.each(["PATTERN_PORTRAIT_ENABLED", "PATTERN_PORTRAIT_MESH_ENABLED", "PATTERN_ADAPTIVE_PORTRAITS_ENABLED"])("keeps the actual grant visible and revocable with %s disabled", async (flag) => {
+    const policy = "2.0.0";
+    expect((await user("/v1/pattern-portrait/automation", { ...automation(), consent_policy_version: policy }, USER_A, { method: "PUT", headers: adaptiveHeaders })).status).toBe(200);
+    await maintainPortraitMeshes(enabledEnv());
+    const bindings = Object.defineProperty(enabledEnv(), flag, { value: "0" });
+    const send = async (body?: unknown) => app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+      method: body ? "PUT" : "GET", body: body ? JSON.stringify(body) : undefined,
+      headers: { "x-user-id": USER_A, "content-type": "application/json", ...adaptiveHeaders },
+    }), bindings);
+    expect(await send().then(response => response.json())).toMatchObject({ available: false, enabled: true, chart_id: chartId,
+      state: { supported_protocols: ["v1", "v2"], generation_available: false, grant_status: "enabled", grant_policy_version: policy, allowed_actions: ["disable"] } });
+    const stopped = await send({ ...automation(false), consent_policy_version: policy });
+    expect(stopped.status).toBe(200);
+    expect(await stopped.json()).toMatchObject({ enabled: false, state: { grant_status: "disabled", allowed_actions: [] } });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM pattern_portrait_jobs WHERE status='cancelled'").first()).toEqual({ n: 4 });
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM portrait_automation_grants WHERE enabled=1").first()).toEqual({ n: 0 });
+  });
+
+  it("reports unknown grant state when storage cannot be read and never confirms withdrawal", async () => {
+    await preference();
+    const database = new Proxy(env.DB, { get(target, property) {
+      if (property === "prepare") return (query: string) => {
+        if (query.includes("portrait_automation_grants")) throw new Error("D1 unavailable");
+        return target.prepare(query);
+      };
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    const bindings = Object.defineProperty(enabledEnv(), "DB", { value: database });
+    const send = async (body?: unknown) => app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+      method: body ? "PUT" : "GET", body: body ? JSON.stringify(body) : undefined,
+      headers: { "x-user-id": USER_A, "content-type": "application/json", ...adaptiveHeaders },
+    }), bindings);
+    const read = await send();
+    expect(read.status).toBe(200);
+    expect(await read.json()).toMatchObject({ available: false, state: { generation_available: false, grant_status: "unknown", grant_policy_version: null, allowed_actions: [] } });
+    expect((await send(automation(false))).status).toBe(503);
+    expect(await env.DB.prepare("SELECT enabled FROM portrait_automation_grants").first()).toEqual({ enabled: 1 });
+  });
+
   it("defaults off without expanding written Pattern consent, then queues one durable start", async () => {
     const before = await user("/v1/pattern-portrait/automation");
     expect(before.status).toBe(200);
@@ -1093,7 +1178,12 @@ it("preserves accepted partial images and models across automation withdrawal an
   const imageCapture = await env.DB.prepare("SELECT completed_at FROM pattern_portrait_jobs WHERE portrait_id=? AND status='complete'").bind(portrait.portrait_id).first<{completed_at:string}>();
   expect(capture?.completed_at).toMatch(/Z$/);
   expect(imageCapture?.completed_at).toMatch(/Z$/);
-  await preference(false);
+  const stopped = await app.fetch(new Request("https://api.test/v1/pattern-portrait/automation", {
+    method: "PUT", headers: { "x-user-id": USER_A, "content-type": "application/json" }, body: JSON.stringify(automation(false)),
+  }), Object.defineProperties(enabledEnv(), {
+    PATTERN_PORTRAIT_ENABLED: { value: "0" }, PATTERN_PORTRAIT_MESH_ENABLED: { value: "0" }, ARTIFACTS: { value: undefined },
+  }));
+  expect(stopped.status).toBe(200);
   expect(
     await env.DB.prepare(
       "SELECT COUNT(*) n FROM pattern_portrait_assets WHERE portrait_id=? AND cleanup_at IS NOT NULL",

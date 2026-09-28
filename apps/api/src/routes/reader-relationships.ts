@@ -13,7 +13,6 @@ const SOURCE_KEYS = ["revision", "paragraph_id"];
 const RELATIONSHIP_KEYS = [...SOURCE_KEYS, "content_hash"];
 
 function query(c: ReaderContext, keys: string[]): Record<string, string> | null {
-  c.header("Cache-Control", "private, no-store");
   const entries = new URL(c.req.url).searchParams;
   if (keys.some((key) => entries.getAll(key).length !== 1)
     || [...entries.keys()].some((key) => !keys.includes(key))) return null;

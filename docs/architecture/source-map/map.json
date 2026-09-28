@@ -141,13 +141,13 @@
             },
             {
               "id": "leaf-passage-connections-4",
-              "text": "Four GET routes on the product API serve connections: relationship-source, relationships, and relationship-target under /v1/readings/:id, and /v1/timing/cycles/:id. A middleware sets private, no-store for these paths before configGuard runs. Timing destinations reach the web through relationship-target; nothing in apps/web calls /v1/timing/cycles/:id. A Daily destination opens only if saved.",
+              "text": "Four GET routes on the product API serve connections: relationship-source, relationships, and relationship-target under /v1/readings/:id, and /v1/timing/cycles/:id. These paths inherit the shared private, no-store policy before configuration and authority checks. Timing destinations reach the web through relationship-target; nothing in apps/web calls /v1/timing/cycles/:id. A Daily destination opens only if saved.",
               "evidence_ids": [
                 "evidence-b1-relationship-source-route",
                 "evidence-b1-relationships-route",
                 "evidence-b1-relationship-target-route",
                 "evidence-b1-timing-cycle-route",
-                "evidence-b1-relationship-no-store",
+                "evidence-b7-private-response-policy",
                 "evidence-b1-timing-target-via-relationship",
                 "evidence-b1-relationship-saved-target"
               ]
@@ -276,7 +276,7 @@
             },
             {
               "id": "leaf-readiness-and-consequences-2",
-              "text": "ReaderConsequences states what an action retains, erases, or stops for six actions: birth correction, Pattern deletion, withdrawing calculation, Daily, or Pattern permission, and turning off automatic artwork. It shows that text only for a known observation at most 60 seconds old; otherwise it says consequences could not be checked and asks for a reload.",
+              "text": "ReaderConsequences states what an action retains, erases, or stops for six actions: birth correction, Pattern deletion, withdrawing calculation, Daily, or Pattern permission, and turning off automatic artwork. By default it requires a known observation at most 60 seconds old; otherwise it asks for a reload. Pattern deletion retains its last known consequences while submission rechecks the current Pattern status.",
               "evidence_ids": [
                 "evidence-b1-consequence-actions",
                 "evidence-b1-consequence-freshness",
@@ -286,7 +286,7 @@
             },
             {
               "id": "leaf-readiness-and-consequences-3",
-              "text": "Birth correction shows that statement beside Privacy's Correct button and on the correction form's review step, keeps submit disabled until the chart observation is fresh, and rechecks freshness after saving calculation permission. Pattern deletion shows it in the typed confirmation and disables Confirm deletion until the Pattern observation is fresh.",
+              "text": "Birth correction shows that statement beside Privacy's Correct button and on the correction form's review step, keeps submit disabled until the chart observation is fresh, and rechecks freshness after saving calculation permission. Pattern deletion retains the statement in its typed confirmation and re-reads Pattern state before sending deletion; changed intent requires another review.",
               "evidence_ids": [
                 "evidence-b1-privacy-correct-consequences",
                 "evidence-b1-onboarding-consequences",
@@ -398,16 +398,15 @@
             },
             {
               "id": "leaf-time-zones-and-uncertainty-4",
-              "text": "Constrained Daily reads the chart's stored uncertainty and needs a note whenever a feature is suppressed or qualified, but accepts one only for approximate time or a suppression; otherwise it fails before any provider call, and command building returns context_ineligible. An exact-time chart with coordinates and nothing suppressed thus gets no constrained Daily reading if anything is qualified, as every pre-1970 chart the current engine calculated is. The code calls this a stop-gap, not a repair.",
+              "text": "Constrained Daily normalizes the chart's stored uncertainty into a typed disclosure plan shared by its packet and candidate validator. Exact time stays exact when the stored birth_instant or birthplace qualification needs confirmation; the stored report does not retain the specific time-zone diagnostic, so the plan does not invent one. Approximate and unknown times and each supported suppression have distinct statements. Unsupported reasons or policies fail before a provider call; omitted, invented, or duplicate statements fail validation.",
               "evidence_ids": [
+                "evidence-b2-daily-stored-uncertainty",
                 "evidence-b2-note-required",
                 "evidence-b2-disclosure-representable",
-                "evidence-b2-note-unrepresentable-refusal",
-                "evidence-b2-context-ineligible",
-                "evidence-b2-disclosure-stop-gap",
-                "evidence-b2-timezone-civil-qualifiers",
-                "evidence-b2-engine-birth-instant-qualification",
-                "evidence-b2-daily-stored-uncertainty"
+                "evidence-b2-uncertainty-input-validation",
+                "evidence-b2-disclosure-plan",
+                "evidence-b2-disclosure-validation",
+                "evidence-b2-context-ineligible"
               ]
             }
           ]
@@ -616,7 +615,7 @@
             },
             {
               "id": "leaf-compile-permitted-context-3",
-              "text": "Categorical feedback events compile only when the command is built under the categorical selection version, which the publisher configuration chooses only when CATEGORIZED_FEEDBACK_EFFECTS_ENABLED is 1; committed wrangler.toml does not set the flag and pins the non-categorical prompt 1.0.3. Only repetitive events can compile, as repetition_control: unclear is dropped, and not_relevant_today needs theme ids the writer never stores.",
+              "text": "Categorical feedback events compile only when the command is built under the categorical selection version, which the publisher configuration chooses only when CATEGORIZED_FEEDBACK_EFFECTS_ENABLED is 1; committed wrangler.toml does not set the flag and pins the non-categorical prompt 1.1.0. Only repetitive events can compile, as repetition_control: unclear is dropped, and not_relevant_today needs theme ids the writer never stores.",
               "evidence_ids": [
                 "evidence-b3-categorical-compile-gate",
                 "evidence-b3-command-feedback-selection",
@@ -631,10 +630,10 @@
             },
             {
               "id": "leaf-compile-permitted-context-4",
-              "text": "prepareConstrainedReadingInput orders facts within each lane by DER-02 score. A cycle's exactness is temporal: 1 at an exact pass and 0 at orb entry or exit, measured against its envelope and neighbouring passes. The default selection policy is 1.3.0 and V1 assembly identity profile v2 binds the same envelope and pass times; a Codex-pinned V2 command with an older selection version, or a V1 command naming an older identity profile, fails policy_unsupported.",
+              "text": "prepareConstrainedReadingInput orders facts within each lane by DER-02 score. A cycle's exactness is temporal: 1 at an exact pass and 0 at orb entry or exit, measured against its envelope and neighbouring passes. The default selection policy is 1.5.0 and V1 assembly identity profile v2 binds the same envelope and pass times; a Codex-pinned V2 command with an older selection version, or a V1 command naming an older identity profile, fails policy_unsupported.",
               "evidence_ids": [
                 "evidence-b3-lane-then-score",
-                "evidence-b3-selection-policy-1-3-0",
+                "evidence-b3-selection-policy-1-5-0",
                 "evidence-b3-temporal-exactness",
                 "evidence-b3-assembly-identity-v2",
                 "evidence-b3-assembly-identity-envelope",
@@ -653,7 +652,7 @@
           "leaves": [
             {
               "id": "leaf-generate-and-validate-1",
-              "text": "The executor sends the frozen packet to Codex as a provider job and schema-checks the candidate. validateReadingCandidate rejects it whole on any failed check, including unknown references, context outside its lane, astrology claims its cited facts do not support, a missing or unrequested uncertainty note, context used as evidence, and safety, markup, or leakage matches. An inexpressible required note is refused before the call (see Calculation authority).",
+              "text": "The executor sends the frozen packet to Codex as a provider job and schema-checks the candidate. validateReadingCandidate rejects it whole on any failed check, including unknown references, context outside its lane, astrology claims its cited facts do not support, missing, invented, repeated, or unrequested uncertainty disclosures, context used as evidence, and safety, markup, or leakage matches. Schema 0.5.1 command preparation requires the current selection and validation versions; unsupported policy tuples or stored uncertainty reasons fail before the call.",
               "evidence_ids": [
                 "evidence-b3-codex-publish",
                 "evidence-apps-api-services-generate-daily-reading-v5-ts",
@@ -898,7 +897,7 @@
             },
             {
               "id": "leaf-read-regenerate-and-erase-3",
-              "text": "For an accepted Pattern on the active chart, Pattern state marks regeneration eligible when its source hash differs from the current one, generation is enabled, consent is granted, the ontology serves readers, and no replacement is in flight. A confirmed source_update request reserves that replacement on the accepted claim; the reader shows its progress and offers regeneration only when eligible.",
+              "text": "For an accepted Pattern on the active chart, Pattern state marks regeneration eligible when its source hash differs from the current one, generation is enabled, consent is granted, the ontology serves readers in their exact confirmed locale, and no replacement is in flight. A confirmed source_update request reserves that replacement on the accepted claim; the reader shows its progress and rechecks eligibility and the current document before requesting regeneration.",
               "evidence_ids": [
                 "evidence-b4-state-regeneration-eligibility",
                 "evidence-b4-state-regeneration-in-flight",
@@ -928,7 +927,7 @@
             },
             {
               "id": "leaf-offline-ontology-supply-2",
-              "text": "Against the committed 60-fragment corpus, default version pattern-ontology-en-us-internal-0.1.2 maps 35 fragments to 36 records. Concentration (6.2) matches only stellium; the sign sections, section 8, 6.3 to 6.5, and 7.3 to 7.4 get no record; section 7.1 adds an exact-time methodology record; explicit source counter-expressions are kept verbatim.",
+              "text": "Against the committed 60-fragment corpus, default version pattern-ontology-en-us-internal-0.1.3 maps 35 fragments to 36 records. Concentration (6.2) matches only stellium; the sign sections, section 8, 6.3 to 6.5, and 7.3 to 7.4 get no record; section 7.1 adds an exact-time methodology record; explicit source counter-expressions are kept verbatim.",
               "evidence_ids": [
                 "evidence-b4-builder-version",
                 "evidence-b4-builder-yield",
@@ -939,7 +938,7 @@
             },
             {
               "id": "leaf-offline-ontology-supply-3",
-              "text": "The builder exits unless the candidate compiles, then writes evaluator_passed true, unevaluated_fixture_count 0, and regression_passed false as constants; no evaluator or regression rehearsal runs. These fields and its sentence matching are not independent evaluation, editorial adjudication, or completed human review.",
+              "text": "The builder structurally compiles its candidate without claiming evaluation or regression success. It emits compiler_passed true only after compilation, evaluator_passed false, regression_passed false, and verdict reject under the existing schema. No fixtures are supplied to this compiler, so the zero fixture count is not evaluation coverage. Release admission still rejects the candidate; no evaluation report, completed review, or activation is created.",
               "evidence_ids": [
                 "evidence-b4-builder-compile-gate",
                 "evidence-b4-builder-evaluation-fields",
@@ -1102,7 +1101,7 @@
           "leaves": [
             {
               "id": "leaf-images-derived-from-chapters-1",
-              "text": "Under the adaptive v2 protocol, which the web client requests, a published Pattern of three to six chapters can have a portrait; the v1 protocol still admits exactly four chapters. New v2 reservations return 503 adaptive_portrait_unavailable unless PATTERN_ADAPTIVE_PORTRAITS_ENABLED is exactly 1, and both committed wrangler blocks set it to 0.",
+              "text": "Adaptive portrait v2 supports published Patterns with three to six chapters; v1 admits exactly four. Both committed adaptive switches remain 0, so new v2 reservations are unavailable. Portrait state separates supported protocols, new-generation availability, and permitted create or retry actions; the image control offers only permitted actions. Accepted reservations retain their protocol and may retry under their existing consent and retry rules even after adaptive admission stops.",
               "evidence_ids": [
                 "evidence-b5-portrait-chapter-count-gate",
                 "evidence-b5-portrait-chapter-count-range",
@@ -1111,7 +1110,9 @@
                 "evidence-b5-adaptive-admission-503",
                 "evidence-b5-adaptive-switch-exact",
                 "evidence-b5-wrangler-adaptive-default",
-                "evidence-b5-wrangler-adaptive-production"
+                "evidence-b5-wrangler-adaptive-production",
+                "evidence-b5-portrait-capabilities",
+                "evidence-b5-portrait-client-actions"
               ]
             },
             {
@@ -1176,7 +1177,7 @@
               "evidence_ids": [
                 "evidence-b5-explorer-download-models",
                 "evidence-b5-explorer-download-bundle",
-                "evidence-b5-mesh-routes-no-store",
+                "evidence-b7-private-response-policy",
                 "evidence-b5-download-verified-before-save",
                 "evidence-b5-download-reading-match",
                 "evidence-b5-download-image-hash",
@@ -1294,22 +1295,22 @@
           "leaves": [
             {
               "id": "leaf-portrait-automation-permissions-1",
-              "text": "Privacy's Pattern generation panel renders PortraitAutomationControl when a chart exists. Its checkbox sets a chart-bound automation grant separate from Pattern generation consent, and the client sends the fixed confirm string the route requires. The control is hidden when the read reports automation unavailable and no enabled grant; while mesh automation is unavailable, the read reports no grant at all and changes return 503.",
+              "text": "Privacy's Pattern generation panel renders PortraitAutomationControl when a chart exists. Its chart-bound automation grant remains separate from Pattern generation consent. Reads inspect the actual grant independently of generation switches and expose supported protocols, generation availability, enabled/disabled/unknown grant state, grant policy, and permitted actions. Missing or unreadable grant storage reports unknown, with no actions; the control offers a retry instead of claiming withdrawal.",
               "evidence_ids": [
                 "evidence-b5-privacy-automation-control",
                 "evidence-b5-automation-grant-table",
                 "evidence-b5-automation-checkbox",
                 "evidence-b5-automation-client-confirm",
                 "evidence-b5-automation-confirm-strings",
-                "evidence-b5-automation-control-hidden",
+                "evidence-b5-automation-unknown-control",
                 "evidence-b5-automation-read",
-                "evidence-b5-automation-set-503",
+                "evidence-b5-withdrawal-storage-and-authority",
                 "evidence-b5-mesh-available"
               ]
             },
             {
               "id": "leaf-portrait-automation-permissions-4",
-              "text": "Grants carry policy 1.1.0, for four-chapter portraits only, or 2.0.0, for three to six chapters. A 2.0.0 request needs the v2 header and enabling it needs the adaptive switch; enabling 2.0.0 turns off an enabled 1.1.0 grant, while a 1.1.0 request cannot replace an enabled 2.0.0 grant and is refused. When mesh automation is available, v2 reads flag an enabled 1.1.0 grant as legacy_enabled; the control can stop it, and its renewal checkbox is disabled while the adaptive switch is off.",
+              "text": "Grants carry policy 1.1.0 for four-chapter portraits or 2.0.0 for three to six chapters. New 2.0.0 grants require the v2 header and adaptive switch; a 1.1.0 request cannot replace an enabled 2.0.0 grant. Existing grants remain observable and revocable while generation is disabled when grant and cancellation storage are available and the current account/chart write fence permits withdrawal. V2 reads expose an enabled 1.1.0 grant as legacy_enabled; its separate stop control does not expand that permission.",
               "evidence_ids": [
                 "evidence-b5-automation-grant-protocol",
                 "evidence-b5-automation-v2-header",
@@ -1318,7 +1319,8 @@
                 "evidence-b5-automation-disable-other-policy",
                 "evidence-b5-automation-read",
                 "evidence-b5-automation-legacy-controls",
-                "evidence-b5-automation-checkbox"
+                "evidence-b5-automation-checkbox",
+                "evidence-b5-withdrawal-storage-and-authority"
               ]
             },
             {
@@ -1337,7 +1339,7 @@
             },
             {
               "id": "leaf-portrait-automation-permissions-3",
-              "text": "Disabling automation clears the grant's enabled flag, and a trigger cancels its pending outbox rows and unfinished image and mesh jobs and marks unfinished portraits failed, without touching completed jobs or the Pattern document. The control's save message confirms the preference, not completed cancellation. Consent withdrawal, Pattern erasure, and account deletion run separate triggers.",
+              "text": "Disabling automation clears the grant's enabled flag, and a trigger cancels its pending outbox rows and unfinished image and mesh jobs and marks unfinished portraits failed, without touching completed jobs or the Pattern document. The control reports the saved on/off choice. Consent withdrawal, Pattern erasure, and account deletion run separate triggers.",
               "evidence_ids": [
                 "evidence-b5-automation-disable",
                 "evidence-b5-automation-withdraw-trigger",
@@ -1371,13 +1373,14 @@
             },
             {
               "id": "leaf-worker-web-assets-and-pwa-2",
-              "text": "Committed production configuration lists /health, /v1, /internal, /admin, /codex-provider, and /crypto-operator in run_worker_first, so the Worker handles them before static assets, and sets not_found_handling to single-page-application for other paths. The service worker registers only in production builds, precaches the app shell, and bypasses /v1 requests.",
+              "text": "Committed production configuration lists /health, /v1, /internal, /admin, /codex-provider, and /crypto-operator in run_worker_first, so the Worker handles them before static assets, and sets not_found_handling to single-page-application for other paths. The service worker registers only in production builds, precaches the app shell, and bypasses /v1 requests. Its asset-cache write also refuses responses marked private or no-store, since the Cache API does not enforce that policy itself.",
               "evidence_ids": [
                 "evidence-apps-api-wrangler-toml-2",
                 "evidence-b6-spa-fallback",
                 "evidence-b6-sw-registration",
                 "evidence-b6-sw-shell-precache",
-                "evidence-apps-web-public-sw-js"
+                "evidence-apps-web-public-sw-js",
+                "evidence-b6-sw-private-cache-guard"
               ]
             }
           ]
@@ -1462,10 +1465,15 @@
             },
             {
               "id": "leaf-codex-runner-and-host-dependency-5",
-              "text": "Portrait image turns still require exactly codex-cli 0.153.3. This is repository code; no installed runner, CLI version, or host liveness is claimed.",
+              "text": "Portrait image turns require exactly codex-cli 0.153.3. Before an image claim spends an attempt, the runner checks the CLI, ChatGPT login, host instruction boundary, and effective app-server configuration without starting a thread or model turn. False or failed compatibility skips the image opportunity while text/mesh remain schedulable. Invocation repeats runtime checks after claim to detect drift. This is repository code, not an observation of installed runners or host liveness.",
               "evidence_ids": [
                 "evidence-b6-portrait-cli-pin",
-                "evidence-b6-portrait-cli-check"
+                "evidence-b6-portrait-cli-check",
+                "evidence-b6-image-compatibility-before-claim",
+                "evidence-b6-image-preflight-wiring",
+                "evidence-b6-image-host-compatibility",
+                "evidence-b6-image-effective-config-preflight",
+                "evidence-b6-image-preflight-no-model-turn"
               ]
             }
           ]
@@ -1564,7 +1572,7 @@
             },
             {
               "id": "leaf-committed-production-switches-4",
-              "text": "PATTERN_ADAPTIVE_PORTRAITS_ENABLED is committed as 0, so a new v2 artwork reservation returns 503 adaptive_portrait_unavailable, while v1 artwork for four-chapter Patterns can still start. CATEGORIZED_FEEDBACK_EFFECTS_ENABLED is not set in committed configuration, and the Daily publisher resolves it to the non-categorical prompt 1.0.3.",
+              "text": "PATTERN_ADAPTIVE_PORTRAITS_ENABLED is committed as 0, so a new v2 artwork reservation returns 503 adaptive_portrait_unavailable, while v1 artwork for four-chapter Patterns can still start. CATEGORIZED_FEEDBACK_EFFECTS_ENABLED is not set in committed configuration, and the Daily publisher resolves it to the non-categorical prompt 1.1.0.",
               "evidence_ids": [
                 "evidence-b6-production-portrait-flags",
                 "evidence-b5-adaptive-admission-503",
@@ -1759,12 +1767,13 @@
             },
             {
               "id": "leaf-route-authority-zones-3",
-              "text": "The product API runs configGuard, authenticate, and accountStateGate ahead of every route it mounts, including categorical feedback and passage connections. Before configGuard, a Cache-Control-only middleware sets private, no-store on /v1/readings/:id/feedback-options, feedback-events, relationship-source, relationships, and relationship-target and on /v1/timing/cycles/:id, not on the resonance /v1/readings/:id/feedback.",
+              "text": "The app applies one private, no-store response policy before route-specific configuration and authority checks, and enforces it again on the final response, including early refusals and exceptions. Only /health and /v1/meta are public exceptions. The product API still runs configGuard, authenticate, and accountStateGate ahead of its routes; session, receipt, admin, service, runner, and crypto-operator authority remain separate.",
               "evidence_ids": [
                 "evidence-apps-api-index-ts-2",
                 "evidence-b7-api-authenticate-gate",
                 "evidence-b7-api-feedback-connection-mounts",
-                "evidence-b7-api-private-no-store-paths"
+                "evidence-b7-private-response-policy",
+                "evidence-b7-private-response-mount"
               ]
             },
             {
@@ -1776,7 +1785,7 @@
                 "evidence-apps-api-index-ts-10",
                 "evidence-apps-api-index-ts-4",
                 "evidence-apps-api-index-ts-5",
-                "evidence-b7-admin-no-store-before-guard",
+                "evidence-b7-private-response-policy",
                 "evidence-b7-admin-route-order",
                 "evidence-b7-authority-token-aliasing"
               ]
@@ -1789,13 +1798,14 @@
           "leaves": [
             {
               "id": "leaf-administrator-inspection-and-audit-1",
-              "text": "The /admin router relies on Cloudflare Access rather than a shared bearer. adminAuth verifies the cf-access-jwt-assertion with the configured team domain as issuer and the policy audience, binds the verified subject to a pattern_admin_sessions row stored by token hash, whose cookie lasts at most 15 minutes, and sets no-store, a deny-all Content-Security-Policy, and frame denial.",
+              "text": "The /admin router relies on Cloudflare Access rather than a shared bearer. adminAuth verifies the cf-access-jwt-assertion with the configured team domain as issuer and the policy audience and binds the verified subject to a token-hashed pattern_admin_sessions row with a cookie lasting at most 15 minutes. It adds a deny-all Content-Security-Policy and frame denial; the shared response boundary supplies private, no-store.",
               "evidence_ids": [
                 "evidence-b7-admin-access-assertion",
                 "evidence-b7-admin-access-iss-aud",
                 "evidence-b7-admin-session-ttl",
                 "evidence-b7-admin-session-insert",
-                "evidence-b7-admin-response-headers"
+                "evidence-b7-admin-response-headers",
+                "evidence-b7-private-response-policy"
               ]
             },
             {
@@ -1933,16 +1943,14 @@
             },
             {
               "id": "leaf-protected-personal-payloads-2",
-              "text": "Owner scoping is a query predicate, as in the owned export lookup, and reading routes project wire fields by name instead of spreading decrypted artifacts. The Today, history, single-reading, evidence, resonance feedback, and save handlers set private, no-store themselves, so a refusal issued before a handler runs carries none.",
+              "text": "Owner scoping is a query predicate, as in the owned export lookup, and reading routes project wire fields by name instead of spreading decrypted artifacts. Today, history, individual readings, evidence, both feedback paths, and saves all inherit the same private, no-store response boundary, including refusals before their handlers.",
               "evidence_ids": [
                 "evidence-b7-owned-export-query",
                 "evidence-b7-reading-projection-contract",
-                "evidence-today-private-no-store",
-                "evidence-b7-history-private-no-store",
-                "evidence-b7-reading-private-no-store",
-                "evidence-reading-evidence-private-no-store",
-                "evidence-resonance-feedback-private-no-store",
-                "evidence-b7-save-private-no-store"
+                "evidence-b7-private-response-policy",
+                "evidence-b7-today-route",
+                "evidence-b3-reading-evidence-route",
+                "evidence-b7-resonance-feedback-route"
               ]
             },
             {
@@ -1972,7 +1980,7 @@
                 "evidence-b7-export-seven-days",
                 "evidence-b7-owned-export-query",
                 "evidence-b7-export-expired-410",
-                "evidence-b7-export-download-no-store"
+                "evidence-b7-private-response-policy"
               ]
             },
             {
@@ -2043,7 +2051,7 @@
           "leaves": [
             {
               "id": "leaf-schemas-and-ordered-migrations-1",
-              "text": "contracts/ holds the frozen M0 baseline and later packages: M3 to M9, geocoder-v2, portrait-v1 and v2, portrait-mesh-v1 and v2, reader-relationships-v1, reading-feedback-v1, and runtime-health-v1, each with JSON Schemas and fixtures.",
+              "text": "contracts/ holds the frozen M0 baseline and later packages: M3 to M9, geocoder-v2, portrait-v1 and v2, portrait-mesh-v1 and v2, portrait-state-v1, daily-uncertainty-v1, reader-relationships-v1, reading-feedback-v1, and runtime-health-v1, with JSON Schemas and fixtures. The Daily uncertainty package versions request/command input to 0.5.1 while frozen published output schemas remain unchanged.",
               "evidence_ids": [
                 "evidence-b8-m0-status-frozen",
                 "evidence-b8-contract-registry",
@@ -2052,11 +2060,11 @@
             },
             {
               "id": "leaf-schemas-and-ordered-migrations-7",
-              "text": "validate_schemas.py runs M0's own validator and validates every other package's fixtures except portrait-mesh-v1, whose fixtures shared tests read instead. Full OpenAPI validation runs only when openapi-spec-validator and pyyaml are installed and otherwise prints a skip; the separate per-package OpenAPI projection checks need only pyyaml, and the geocoder-v2 check imports it unconditionally.",
+              "text": "validate_schemas.py runs M0's own validator and validates the other registered packages' fixtures, including portrait state and Daily uncertainty. Portrait-mesh-v1 fixtures remain covered by shared tests. Required OpenAPI validator and YAML dependencies are checked at entry; their absence fails the release contracts lane instead of skipping full validation. Per-package projection checks add separate consistency checks.",
               "evidence_ids": [
                 "evidence-b8-m0-own-validator",
                 "evidence-b8-new-package-validation",
-                "evidence-b8-openapi-skip",
+                "evidence-b8-required-openapi-dependencies",
                 "evidence-b8-mesh-v1-shared-fixtures",
                 "evidence-b8-projection-yaml-guard",
                 "evidence-b8-geocoder-yaml-import"
@@ -2249,7 +2257,7 @@
             },
             {
               "id": "leaf-release-assurance-tooling-3",
-              "text": "release-evidence.mjs gate runs npm run ci:local and records the source snapshot, parsed gate summary, artifact hashes, and repository pins, with every deployment field unverified; verify rechecks a receipt against the current checkout. release-reconciliation.mjs accepts only a verified receipt and declares no platform, provider, account, or database calls.",
+              "text": "release-evidence.mjs gate runs npm run ci:local and records its process exit, complete parsed summary, unchanged source snapshot, artifact hashes, and repository pins, with every deployment field unverified. verify rechecks the receipt against the current checkout. release-reconciliation.mjs accepts only a verified receipt and declares no platform, provider, account, or database calls.",
               "evidence_ids": [
                 "evidence-b8-release-evidence-runs-gate",
                 "evidence-b8-release-evidence-receipt-fields",
@@ -2261,10 +2269,10 @@
             },
             {
               "id": "leaf-release-assurance-tooling-5",
-              "text": "scripts/ci-local.sh emits the success line required by parseCiSummary in release-evidence.mjs. The parser also requires all fourteen expected passing lanes in order and a toolchain line; an incomplete receipt summary fails with gate_summary_incomplete. A regression runs the committed CI script with stubbed npm commands and checks that its real success summary is accepted.",
+              "text": "scripts/ci-local.sh and its receipt consumer share one ASCII summary formatter and parser. Success requires process exit 0, exactly one complete summary, all sixteen passing lanes in order, and a valid toolchain line; failed, skipped, duplicate, or incomplete summaries cannot pass. Regression coverage runs the actual CI script and formatter with stubbed expensive commands, including clean install, skipped ephemeris, and failing required lanes.",
               "evidence_ids": [
                 "evidence-b8-ci-local-success",
-                "evidence-b8-parse-ci-summary-em-dash",
+                "evidence-b8-canonical-ci-summary-parser",
                 "evidence-b8-gate-summary-incomplete",
                 "evidence-b8-ci-summary-integration-test"
               ]
@@ -2277,7 +2285,7 @@
           "leaves": [
             {
               "id": "leaf-local-verification-and-release-gate-1",
-              "text": "npm run ci:local runs scripts/ci-local.sh. Its contracts lane, test:contracts, runs the spec-renderer tests, validate_schemas.py, both D1 smoke checks, and an adaptive-portrait migration regression. Its monorepo lanes run npm ci --dry-run (a full npm ci with --clean), an ephemeris download step unless --skip-ephe (calc-stub's pretest downloads regardless), typecheck, six workspaces' tests, and the root build of every workspace, which ends in the API's production dry-run.",
+              "text": "npm run ci:local runs scripts/ci-local.sh. Its contracts lane runs contract-tooling regressions, spec-renderer tests, required schema/OpenAPI checks, both D1 smoke checks, and the adaptive-portrait migration regression. Monorepo lanes run npm ci --dry-run (full npm ci with --clean), ephemeris download, typecheck, six workspaces' tests, and all-workspace builds ending in the API production dry-run. --skip-ephe records an incomplete gate and exits nonzero even though calc-stub pretest also downloads ephemeris.",
               "evidence_ids": [
                 "evidence-package-json",
                 "evidence-scripts-ci-local-sh",
@@ -2291,7 +2299,7 @@
             },
             {
               "id": "leaf-local-verification-and-release-gate-4",
-              "text": "calc-stub's test glob covers its golden suites, so ci:local runs them through the ordinary calc-stub test lane rather than the separate test:golden script. The script then runs the pattern-engine and codex-runner tests and test:content as separately reported extras.",
+              "text": "calc-stub's test glob covers its golden suites through the ordinary calc-stub lane. The gate then runs pattern-engine, codex-runner, test:content, test:source-map, and map:check:current as separately reported extras beyond ci.yml.",
               "evidence_ids": [
                 "evidence-b8-calc-stub-test-glob",
                 "evidence-b8-ci-local-monorepo-steps",
@@ -2317,6 +2325,20 @@
                 "evidence-b8-readme-release-path",
                 "evidence-b6-production-release-placeholder",
                 "evidence-b8-release-runbook-not-applied"
+              ]
+            },
+            {
+              "id": "leaf-maintainer-tooling-outside-the-gate-3",
+              "text": "scripts/source-map captures the authored map.json into a new immutable snapshot and checks literal evidence selectors and referenced source identities. The local gate requires both tooling tests and map:check:current, which follows the explicit current.json pointer; missing, unsafe, or stale selections fail. Capture rejects missing or repeated anchors; checks detect changes to sources, tooling, definition, or generated output.",
+              "evidence_ids": [
+                "evidence-b8-map-scripts",
+                "evidence-b8-root-test-lanes",
+                "evidence-b8-ci-local-extra-steps",
+                "evidence-b8-map-literal-anchors",
+                "evidence-b8-map-capture-refuses",
+                "evidence-b8-map-definition-and-snapshots",
+                "evidence-b8-map-check-changes",
+                "evidence-b8-map-current-pointer"
               ]
             }
           ]
@@ -2344,19 +2366,6 @@
                 "evidence-b8-promptfoo-test-per-case",
                 "evidence-b8-fresh-daily-eight-profiles",
                 "evidence-b8-promptfoo-exploration-evidence"
-              ]
-            },
-            {
-              "id": "leaf-maintainer-tooling-outside-the-gate-3",
-              "text": "scripts/source-map captures and checks docs/architecture/source-map/map.json through root map:capture and map:check, tested by test:source-map; neither the root test script nor ci:local runs them. Capture matches each selector as literal text, refuses a missing or repeated one, and writes under docs/architecture/source-map/snapshots; check reports changed sources, tooling, or definition.",
-              "evidence_ids": [
-                "evidence-b8-map-scripts",
-                "evidence-b8-root-test-lanes",
-                "evidence-b8-ci-local-extra-steps",
-                "evidence-b8-map-literal-anchors",
-                "evidence-b8-map-capture-refuses",
-                "evidence-b8-map-definition-and-snapshots",
-                "evidence-b8-map-check-changes"
               ]
             }
           ]
@@ -2942,15 +2951,6 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b1-relationship-no-store",
-      "kind": "source",
-      "path": "apps/api/src/index.ts",
-      "selector": {
-        "text": "api.use(\"*\", async (c, next) => {\n  if (/^\\/v1\\/readings\\/[^/]+\\/(?:relationship-source|relationships|relationship-target|feedback-options|feedback-events)$/.test(c.req.path)\n    || /^\\/v1\\/timing\\/cycles\\/[^/]+$/.test(c.req.path)) c.header(\"Cache-Control\", \"private, no-store\");\n  await next();\n});\napi.use(\"*\", configGuard);"
-      },
-      "observed_at": null
-    },
-    {
       "id": "evidence-b1-timing-target-via-relationship",
       "kind": "source",
       "path": "apps/api/src/services/reader-relationships.ts",
@@ -3099,7 +3099,7 @@
       "kind": "source",
       "path": "apps/web/src/components/ChartView.tsx",
       "selector": {
-        "text": "<ChartWheel\n            positions={chart.positions}\n            aspects={chart.aspects}\n            houseCusps={chart.houses?.cusps_deg ?? null}"
+        "text": "<ChartWheel\n            positions={wheelPositions}\n            aspects={chart.aspects}\n            houseCusps={chart.houses?.cusps_deg ?? null}"
       },
       "observed_at": null
     },
@@ -3153,7 +3153,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PatternExperience.tsx",
       "selector": {
-        "text": "AI-generated from your calculated chart · {generatedLabel} · Pattern {document.pattern_id}"
+        "text": "AI-generated from your calculated chart · {generatedLabel} · Pattern <span className=\"pattern-provenance__id\">{document.pattern_id}</span>"
       },
       "observed_at": null
     },
@@ -3441,7 +3441,7 @@
       "kind": "source",
       "path": "apps/web/src/components/ReaderReadiness.tsx",
       "selector": {
-        "text": "const consequences = selectReaderConsequences(action, { observedAt, evidence: fresh && evidence === \"known\" ? \"known\" : \"unavailable\" });"
+        "text": "evidence: retainEvidence || (fresh && evidence === \"known\") ? evidence : \"unavailable\","
       },
       "observed_at": null
     },
@@ -3495,7 +3495,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PatternExperience.tsx",
       "selector": {
-        "text": "<ReaderConsequences action=\"delete_pattern\" observedAt={observedAt} evidence={fresh ? \"known\" : \"unavailable\"} />"
+        "text": "<ReaderConsequences action=\"delete_pattern\" observedAt={observedAt} evidence=\"known\" retainEvidence />"
       },
       "observed_at": null
     },
@@ -3504,7 +3504,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PatternExperience.tsx",
       "selector": {
-        "text": "disabled={confirmText !== DELETE_CONFIRMATION || busy || !fresh}"
+        "text": "  const erase = async () => {\n    if (mutatingRef.current || !currentDocument.current) return;\n    const controller = new AbortController();\n    mutatingRef.current = true;\n    setMutating(true);\n    const intent = `delete:${state?.pattern?.pattern_id ?? \"pattern\"}`;\n    try {\n      const current = await getPatternState(controller.signal);\n      if (controller.signal.aborted || !mounted.current) return;\n      if (await changedBeforeSubmit(controller.signal, current)) return;"
       },
       "observed_at": null
     },
@@ -3927,25 +3927,25 @@
       "kind": "source",
       "path": "packages/reading-engine/src/constrained-input.ts",
       "selector": {
-        "text": "uncertainty.suppressed_features.length > 0 || uncertainty.qualified_features.length > 0,"
+        "text": "const composition = buildComposition(\n    facts,\n    uncertaintyDisclosure.disclosures.length > 0,\n  );"
       },
       "observed_at": null
     },
     {
       "id": "evidence-b2-disclosure-representable",
       "kind": "source",
-      "path": "packages/reading-engine/src/claim-support.ts",
+      "path": "packages/reading-engine/src/uncertainty-disclosure.ts",
       "selector": {
-        "text": "return birthTimeAccuracy === \"approximate\" || suppressedFeatures.length > 0;"
+        "text": "const QUALIFICATIONS: ReadonlyArray<DailyUncertaintyQualification & { statement: string }> = [\n  { feature_id: \"birth_instant\", qualification: \"technique_specific\",\n    statement: \"The time-zone mapping of your local birth time needs confirmation.\" },\n  { feature_id: \"birthplace\", qualification: \"technique_specific\",\n    statement: \"Your birthplace needs confirmation.\" },\n  { feature_id: \"houses\", qualification: \"approximate_only\", statement: \"House details are approximate.\" },\n  { feature_id: \"moon\", qualification: \"low_confidence_moon\", statement: \"Time-sensitive Moon details have low confidence.\" },\n];\n"
       },
       "observed_at": null
     },
     {
-      "id": "evidence-b2-note-unrepresentable-refusal",
+      "id": "evidence-b2-uncertainty-input-validation",
       "kind": "source",
       "path": "packages/reading-engine/src/constrained-input.ts",
       "selector": {
-        "text": "composition.uncertainty_note_required &&\n    !uncertaintyDisclosureRepresentable("
+        "text": "  let uncertainty;\n  try {\n    uncertainty = normalizeDailyUncertainty(input.chart.uncertainty);\n  } catch (error) {\n    throw new ConstrainedInputError(error instanceof Error ? error.message : \"unsupported uncertainty input\");\n  }\n  const uncertaintyDisclosure = buildUncertaintyDisclosurePlan(uncertainty);\n  if (uncertaintyDisclosure.disclosures.map((entry) => entry.statement).join(\" \").length > PARAGRAPH_MAX_CHARS) {\n    throw new ConstrainedInputError(\"unsupported uncertainty disclosure length\");\n  }\n"
       },
       "observed_at": null
     },
@@ -3959,11 +3959,11 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b2-disclosure-stop-gap",
+      "id": "evidence-b2-disclosure-validation",
       "kind": "source",
-      "path": "packages/reading-engine/src/constrained-input.ts",
+      "path": "packages/reading-engine/src/uncertainty-disclosure.ts",
       "selector": {
-        "text": "// This is a stop-gap that stops the spend, not a repair: the qualification"
+        "text": "export function uncertaintyDisclosureFailure(text: string, plan: DailyUncertaintyDisclosurePlan): string | null {\n  const expected = plan.disclosures.map((entry) => normalizedSentences(entry.statement)[0]!);\n  const actual = normalizedSentences(text);\n  if (actual.some((sentence) => !expected.includes(sentence))) return \"unsupported_uncertainty_disclosure\";\n  if (new Set(actual).size !== actual.length) return \"duplicate_uncertainty_disclosure\";\n  if (expected.some((sentence) => !actual.includes(sentence))) return \"incomplete_uncertainty_disclosure\";\n  return null;"
       },
       "observed_at": null
     },
@@ -4773,7 +4773,7 @@
       "kind": "source",
       "path": "apps/api/src/services/reading-feedback-policy.ts",
       "selector": {
-        "text": "  return enabled === \"1\"\n    ? { promptVersion: CATEGORIZED_FEEDBACK_PROMPT_VERSION, selectionVersion: CATEGORIZED_FEEDBACK_SELECTION_VERSION, categorical: true }\n    : { promptVersion: \"1.0.3\", selectionVersion: SELECTION_POLICY_VERSION, categorical: false };"
+        "text": "  return enabled === \"1\"\n    ? { promptVersion: CATEGORIZED_FEEDBACK_PROMPT_VERSION, selectionVersion: CATEGORIZED_FEEDBACK_SELECTION_VERSION, categorical: true }\n    : { promptVersion: \"1.1.0\", selectionVersion: SELECTION_POLICY_VERSION, categorical: false };"
       },
       "observed_at": null
     },
@@ -4800,7 +4800,7 @@
       "kind": "source",
       "path": "apps/api/wrangler.toml",
       "selector": {
-        "text": "OPENAI_READING_PROMPT_VERSION = \"1.0.3\""
+        "text": "OPENAI_READING_PROMPT_VERSION = \"1.1.0\""
       },
       "observed_at": null
     },
@@ -4841,11 +4841,11 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b3-selection-policy-1-3-0",
+      "id": "evidence-b3-selection-policy-1-5-0",
       "kind": "source",
       "path": "packages/reading-engine/src/constrained-types.ts",
       "selector": {
-        "text": "export const SELECTION_POLICY_VERSION = \"1.3.0\" as const;"
+        "text": "export const SELECTION_POLICY_VERSION = \"1.5.0\" as const;"
       },
       "observed_at": null
     },
@@ -4899,7 +4899,7 @@
       "kind": "source",
       "path": "apps/api/src/services/reading-feedback-policy.ts",
       "selector": {
-        "text": "  return (prompt === \"1.0.3\" && selection === SELECTION_POLICY_VERSION) ||\n    (prompt === CATEGORIZED_FEEDBACK_PROMPT_VERSION && selection === CATEGORIZED_FEEDBACK_SELECTION_VERSION);"
+        "text": "  return (prompt === \"1.1.0\" && selection === SELECTION_POLICY_VERSION) ||\n    (prompt === CATEGORIZED_FEEDBACK_PROMPT_VERSION && selection === CATEGORIZED_FEEDBACK_SELECTION_VERSION);"
       },
       "observed_at": null
     },
@@ -4971,7 +4971,7 @@
       "kind": "source",
       "path": "packages/reading-engine/src/candidate-validation.ts",
       "selector": {
-        "text": "  if (composition.uncertainty_note_required) {\n    const note = candidate.uncertainty_note;\n    if (!note || note.text.trim().length === 0) {\n      fail(\"uncertainty\", \"required_note_missing\");\n    } else if (!uncertaintyTerms(prepared).some((term) => term.test(note.text))) {\n      fail(\"uncertainty\", \"note_names_nothing\");\n    }\n  } else if (candidate.uncertainty_note !== null) {\n    fail(\"uncertainty\", \"unrequested_note\");\n  }"
+        "text": "  if (composition.uncertainty_note_required) {\n    const note = candidate.uncertainty_note;\n    if (!note || note.text.trim().length === 0) {\n      fail(\"uncertainty\", \"required_note_missing\");\n    } else {\n      const reason = uncertaintyDisclosureFailure(note.text, prepared.request.uncertainty_disclosure);\n      if (reason) fail(\"uncertainty\", reason);\n    }\n  } else if (candidate.uncertainty_note !== null) {\n    fail(\"uncertainty\", \"unrequested_note\");\n  }"
       },
       "observed_at": null
     },
@@ -4989,7 +4989,7 @@
       "kind": "source",
       "path": "packages/reading-engine/src/constrained-input.ts",
       "selector": {
-        "text": "!uncertaintyDisclosureRepresentable("
+        "text": "  if (input.schema_version !== DAILY_GENERATION_SCHEMA_VERSION ||\n    (input.selection_policy_version !== SELECTION_POLICY_VERSION && input.selection_policy_version !== CATEGORIZED_FEEDBACK_SELECTION_VERSION) ||\n    input.validation_policy_version !== VALIDATION_POLICY_VERSION) {\n    throw new ConstrainedInputError(\"unsupported constrained input policy\");\n  }"
       },
       "observed_at": null
     },
@@ -5826,7 +5826,7 @@
       "kind": "source",
       "path": "apps/api/src/services/pattern-state.ts",
       "selector": {
-        "text": "  if (document && claim?.status === \"accepted\") {\n    if (document.chart_fingerprint_hash !== fingerprintHash) {\n      return emptyState(\"available\", chartBlock, consent);\n    }\n    const sourceChanged = document.pattern_source_hash !== PATTERN_CREATION_SOURCE_HASH;\n    const canRegenerate =\n      patternGenerationIsEnabled(env) &&\n      sourceChanged &&\n      consent.status === \"granted\" &&\n      ontologyServesAccount(ontology);"
+        "text": "  if (document && claim?.status === \"accepted\") {\n    if (document.chart_fingerprint_hash !== fingerprintHash) {\n      return emptyState(\"available\", chartBlock, consent);\n    }\n    const sourceChanged = document.pattern_source_hash !== PATTERN_CREATION_SOURCE_HASH;\n    const canRegenerate =\n      patternGenerationIsEnabled(env) &&\n      sourceChanged &&\n      consent.status === \"granted\" &&\n      ontologyServesAccount(ontology) &&\n      patternLocaleServesReader(ontology, preferences.locale);"
       },
       "observed_at": null
     },
@@ -5862,7 +5862,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PatternExperience.tsx",
       "selector": {
-        "text": "Updating your Pattern · {PROGRESS[regeneration.generation.stage]}"
+        "text": "<h3 id=\"pattern-regeneration-heading\">Replacing your Pattern</h3>\n        <p>{PROGRESS[regeneration.generation.stage]}</p>"
       },
       "observed_at": null
     },
@@ -5871,7 +5871,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PatternExperience.tsx",
       "selector": {
-        "text": "      !state.regeneration?.eligible ||"
+        "text": "current.chart?.chart_id !== chartId || current.state !== \"ready\" || !current.regeneration?.eligible"
       },
       "observed_at": null
     },
@@ -5934,7 +5934,7 @@
       "kind": "source",
       "path": "apps/api/scripts/build-internal-ontology.ts",
       "selector": {
-        "text": "const ONTOLOGY_VERSION = process.env.ONTOLOGY_VERSION ?? \"pattern-ontology-en-us-internal-0.1.2\";"
+        "text": "const ONTOLOGY_VERSION = process.env.ONTOLOGY_VERSION ?? \"pattern-ontology-en-us-internal-0.1.3\";"
       },
       "observed_at": null
     },
@@ -5979,7 +5979,7 @@
       "kind": "source",
       "path": "apps/api/scripts/build-internal-ontology.ts",
       "selector": {
-        "text": "const compiled = compileOntologyRelease(release);\nif (!compiled.ok) {\n  console.error(`compile failed with ${compiled.failures.length} failure(s):`);\n  for (const failure of compiled.failures.slice(0, 20)) {\n    console.error(`  ${failure.code}: ${failure.message}`);\n  }\n  process.exit(1);"
+        "text": "const compiled = compileOntologyCandidate(release);\nif (!compiled.ok) {\n  console.error(`compile failed with ${compiled.failures.length} failure(s):`);\n  for (const failure of compiled.failures.slice(0, 20)) {\n    console.error(`  ${failure.code}: ${failure.message}`);\n  }\n  process.exit(1);"
       },
       "observed_at": null
     },
@@ -5988,7 +5988,7 @@
       "kind": "source",
       "path": "apps/api/scripts/build-internal-ontology.ts",
       "selector": {
-        "text": "    compiler_passed: true,\n    evaluator_passed: true,\n    // No rehearsal ran. The field is on the frozen contract and is not read on\n    // the synthetic path, which never had a regression stage to pass.\n    regression_passed: false,\n    unevaluated_fixture_count: 0,"
+        "text": "    verdict: \"reject\",\n    compiler_passed: true,\n    evaluator_passed: false,\n    regression_passed: false,\n    unevaluated_fixture_count: 0,"
       },
       "observed_at": null
     },
@@ -6812,15 +6812,6 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b5-mesh-routes-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/pattern-portrait-mesh.ts",
-      "selector": {
-        "text": "c.header(\"cache-control\", \"private, no-store\");"
-      },
-      "observed_at": null
-    },
-    {
       "id": "evidence-b5-download-verified-before-save",
       "kind": "source",
       "path": "apps/web/src/components/AccountPortraitExplorer.tsx",
@@ -7230,7 +7221,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PortraitAutomationControl.tsx",
       "selector": {
-        "text": "<input type=\"checkbox\" checked={preference.enabled} disabled={busy || !fresh || (!preference.enabled && (!canEnable || !preference.available))} aria-describedby={description} onChange={(event) => void change(event.target.checked)} />"
+        "text": "      <input type=\"checkbox\" checked={preference.enabled} disabled={busy || !fresh || (preference.enabled ? !mayDisable : !canEnable || !mayEnable)} aria-describedby={description} onChange={(event) => void change(event.target.checked)} />"
       },
       "observed_at": null
     },
@@ -7253,11 +7244,11 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b5-automation-control-hidden",
+      "id": "evidence-b5-automation-unknown-control",
       "kind": "source",
       "path": "apps/web/src/components/PortraitAutomationControl.tsx",
       "selector": {
-        "text": "if (!preference || (!preference.available && !preference.enabled && !legacyEnabled) || preference.chart_id !== chartId) return error ? <p role=\"status\">{error}</p> : null;"
+        "text": "  if (preference?.state?.grant_status === \"unknown\") return <section className=\"portrait-automation\" aria-label=\"Automatic visual portrait\">\n    <p role=\"status\">Automatic artwork permission could not be checked. Your saved choice is unknown.</p>\n    <button type=\"button\" onClick={() => setAttempt(value => value + 1)}>Check again</button>\n  </section>;\n  if (!preference || (!preference.available && !preference.enabled && !legacyEnabled) || preference.chart_id !== chartId) return error ? <div><p role=\"status\">{error}</p><button type=\"button\" onClick={() => setAttempt(value => value + 1)}>Check again</button></div> : null;"
       },
       "observed_at": null
     },
@@ -7266,16 +7257,16 @@
       "kind": "source",
       "path": "apps/api/src/services/pattern-portrait-mesh.ts",
       "selector": {
-        "text": "const enabled = await available(env);\n  const chart = enabled ? await loadActiveChart(env, userId) : null;\n  const grant = chart ? await liveGrant(env, userId, chart.id) : null;\n  const base = { available: enabled && (protocol === \"v1\" || adaptivePortraitsEnabled(env)),\n    chart_id: chart?.id ?? null, enabled: !!grant && (protocol === \"v1\" || grant.policy_version === \"2.0.0\") };\n  return protocol === \"v2\"\n    ? { ...base, schema_version: \"portrait-automation/v2\", legacy_enabled: grant?.policy_version === \"1.1.0\", consent_policy_version: PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION }"
+        "text": "    chart = await loadActiveChart(env, userId);\n    if (await automationGrantStoreAvailable(env)) {\n      grant = chart ? await liveGrant(env, userId, chart.id) : null;\n      state.grant_status = grant ? \"enabled\" : \"disabled\";\n      state.grant_policy_version = grant?.policy_version ?? null;\n      const canWithdraw = await withdrawalAvailable(env);\n      state.generation_available = canWithdraw && await available(env) && (protocol === \"v1\" || adaptivePortraitsEnabled(env));\n      const writable = chart && await env.DB.prepare(chartWriteCheck).bind(chart.id, userId, chart.fingerprint).first();\n      if (writable && state.generation_available && (protocol === \"v2\" || grant?.policy_version !== \"2.0.0\")\n        && await loadLiveAccountProcessingGrant(env, userId, new Date())) state.allowed_actions.push(\"enable\");\n      if (writable && grant && canWithdraw) state.allowed_actions.push(\"disable\");\n    }\n  } catch {\n    // Failure to observe permission is not evidence that permission was withdrawn.\n    grant = null;\n    state.grant_status = \"unknown\";\n    state.grant_policy_version = null;\n    state.generation_available = false;\n    state.allowed_actions = [];\n  }"
       },
       "observed_at": null
     },
     {
-      "id": "evidence-b5-automation-set-503",
+      "id": "evidence-b5-withdrawal-storage-and-authority",
       "kind": "source",
       "path": "apps/api/src/services/pattern-portrait-mesh.ts",
       "selector": {
-        "text": "if (!(await available(env)))\n    throw new PortraitError(503, \"portrait_unavailable\");\n  const chart = await loadActiveChart(env, userId);"
+        "text": "  if (!(await automationGrantStoreAvailable(env)))\n    throw new PortraitError(503, \"portrait_unavailable\");\n  const chart = await loadActiveChart(env, userId);\n  const identity = await loadUserIdentity(env, userId);\n  const now = new Date();\n  if (!chart || chart.id !== input.chart_id || identity?.status !== \"active\")\n    throw new PortraitError(409, \"portrait_revision_conflict\");\n  if (!input.enabled) {\n    if (!await withdrawalAvailable(env)) throw new PortraitError(503, \"portrait_unavailable\");\n    try {\n      await env.DB.batch([chartWriteFence(env, userId, chart), env.DB.prepare(\n        \"UPDATE portrait_automation_grants SET enabled=0,updated_at=? WHERE user_id=? AND chart_id=? AND enabled=1\",\n      ).bind(now.toISOString(), userId, chart.id)]);\n    } catch { throw new PortraitError(409, \"portrait_revision_conflict\"); }\n    const result = await readPortraitAutomation(env, userId, protocol);\n    if (result.state?.grant_status === \"unknown\") throw new PortraitError(503, \"portrait_unavailable\");\n    return result;\n  }"
       },
       "observed_at": null
     },
@@ -7338,7 +7329,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PortraitAutomationControl.tsx",
       "selector": {
-        "text": "{legacyEnabled && <div><p>Automatic artwork is enabled under your earlier four-chapter permission.</p>\n      <button type=\"button\" disabled={busy || !fresh} onClick={() => void change(false)}>Stop four-chapter automatic artwork</button>\n      <p>Renew below to include every chapter in readings with three to six chapters.</p></div>}"
+        "text": "    {legacyEnabled && <div><p>Automatic artwork is enabled under your earlier four-chapter permission.</p>\n      <button type=\"button\" disabled={busy || !fresh || !mayDisable} onClick={() => void change(false)}>Stop four-chapter automatic artwork</button>\n      <p>Renew below to include every chapter in readings with three to six chapters.</p></div>}"
       },
       "observed_at": null
     },
@@ -7428,7 +7419,7 @@
       "kind": "source",
       "path": "apps/web/src/components/PortraitAutomationControl.tsx",
       "selector": {
-        "text": "Your artwork choice is saved. This confirms the preference, not completion of unfinished-work cancellation."
+        "text": "Automatic artwork is {savedEnabled ? \"on\" : \"off\"}."
       },
       "observed_at": null
     },
@@ -8148,7 +8139,7 @@
       "kind": "source",
       "path": "apps/api/src/services/reading-feedback-policy.ts",
       "selector": {
-        "text": "return enabled === \"1\"\n    ? { promptVersion: CATEGORIZED_FEEDBACK_PROMPT_VERSION, selectionVersion: CATEGORIZED_FEEDBACK_SELECTION_VERSION, categorical: true }\n    : { promptVersion: \"1.0.3\", selectionVersion: SELECTION_POLICY_VERSION, categorical: false };"
+        "text": "  return enabled === \"1\"\n    ? { promptVersion: CATEGORIZED_FEEDBACK_PROMPT_VERSION, selectionVersion: CATEGORIZED_FEEDBACK_SELECTION_VERSION, categorical: true }\n    : { promptVersion: \"1.1.0\", selectionVersion: SELECTION_POLICY_VERSION, categorical: false };"
       },
       "observed_at": null
     },
@@ -8684,15 +8675,6 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b7-api-private-no-store-paths",
-      "kind": "source",
-      "path": "apps/api/src/index.ts",
-      "selector": {
-        "text": "if (/^\\/v1\\/readings\\/[^/]+\\/(?:relationship-source|relationships|relationship-target|feedback-options|feedback-events)$/.test(c.req.path)\n    || /^\\/v1\\/timing\\/cycles\\/[^/]+$/.test(c.req.path)) c.header(\"Cache-Control\", \"private, no-store\");"
-      },
-      "observed_at": null
-    },
-    {
       "id": "evidence-apps-api-index-ts-9",
       "kind": "source",
       "path": "apps/api/src/index.ts",
@@ -8734,15 +8716,6 @@
       "path": "apps/api/src/index.ts",
       "selector": {
         "text": "app.route(\"/\", api);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b7-admin-no-store-before-guard",
-      "kind": "source",
-      "path": "apps/api/src/index.ts",
-      "selector": {
-        "text": "admin.use(\"*\", async (c, next) => { c.header(\"Cache-Control\", \"no-store\"); await next(); });\nadmin.use(\"*\", configGuard);"
       },
       "observed_at": null
     },
@@ -8805,7 +8778,7 @@
       "kind": "source",
       "path": "apps/api/src/middleware/admin-auth.ts",
       "selector": {
-        "text": "c.header(\"Cache-Control\", \"no-store\");\n  c.header(\"Content-Security-Policy\", \"default-src 'none'; frame-ancestors 'none'\");\n  c.header(\"Cross-Origin-Resource-Policy\", \"same-origin\");\n  c.header(\"Referrer-Policy\", \"no-referrer\");\n  c.header(\"X-Frame-Options\", \"DENY\");"
+        "text": "c.header(\"Content-Security-Policy\", \"default-src 'none'; frame-ancestors 'none'\");\n  c.header(\"Cross-Origin-Resource-Policy\", \"same-origin\");\n  c.header(\"Referrer-Policy\", \"no-referrer\");\n  c.header(\"X-Frame-Options\", \"DENY\");"
       },
       "observed_at": null
     },
@@ -9278,56 +9251,11 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b7-history-private-no-store",
+      "id": "evidence-b7-today-route",
       "kind": "source",
       "path": "apps/api/src/routes/readings.ts",
       "selector": {
-        "text": "readingRoutes.get(\"/v1/readings\", async (c) => {\n  privateNoStore(c);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b7-reading-private-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/readings.ts",
-      "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/:id\", async (c) => {\n  privateNoStore(c);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b7-save-private-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/readings.ts",
-      "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/:id/save\", async (c) => {\n  privateNoStore(c);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-today-private-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/readings.ts",
-      "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/today\", async (c) => {\n  privateNoStore(c);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-reading-evidence-private-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/readings.ts",
-      "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/:id/evidence\", async (c) => {\n  privateNoStore(c);"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-resonance-feedback-private-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/readings.ts",
-      "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/:id/feedback\", async (c) => {\n  privateNoStore(c);"
+        "text": "readingRoutes.get(\"/v1/readings/today\", async (c) => {"
       },
       "observed_at": null
     },
@@ -9418,15 +9346,6 @@
       "path": "apps/api/src/routes/privacy.ts",
       "selector": {
         "text": "errorBody(requestId, \"export_expired\", \"This export has expired\"),"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b7-export-download-no-store",
-      "kind": "source",
-      "path": "apps/api/src/routes/privacy.ts",
-      "selector": {
-        "text": "\"cache-control\": \"no-store\","
       },
       "observed_at": null
     },
@@ -9678,7 +9597,7 @@
       "kind": "source",
       "path": "contracts/validate_schemas.py",
       "selector": {
-        "text": "for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):"
+        "text": "    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, PORTRAIT_STATE_V1, DAILY_UNCERTAINTY_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):"
       },
       "observed_at": null
     },
@@ -9705,16 +9624,16 @@
       "kind": "source",
       "path": "contracts/validate_schemas.py",
       "selector": {
-        "text": "errors += validate_package(registry, \"portrait-v2\", PORTRAIT_V2, set())\n    errors += check_openapi(PORTRAIT_V2, registry)\n    errors += validate_package(registry, \"portrait-mesh-v2\", PORTRAIT_MESH_V2, set())\n    errors += check_openapi(PORTRAIT_MESH_V2, registry)\n    errors += check_geocoder_v2_projection(registry)\n\n    print(\"\\n== contracts/reader-relationships-v1 ==\")\n    errors += validate_package(registry, \"reader-relationships-v1\", READER_RELATIONSHIPS_V1, set())\n    errors += check_openapi(READER_RELATIONSHIPS_V1, registry)\n\n    print(\"\\n== contracts/reading-feedback-v1 ==\")\n    errors += validate_package(registry, \"reading-feedback-v1\", READING_FEEDBACK_V1, set())\n    errors += check_openapi(READING_FEEDBACK_V1, registry)\n    errors += validate_package(registry, \"runtime-health-v1\", RUNTIME_HEALTH_V1, set())\n    errors += check_openapi(RUNTIME_HEALTH_V1, registry)"
+        "text": "    errors += validate_package(registry, \"portrait-v2\", PORTRAIT_V2, set())\n    errors += check_openapi(PORTRAIT_V2, registry)\n    errors += validate_package(registry, \"portrait-mesh-v2\", PORTRAIT_MESH_V2, set())\n    errors += check_openapi(PORTRAIT_MESH_V2, registry)\n    errors += validate_package(registry, \"portrait-state-v1\", PORTRAIT_STATE_V1, set())\n    errors += validate_package(registry, \"daily-uncertainty-v1\", DAILY_UNCERTAINTY_V1, set())\n    errors += check_geocoder_v2_projection(registry)\n\n    print(\"\\n== contracts/reader-relationships-v1 ==\")\n    errors += validate_package(registry, \"reader-relationships-v1\", READER_RELATIONSHIPS_V1, set())\n    errors += check_openapi(READER_RELATIONSHIPS_V1, registry)\n\n    print(\"\\n== contracts/reading-feedback-v1 ==\")\n    errors += validate_package(registry, \"reading-feedback-v1\", READING_FEEDBACK_V1, set())\n    errors += check_openapi(READING_FEEDBACK_V1, registry)\n    errors += validate_package(registry, \"runtime-health-v1\", RUNTIME_HEALTH_V1, set())\n    errors += check_openapi(RUNTIME_HEALTH_V1, registry)"
       },
       "observed_at": null
     },
     {
-      "id": "evidence-b8-openapi-skip",
+      "id": "evidence-b8-required-openapi-dependencies",
       "kind": "source",
       "path": "contracts/validate_schemas.py",
       "selector": {
-        "text": "print(\"OpenAPI SKIP (install openapi-spec-validator pyyaml to enable)\")"
+        "text": "def required_openapi_dependencies() -> list[str]:\n    \"\"\"The release gate never treats an unavailable validator as a passing check.\"\"\"\n    try:\n        import yaml\n        from jsonschema_path.handlers import default_handlers\n        from openapi_spec_validator import validate\n        from openapi_spec_validator.validation import OpenAPIV31SpecValidator\n    except ImportError:\n        return [\"required OpenAPI validation dependencies unavailable; install openapi-spec-validator pyyaml\"]\n    return []\n"
       },
       "observed_at": null
     },
@@ -10425,7 +10344,7 @@
       "kind": "source",
       "path": "scripts/pattern-release/release-evidence.mjs",
       "selector": {
-        "text": "source_before: sourceBefore,\n    source_after_sha256: sourceAfter.files_sha256,\n    source_unchanged: sourceComparison.ok,\n    source_comparison: sourceComparison,\n    gate: {\n      status: \"observed\", command: \"npm run ci:local\", started_at: startedAt,\n      exit_code: exitCode, output_sha256: outputHash.digest(\"hex\"), summary: parseCiSummary(outputTail),\n    },\n    repository_identity: captureRepositoryIdentity(root, sourceAfter),\n    artifacts: captureArtifacts(root),\n    deployment: { ...DEPLOYMENT },"
+        "text": "    source_before: sourceBefore,\n    source_after_sha256: sourceAfter.files_sha256,\n    source_unchanged: sourceComparison.ok,\n    source_comparison: sourceComparison,\n    gate: {\n      status: \"observed\", command: \"npm run ci:local\", started_at: startedAt,\n      exit_code: exitCode, output_sha256: outputHash.digest(\"hex\"), summary: parseCiSummary(outputTail, exitCode),\n    },\n    repository_identity: captureRepositoryIdentity(root, sourceAfter),\n    artifacts: captureArtifacts(root),\n    deployment: { ...DEPLOYMENT },"
       },
       "observed_at": null
     },
@@ -10470,16 +10389,16 @@
       "kind": "source",
       "path": "scripts/ci-local.sh",
       "selector": {
-        "text": "green \"ALL STEPS PASSED — safe to merge on local evidence.\""
+        "text": "node \"$SUMMARY_TOOL\" format \"$(node -v)\" \"$(npm -v)\" \"${HAVE_PY#Python }\" \"${STEP_RECORDS[@]}\" || FAILED=1"
       },
       "observed_at": null
     },
     {
-      "id": "evidence-b8-parse-ci-summary-em-dash",
+      "id": "evidence-b8-canonical-ci-summary-parser",
       "kind": "source",
-      "path": "scripts/pattern-release/release-evidence.mjs",
+      "path": "scripts/pattern-release/ci-summary.mjs",
       "selector": {
-        "text": "export function parseCiSummary(output) {\n  const clean = output.replace(/\\u001b\\[[0-9;]*m/g, \"\");\n  const index = clean.lastIndexOf(\" SUMMARY \");\n  const tail = index < 0 ? \"\" : clean.slice(index);\n  const parsed = [...tail.matchAll(/^\\s*(pass|FAIL)\\s+(.+?)\\s*$/gm)].map((match) => ({ name: match[2], result: match[1] }));\n  const toolchainMatch = tail.match(/^node\\s+(v\\d+\\.\\d+\\.\\d+)\\s+npm\\s+(\\d+\\.\\d+\\.\\d+)\\s+python\\s+(\\d+\\.\\d+\\.\\d+)\\s*$/m);\n  const toolchain = toolchainMatch ? { node: toolchainMatch[1], npm: toolchainMatch[2], python: toolchainMatch[3] } : null;\n  const lanes = parsed.filter((item) => CI_LANES.includes(item.name));\n  const finalSuccess = /^ALL STEPS PASSED — safe to merge on local evidence\\.\\s*$/m.test(tail);\n  const passed = finalSuccess && toolchain !== null && parsed.length === CI_LANES.length\n    && parsed.every((item, index) => item.name === CI_LANES[index] && item.result === \"pass\");\n  return { passed, final_success: finalSuccess, toolchain, lanes };\n}"
+        "text": "export function parseCiSummary(output, exitCode) {\n  const clean = typeof output === \"string\" ? output.replace(/\\u001b\\[[0-9;]*m/g, \"\") : \"\";\n  const lines = clean.replace(/\\r\\n/g, \"\\n\").replace(/\\n+$/, \"\").split(\"\\n\");\n  const starts = lines.flatMap((line, index) => line === CI_SUMMARY_BEGIN ? [index] : []);\n  const block = starts.length === 1 ? lines.slice(starts[0]) : [];\n  const toolchain = parseToolchain(block[1] ?? \"\");\n  const finalSuccess = block.at(-2) === CI_SUMMARY_PASSED;\n  const entries = block.slice(2, -2).map((line) => {\n    const match = /^(pass|FAIL|skip)\\t([\\x20-\\x7e]+)$/.exec(line);\n    return match ? { name: match[2], result: match[1] } : null;\n  });\n  const lanes = entries.filter((lane) => lane !== null);\n  const complete = block.at(-1) === CI_SUMMARY_END && entries.every(Boolean)\n    && toolchain !== null && passingLanes(lanes);\n  return {\n    format_version: CI_SUMMARY_VERSION,\n    exit_code: Number.isInteger(exitCode) ? exitCode : null,\n    passed: exitCode === 0 && finalSuccess && complete,\n    final_success: finalSuccess,\n    toolchain,\n    lanes,\n  };\n}\n"
       },
       "observed_at": null
     },
@@ -10506,7 +10425,7 @@
       "kind": "source",
       "path": "scripts/ci-local.sh",
       "selector": {
-        "text": "run_step \"contracts: npm run test:contracts\" npm run test:contracts"
+        "text": "run_step contracts npm run test:contracts"
       },
       "observed_at": null
     },
@@ -10515,7 +10434,7 @@
       "kind": "source",
       "path": "package.json",
       "selector": {
-        "text": "\"test:contracts\": \"npm run test:spec-renderers && python contracts/validate_schemas.py && python contracts/m0/smoke_check.py && python contracts/smoke_check.py && python contracts/test_portrait_adaptive_migration.py\","
+        "text": "    \"test:contracts\": \"npm run test:spec-renderers && npm run test:contract-tooling && python contracts/validate_schemas.py && python contracts/m0/smoke_check.py && python contracts/smoke_check.py && python contracts/test_portrait_adaptive_migration.py\","
       },
       "observed_at": null
     },
@@ -10524,7 +10443,7 @@
       "kind": "source",
       "path": "scripts/ci-local.sh",
       "selector": {
-        "text": "if [ \"$CLEAN_INSTALL\" -eq 1 ]; then\n  run_step \"monorepo: npm ci\" npm ci\nelse\n  # Workers Builds runs `npm clean-install`, which fails on a lockfile that\n  # disagrees with package.json. This proves that would succeed without paying\n  # for a full reinstall.\n  run_step \"monorepo: npm ci --dry-run (lockfile agrees with package.json)\" \\\n    npm ci --dry-run\nfi\n\nif [ \"$SKIP_EPHE\" -eq 0 ]; then\n  run_step \"monorepo: ephemeris download\" \\\n    npm run ephe:download -w @patternlike/calc-stub"
+        "text": "if [ \"$CLEAN_INSTALL\" -eq 1 ]; then\n  run_step install npm ci\nelse\n  # Workers Builds runs `npm clean-install`, which fails on a lockfile that\n  # disagrees with package.json. This proves that would succeed without paying\n  # for a full reinstall.\n  run_step install npm ci --dry-run\nfi\n\nif [ \"$SKIP_EPHE\" -eq 0 ]; then\n  run_step ephemeris npm run ephe:download -w @patternlike/calc-stub\nelse\n  yellow \"  SKIP ephemeris download (--skip-ephe); incomplete local gate\"\n  STEP_RECORDS+=($'skip\\t'\"${LANE_NAMES[ephemeris]}\")\n  FAILED=1\nfi\n"
       },
       "observed_at": null
     },
@@ -10533,7 +10452,7 @@
       "kind": "source",
       "path": "scripts/ci-local.sh",
       "selector": {
-        "text": "run_step \"monorepo: npm run typecheck\" npm run typecheck\nrun_step \"monorepo: test @patternlike/shared\"          npm run test -w @patternlike/shared\nrun_step \"monorepo: test @patternlike/reading-engine\"  npm run test -w @patternlike/reading-engine\nrun_step \"monorepo: test @patternlike/calc-stub\"       npm run test -w @patternlike/calc-stub\nrun_step \"monorepo: test @patternlike/ontology-signer\" npm run test -w @patternlike/ontology-signer\nrun_step \"monorepo: test @patternlike/api\"             npm run test -w @patternlike/api\nrun_step \"monorepo: test @patternlike/web\"             npm run test -w @patternlike/web\nrun_step \"monorepo: npm run build\" npm run build"
+        "text": "run_step typecheck npm run typecheck\nrun_step shared npm run test -w @patternlike/shared\nrun_step reading-engine npm run test -w @patternlike/reading-engine\nrun_step calc-stub npm run test -w @patternlike/calc-stub\nrun_step ontology-signer npm run test -w @patternlike/ontology-signer\nrun_step api npm run test -w @patternlike/api\nrun_step web npm run test -w @patternlike/web\nrun_step build npm run build"
       },
       "observed_at": null
     },
@@ -10578,7 +10497,7 @@
       "kind": "source",
       "path": "scripts/ci-local.sh",
       "selector": {
-        "text": "run_step \"extra: test @patternlike/pattern-engine\" npm run test -w @patternlike/pattern-engine\nrun_step \"extra: test @patternlike/codex-runner\"   npm run test -w @patternlike/codex-runner\nrun_step \"extra: npm run test:content\"             npm run test:content"
+        "text": "run_step pattern-engine npm run test -w @patternlike/pattern-engine\nrun_step codex-runner npm run test -w @patternlike/codex-runner\nrun_step content npm run test:content\nrun_step source-map-tests npm run test:source-map\nrun_step source-map-current npm run map:check:current"
       },
       "observed_at": null
     },
@@ -10731,7 +10650,7 @@
       "kind": "source",
       "path": "package.json",
       "selector": {
-        "text": "\"map:capture\": \"node scripts/source-map/cli.mjs capture\",\n    \"map:check\": \"node scripts/source-map/cli.mjs check\",\n    \"test:source-map\": \"node --test --test-concurrency=1 \\\"scripts/source-map/*.test.mjs\\\"\""
+        "text": "    \"map:capture\": \"node scripts/source-map/cli.mjs capture\",\n    \"map:check\": \"node scripts/source-map/cli.mjs check\",\n    \"map:check:current\": \"node scripts/source-map/cli.mjs check-current\",\n    \"test:source-map\": \"node --test --test-concurrency=1 \\\"scripts/source-map/*.test.mjs\\\"\""
       },
       "observed_at": null
     },
@@ -10767,7 +10686,7 @@
       "kind": "source",
       "path": "scripts/source-map/model.mjs",
       "selector": {
-        "text": "export const DEFINITION = \"docs/architecture/source-map/map.json\";\nexport const SNAPSHOTS = \"docs/architecture/source-map/snapshots\";"
+        "text": "export const DEFINITION = \"docs/architecture/source-map/map.json\";\nexport const CURRENT = \"docs/architecture/source-map/current.json\";\nexport const SNAPSHOTS = \"docs/architecture/source-map/snapshots\";"
       },
       "observed_at": null
     },
@@ -10830,7 +10749,7 @@
       "kind": "source",
       "path": "scripts/pattern-release/release-evidence.test.mjs",
       "selector": {
-        "text": "test(\"the committed CI script emits a success summary accepted by the release recorder\", () => {\n  const root = repository();\n  try {\n    mkdirSync(join(root, \"scripts\"));\n    writeFileSync(join(root, \"scripts/ci-local.sh\"), readFileSync(join(REPO_ROOT, \"scripts/ci-local.sh\")));\n    mkdirSync(join(root, \".venv/bin\"), { recursive: true });\n    writeFileSync(join(root, \".venv/bin/python\"), \"#!/bin/sh\\nprintf 'Python 3.12.3\\\\n'\\n\", { mode: 0o755 });\n    // Stub the expensive lanes, keeping the committed runner and summary real.\n    const command = [\n      \"npm() { if [ \\\"$1\\\" = \\\"-v\\\" ]; then printf '10.9.8\\\\n'; fi; return 0; }\",\n      \"export -f npm\",\n      \"exec bash scripts/ci-local.sh\",\n    ].join(\"\\n\");\n    const result = spawnSync(\"bash\", [\"-c\", command], { cwd: root, encoding: \"utf8\" });\n    assert.equal(result.status, 0, result.stdout + result.stderr);\n    const parsed = evidence.parseCiSummary(result.stdout);\n    assert.equal(parsed.passed, true, result.stdout);\n    assert.equal(parsed.lanes.length, 14);\n  } finally { rmSync(root, { recursive: true, force: true }); }\n});"
+        "text": "    for (const flags of [\"\", \" --clean\", \" --skip-ephe\"]) {\n      const result = spawnSync(\"bash\", [\"-c\", command + flags], { cwd: root, encoding: \"utf8\" });\n      const skipped = flags === \" --skip-ephe\";\n      assert.equal(result.status, skipped ? 1 : 0, result.stdout + result.stderr);\n      assert.match(result.stdout, /^PATTERNLIKE_CI_SUMMARY_V1_BEGIN$/m);\n      assert.match(result.stdout, skipped ? /^PATTERNLIKE_CI_SUMMARY_V1_FAILED$/m : /^PATTERNLIKE_CI_SUMMARY_V1_PASSED$/m);\n      const parsed = evidence.parseCiSummary(result.stdout, result.status);\n      assert.equal(parsed.passed, !skipped, result.stdout);\n      assert.equal(parsed.lanes.length, 16);\n      assert.equal(parsed.lanes[2].result, skipped ? \"skip\" : \"pass\");\n    }"
       },
       "observed_at": null
     },
@@ -10840,6 +10759,114 @@
       "path": "apps/api/src/services/pattern-execute.ts",
       "selector": {
         "text": "          const correction = buildCorrectionDocument(\n            plan,\n            { deterministic: candidate.failures },\n            planned.next.writer_attempts,\n            (await getWriterCorrectionAt(\n              env, identity, coordinate.generationId, coordinate.stageGeneration, coordinate.attempt,\n            ))?.value,\n          );"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b7-private-response-policy",
+      "kind": "source",
+      "path": "apps/api/src/middleware/private-response.ts",
+      "selector": {
+        "text": "export const privateResponsePolicy: MiddlewareHandler = async (c, next) => {\n  if (c.req.path === \"/health\" || c.req.path === \"/v1/meta\") {\n    await next();\n    return;\n  }\n  // Prepare the header before any refusal, then enforce it on the final response\n  // too, including raw Response objects, downloads, and Hono's error response.\n  c.header(\"Cache-Control\", \"private, no-store\");\n  await next();\n  c.header(\"Cache-Control\", \"private, no-store\");\n};"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b7-private-response-mount",
+      "kind": "source",
+      "path": "apps/api/src/index.ts",
+      "selector": {
+        "text": "app.use(\"*\", privateResponsePolicy);\napp.route(\"/\", healthRoutes);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b2-disclosure-plan",
+      "kind": "source",
+      "path": "packages/reading-engine/src/uncertainty-disclosure.ts",
+      "selector": {
+        "text": "export function buildUncertaintyDisclosurePlan(input: DailyUncertaintyInput): DailyUncertaintyDisclosurePlan {\n  const disclosures: DailyUncertaintyDisclosure[] = [];\n  if (input.accuracy !== \"exact\") {\n    disclosures.push({ kind: \"birth_time\", reason: input.accuracy === \"unknown\" ? \"unknown_birth_time\" : \"approximate_birth_time\",\n      statement: `Your birth time is ${input.accuracy}.` });\n  }\n  for (const feature of input.suppressed_features) {\n    const cause = feature.reason === \"unknown_birth_time\" ? \"your birth time is unknown\" : \"your birthplace is unavailable\";\n    disclosures.push({ kind: \"suppression\", feature_class: feature.feature_class, reason: feature.reason,\n      statement: `${SUPPRESSED_LABELS[feature.feature_class]} are omitted because ${cause}.` });\n  }\n  for (const feature of input.qualified_features) {\n    const supported = QUALIFICATIONS.find((entry) => entry.feature_id === feature.feature_id &&\n      entry.qualification === feature.qualification)!;\n    disclosures.push({ kind: \"qualification\", ...feature, statement: supported.statement });\n  }\n"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b5-portrait-capabilities",
+      "kind": "source",
+      "path": "apps/api/src/services/pattern-portrait.ts",
+      "selector": {
+        "text": "  const generationAvailable = schemaAvailable && portraitEnabled(env)\n    && (selectedProtocol === \"v1\" || adaptivePortraitsEnabled(env));\n  response.capabilities = { supported_protocols: [\"v1\", \"v2\"], generation_available: generationAvailable, allowed_actions: [] };\n  if ((generationAvailable && response.status === \"not_started\") || (schemaAvailable && portraitEnabled(env) && response.status === \"failed\" && response.retryable)) {\n    const now = new Date();\n    const [processing, pattern, writable, existing] = await Promise.all([\n      loadLiveAccountProcessingGrant(env, userId, now), loadPatternGenerationGrant(env, userId, now),\n      env.DB.prepare(\"SELECT 1 FROM users WHERE id=? AND status='active' AND crypto_write_fence IS NULL\").bind(userId).first(),\n      response.portrait_id ? portraitById(env, response.portrait_id) : null,\n    ]);\n    if (processing && pattern && writable && (!existing || (existing.processing_consent_id === processing.consentId && existing.pattern_consent_id === pattern.consentId))) {\n      response.capabilities.allowed_actions.push(response.status === \"failed\" ? \"retry\" : \"create\");\n    }\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b5-portrait-client-actions",
+      "kind": "source",
+      "path": "apps/web/src/components/AccountPatternPortrait.tsx",
+      "selector": {
+        "text": "const mayGenerate = observedAt !== null && (response?.capabilities\n    ? response.capabilities.allowed_actions.includes(response.status === \"failed\" ? \"retry\" : \"create\")\n    : response?.schema_version === \"pattern-portrait/v1\" && (response.status === \"not_started\" || response.retryable));"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-sw-private-cache-guard",
+      "kind": "source",
+      "path": "apps/web/public/sw.js",
+      "selector": {
+        "text": "            const policy = response.headers.get(\"cache-control\") || \"\";\n            if (/(?:^|,)\\s*(?:private|no-store)(?:\\s*(?:=|,|$))/i.test(policy)) return response;"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b8-map-current-pointer",
+      "kind": "source",
+      "path": "scripts/source-map/snapshot.mjs",
+      "selector": {
+        "text": "    if (checkCurrent) {\n      if (argument !== undefined) fail(\"usage_invalid\", null, null, 2);\n      command = \"check\";\n    } else if (![\"capture\", \"check\"].includes(command) || typeof argument !== \"string\") fail(\"usage_invalid\", null, null, 2);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-image-compatibility-before-claim",
+      "kind": "source",
+      "path": "apps/codex-runner/src/runner.ts",
+      "selector": {
+        "text": "  // Claiming spends an attempt. Known local incompatibility must stay outside\n  // that boundary, and must not disable independent text or mesh work.\n  try { if (await options.checkCompatibility() !== true) return \"empty\"; }\n  catch { return \"empty\"; }\n  const claimed = await options.client.claim();"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-image-preflight-wiring",
+      "kind": "source",
+      "path": "apps/codex-runner/src/index.ts",
+      "selector": {
+        "text": "        checkCompatibility: () => portraitModules[1].checkPortraitCompatibility({\n          codexBin: config.codexBin, signal: controller.signal,\n        }),\n"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-image-host-compatibility",
+      "kind": "source",
+      "path": "apps/codex-runner/src/portrait-invocation.ts",
+      "selector": {
+        "text": "async function requirePortraitHost(binary: string, env: NodeJS.ProcessEnv, home: string): Promise<void> {\n  await requireCleanHostInstructions(home);\n  const version = await inspectCli(binary, [\"--version\"], env);\n  if (version !== `codex-cli ${PORTRAIT_CODEX_CLI_VERSION}`) throw new PortraitError(\"generation_failed\", true);\n  const auth = await inspectCli(binary, [\"login\", \"status\"], env);\n  if (!/^Logged in using ChatGPT\\s*$/.test(auth)) throw new PortraitError(\"authentication_failed\", true);\n}\n"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-image-effective-config-preflight",
+      "kind": "source",
+      "path": "apps/codex-runner/src/portrait-invocation.ts",
+      "selector": {
+        "text": "export async function checkPortraitCompatibility(options: PortraitCompatibilityOptions): Promise<boolean> {\n  const env = buildCodexChildEnvironment(options.env ?? process.env);\n  const home = env.CODEX_HOME ?? (env.HOME ? join(env.HOME, \".codex\") : \"\");\n  if (!isAbsolute(home) || options.signal?.aborted) return false;\n  let directory: string | null = null;\n  let compatible = false;\n  try {\n    await requirePortraitHost(options.codexBin, env, home);\n    if (options.signal?.aborted) return false;\n    const parent = options.tempRoot ?? tmpdir();\n    await mkdir(parent, { recursive: true, mode: 0o700 });\n    directory = await mkdtemp(join(parent, \"patternlike-portrait-preflight-\"));\n    await chmod(directory, 0o700);\n    await writeFile(join(directory, \"instructions.txt\"), INSTRUCTIONS, { mode: 0o600 });\n    await appServer({ codexBin: options.codexBin, signal: options.signal }, directory, env, home, () => undefined);\n    compatible = !options.signal?.aborted;\n  } catch { compatible = false; }\n  if (directory) {\n    try { await rm(directory, { recursive: true, force: true }); }\n    catch { compatible = false; }\n  }\n  return compatible;\n}\n"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-image-preflight-no-model-turn",
+      "kind": "source",
+      "path": "apps/codex-runner/src/portrait-invocation.ts",
+      "selector": {
+        "text": "if (!claim) { configurationVerified = true; stop(); return; }"
       },
       "observed_at": null
     }

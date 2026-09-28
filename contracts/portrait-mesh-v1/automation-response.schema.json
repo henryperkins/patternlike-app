@@ -11,6 +11,7 @@
     "consent_policy_version"
   ],
   "properties": {
+    "state": { "$ref": "https://patternlike.app/contracts/portrait-state-v1/portrait-state.schema.json#/$defs/automationState" },
     "schema_version": {
       "const": "portrait-automation/v1"
     },

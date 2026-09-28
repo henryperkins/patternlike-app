@@ -18,6 +18,7 @@ import type {
   CelestialBody,
   ContextRefV5,
   DailySkyFact,
+  DailyUncertaintyInput,
   FactAttributes,
   FactScope,
   LaneRank,
@@ -31,7 +32,6 @@ import type {
 } from "@patternlike/shared";
 
 import type {
-  AssemblyUncertaintyInput,
   EvidenceLane,
   NormalizedCycle,
   Rejection,
@@ -51,21 +51,20 @@ import type {
  */
 export const SELECTION_POLICY_ID = "constrained-context-selection" as const;
 /**
- * 1.3.0: facts are ordered within each lane by DER-02 score (with the
- * corrected exactness factor) instead of by hash-prefix `fact_id`. Frozen
- * commands pinned to 1.1.0/1.2.0 fail `policy_unsupported` and are replaced
- * through the bounded scheduler path rather than executed under new semantics.
+ * 1.5.0: the mandatory provider packet and identity include the complete typed
+ * uncertainty disclosure plan. Earlier commands fail `policy_unsupported`;
+ * their frozen projection is never interpreted under these semantics.
  */
-export const SELECTION_POLICY_VERSION = "1.3.0" as const;
-/** Opt-in categorical feedback projection over the 1.3.0 selection policy. */
-export const CATEGORIZED_FEEDBACK_SELECTION_VERSION = "1.4.0" as const;
+export const SELECTION_POLICY_VERSION = "1.5.0" as const;
+/** Opt-in categorical feedback projection with the same typed uncertainty plan. */
+export const CATEGORIZED_FEEDBACK_SELECTION_VERSION = "1.6.0" as const;
 
 /**
  * Bump for ANY change to what a candidate must satisfy. Stored in v5 evidence,
  * so a reader can tell which rule set a published reading actually passed.
  */
 export const VALIDATION_POLICY_ID = "constrained-candidate-validation" as const;
-export const VALIDATION_POLICY_VERSION = "1.1.1" as const;
+export const VALIDATION_POLICY_VERSION = "1.2.0" as const;
 
 /** Domain-separation tags. Two preimages over the same selection, two digests. */
 export const GENERATION_INPUT_IDENTITY_PROFILE = "patternlike.generation-input-id.v1" as const;
@@ -131,7 +130,7 @@ export interface ConstrainedChartInput {
   container_digest: string;
   /** The recomputed effective accuracy, never the label the caller supplied. */
   effective_accuracy: BirthTimeAccuracy;
-  uncertainty: AssemblyUncertaintyInput;
+  uncertainty: DailyUncertaintyInput;
 }
 
 /**
@@ -204,7 +203,7 @@ export interface ConstrainedContextSignalInput {
 }
 
 export interface ConstrainedReadingInput {
-  schema_version: "0.5.0";
+  schema_version: "0.5.1";
   prompt_version: string;
   output_schema: "daily-reading-v5";
   selection_policy_version: string;

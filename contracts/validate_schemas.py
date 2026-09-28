@@ -50,6 +50,8 @@ GEOCODER_V2 = ROOT / "geocoder-v2"
 PORTRAIT_V1 = ROOT / "portrait-v1"
 PORTRAIT_V2 = ROOT / "portrait-v2"
 PORTRAIT_MESH_V2 = ROOT / "portrait-mesh-v2"
+PORTRAIT_STATE_V1 = ROOT / "portrait-state-v1"
+DAILY_UNCERTAINTY_V1 = ROOT / "daily-uncertainty-v1"
 READER_RELATIONSHIPS_V1 = ROOT / "reader-relationships-v1"
 READING_FEEDBACK_V1 = ROOT / "reading-feedback-v1"
 RUNTIME_HEALTH_V1 = ROOT / "runtime-health-v1"
@@ -71,12 +73,22 @@ GEOCODER_V2_BASE = "https://patternlike.app/contracts/geocoder-v2/"
 PORTRAIT_V1_BASE = "https://patternlike.app/contracts/portrait-v1/"
 PORTRAIT_V2_BASE = "https://patternlike.app/contracts/portrait-v2/"
 PORTRAIT_MESH_V2_BASE = "https://patternlike.app/contracts/portrait-mesh-v2/"
+PORTRAIT_STATE_V1_BASE = "https://patternlike.app/contracts/portrait-state-v1/"
+DAILY_UNCERTAINTY_V1_BASE = "https://patternlike.app/contracts/daily-uncertainty-v1/"
 READER_RELATIONSHIPS_V1_BASE = "https://patternlike.app/contracts/reader-relationships-v1/"
 READING_FEEDBACK_V1_BASE = "https://patternlike.app/contracts/reading-feedback-v1/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
 FIXTURE_SCHEMA = {
+    "portrait-state-v1": {
+        "capabilities": PORTRAIT_STATE_V1_BASE + "portrait-state.schema.json#/$defs/generationCapabilities",
+        "automation-state": PORTRAIT_STATE_V1_BASE + "portrait-state.schema.json#/$defs/automationState",
+    },
+    "daily-uncertainty-v1": {
+        "reading-generation-request": DAILY_UNCERTAINTY_V1_BASE + "reading-generation-request.schema.json#/$defs/readingGenerationRequest",
+        "generation-command": DAILY_UNCERTAINTY_V1_BASE + "generation-command.schema.json#/$defs/generateDailyReadingCommandV2",
+    },
     "runtime-health-v1": {
         "runtime-health-policy": "https://patternlike.app/contracts/runtime-health-v1/runtime-health-policy.schema.json",
         "runtime-health": "https://patternlike.app/contracts/runtime-health-v1/runtime-health.schema.json",
@@ -266,6 +278,8 @@ FIXTURE_SCHEMA = {
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
 # may legitimately accept them; the policy check below must not.
 POLICY_ONLY = {
+    "portrait-state-v1": set(),
+    "daily-uncertainty-v1": set(),
     "runtime-health-v1": set(),
     "reading-feedback-v1": set(),
     "reader-relationships-v1": set(),
@@ -452,7 +466,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):
+    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, PORTRAIT_STATE_V1, DAILY_UNCERTAINTY_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -954,13 +968,27 @@ def generation_command_v2_policy(doc: dict) -> list[str]:
     return errs
 
 
-def reading_generation_request_policy(doc: dict) -> list[str]:
+def reading_generation_request_policy(doc: dict, *, inspect_keys: bool = False) -> list[str]:
     errs = m5_allowed_use_policy(doc)
     encoded = json.dumps(doc)
+    def declared_keys(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                yield key
+                yield from declared_keys(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from declared_keys(child)
+
+    # The successor disclosure plan has closed class labels such as
+    # feature_id="birth_instant". A label is not a private-data property.
+    # Keep the frozen M5 policy unchanged; inspect actual nested keys for the
+    # successor while retaining all stored-handle and cross-field checks.
+    keys = set(declared_keys(doc)) if inspect_keys else None
     errs += [
         f"provider boundary: request declares the key \"{key}\""
         for key in FORBIDDEN_KEYS_IN_GENERATION_REQUEST
-        if f'"{key}"' in encoded
+        if (key in keys if keys is not None else f'"{key}"' in encoded)
     ]
     errs += [
         f"provider boundary: request carries a stored-row handle {prefix!r}"
@@ -1441,7 +1469,9 @@ def validate_package(
             return _m3_policy_errors(fixture, instance, catalogue)
         if name == "m4":
             return _m4_policy_errors(fixture, instance)
-        if name == "m5":
+        if name == "daily-uncertainty-v1" and fixture.startswith("reading-generation-request"):
+            return reading_generation_request_policy(instance, inspect_keys=True)
+        if name in ("m5", "daily-uncertainty-v1"):
             return _m5_policy_errors(fixture, instance)
         if name == "m6":
             return []
@@ -1449,7 +1479,7 @@ def validate_package(
             return _m7_policy_errors(fixture, instance)
         if name == "m8":
             return _m8_policy_errors(fixture, instance)
-        if name in ("m9", "geocoder-v2", "portrait-v1", "portrait-v2", "portrait-mesh-v2", "reader-relationships-v1", "reading-feedback-v1", "runtime-health-v1"):
+        if name in ("m9", "geocoder-v2", "portrait-v1", "portrait-v2", "portrait-mesh-v2", "portrait-state-v1", "reader-relationships-v1", "reading-feedback-v1", "runtime-health-v1"):
             return []
         raise ValueError(f"unregistered contract package policy: {name}")
 
@@ -1520,6 +1550,8 @@ PACKAGE_BASE = {
     "portrait-v1": PORTRAIT_V1_BASE,
     "portrait-v2": PORTRAIT_V2_BASE,
     "portrait-mesh-v2": PORTRAIT_MESH_V2_BASE,
+    "portrait-state-v1": PORTRAIT_STATE_V1_BASE,
+    "daily-uncertainty-v1": DAILY_UNCERTAINTY_V1_BASE,
     "reader-relationships-v1": READER_RELATIONSHIPS_V1_BASE,
     "reading-feedback-v1": READING_FEEDBACK_V1_BASE,
     "runtime-health-v1": "https://patternlike.app/contracts/runtime-health-v1/",
@@ -1570,15 +1602,32 @@ def check_normative_pointers(spec: dict, registry: Registry, label: str) -> list
     return errors
 
 
-def check_openapi(package: Path, registry: Registry) -> list[str]:
+def required_openapi_dependencies() -> list[str]:
+    """The release gate never treats an unavailable validator as a passing check."""
     try:
         import yaml
         from jsonschema_path.handlers import default_handlers
         from openapi_spec_validator import validate
         from openapi_spec_validator.validation import OpenAPIV31SpecValidator
     except ImportError:
-        print("OpenAPI SKIP (install openapi-spec-validator pyyaml to enable)")
-        return []
+        return ["required OpenAPI validation dependencies unavailable; install openapi-spec-validator pyyaml"]
+    return []
+
+
+def check_openapi(package: Path, registry: Registry) -> list[str]:
+    dependency_errors = required_openapi_dependencies()
+    if dependency_errors:
+        for error in dependency_errors:
+            print(f"FAIL openapi      {error}")
+        return dependency_errors
+
+    try:
+        import yaml
+        from jsonschema_path.handlers import default_handlers
+        from openapi_spec_validator import validate
+        from openapi_spec_validator.validation import OpenAPIV31SpecValidator
+    except ImportError:
+        return ["required OpenAPI validation dependencies unavailable; install openapi-spec-validator pyyaml"]
 
     def local_contract_handler(uri: str):
         from urllib.parse import unquote, urlparse
@@ -3996,6 +4045,12 @@ def check_geocoder_v2_projection(registry: Registry) -> list[str]:
 
 
 def main() -> int:
+    dependency_errors = required_openapi_dependencies()
+    if dependency_errors:
+        for error in dependency_errors:
+            print(f"FAIL openapi      {error}")
+        return 1
+
     print("== freeze ==")
     freeze_errors = check_predecessors_frozen()
     for e in freeze_errors:
@@ -4106,6 +4161,8 @@ def main() -> int:
     errors += check_openapi(PORTRAIT_V2, registry)
     errors += validate_package(registry, "portrait-mesh-v2", PORTRAIT_MESH_V2, set())
     errors += check_openapi(PORTRAIT_MESH_V2, registry)
+    errors += validate_package(registry, "portrait-state-v1", PORTRAIT_STATE_V1, set())
+    errors += validate_package(registry, "daily-uncertainty-v1", DAILY_UNCERTAINTY_V1, set())
     errors += check_geocoder_v2_projection(registry)
 
     print("\n== contracts/reader-relationships-v1 ==")
