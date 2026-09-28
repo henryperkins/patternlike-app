@@ -44,6 +44,19 @@ remains available." was traced to this switch.
   stayed pending because `adaptive_portrait_unavailable` is not one of the
   errors that cancel an outbox entry.
 
+## Merge gate
+
+`node scripts/pattern-release/release-evidence.mjs gate` ran `npm run ci:local`
+on `49062fb` from 12:55:12 to 13:08:07 UTC. It exited `0`, all 16 lanes passed,
+and the source was unchanged. The API lane passed 2,806 tests plus the
+compatibility suite, and web passed 948. The bound receipt is
+[`local-gate.json`](artifacts/2026-09-28-adaptive-portrait-admission/local-gate.json),
+and the exact summary is in
+[`local-gate-summary.txt`](artifacts/2026-09-28-adaptive-portrait-admission/local-gate-summary.txt).
+`verify` reports `passed: true` with no problems. The receipt's deployment
+section is `unverified` by design: it records source and gate identity, not the
+deployed Worker.
+
 ## Rollback
 
 Set the production value back to `"0"` and merge; a push to `main` deploys.
