@@ -54,7 +54,7 @@ interface ChartViewProps {
 export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
   const sky = useMemo(() => createPortraitSky(chart, chart.id), [chart]);
   const positionByBody = new Map(chart.positions.map((position) => [position.body, position]));
-  const suppressed = new Set(chart.uncertainty.suppressed_features.map((feature) => feature.feature_class));
+  const suppressed = new Map(chart.uncertainty.suppressed_features.map((feature) => [feature.feature_class, feature.reason]));
   const unknownTime = chart.uncertainty.accuracy === "unknown";
   const moonHidden = unknownTime || suppressed.has("moon_time_sensitive");
   const anglesHidden = unknownTime || suppressed.has("angles");
@@ -90,14 +90,19 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
         {anchors.map((body, index) => {
           const position = positionByBody.get(body);
           const hidden = (body === "moon" && moonHidden) || (body === "ascendant" && anglesHidden);
+          const reason = body === "moon" ? suppressed.get("moon_time_sensitive") : body === "ascendant" ? suppressed.get("angles") : null;
+          const missingTime = unknownTime || reason === "unknown_birth_time";
+          const missingPlace = reason === "birthplace_unavailable";
+          const unavailableLabel = missingTime ? "Birth time unknown" : missingPlace ? "Birthplace unavailable" : "Not available";
+          const unavailableDetail = missingTime ? "Not used without a birth time" : missingPlace ? "Not used without a birthplace" : "Not used for this chart";
           return (
             <article className="anchor" key={body}>
               <span className="anchor__number">0{index + 1}</span>
               <div>
                 <p>{BODY_NAMES[body]}</p>
-                <strong>{hidden ? "Birth time unknown" : positionLabel(position)}</strong>
+                <strong>{hidden ? unavailableLabel : positionLabel(position)}</strong>
                 <small>
-                  {hidden ? "Not used without a birth time" : position?.house ? `House ${position.house}` : body === "ascendant" ? "Birth time dependent" : "No house used"}
+                  {hidden ? unavailableDetail : position?.house ? `House ${position.house}` : body === "ascendant" ? "Birth time dependent" : "No house used"}
                 </small>
               </div>
             </article>

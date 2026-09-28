@@ -100,7 +100,9 @@ export function PortraitAutomationControl({ chartId, canEnable = true, onUnautho
       if (!controller.signal.aborted) {
         valid(next);
         if (next.state?.grant_status === "unknown") throw new Error("Automatic artwork permission could not be checked. Your saved choice is unknown.");
-        setPreference(next); setFresh(true); setObservedAt(Date.now()); setSaved(true); setSavedEnabled(enabled); intentKey.current = null; onChanged?.();
+        const confirmed = next.enabled === enabled && (enabled || !(next.schema_version === "portrait-automation/v2" && next.legacy_enabled));
+        setPreference(next); setFresh(true); setObservedAt(Date.now()); setSaved(confirmed); setSavedEnabled(confirmed ? enabled : null); intentKey.current = null; onChanged?.();
+        if (!confirmed) setError("Your artwork permission changed. Review the current choice and try again.");
       }
     } catch (cause) {
       if (!controller.signal.aborted) {

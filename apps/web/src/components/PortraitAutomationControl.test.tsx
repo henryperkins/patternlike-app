@@ -14,6 +14,24 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("automatic portrait permission", () => {
+  it.each([
+    { initialEnabled: false, returnedEnabled: false, returnedLegacy: false },
+    { initialEnabled: true, returnedEnabled: true, returnedLegacy: false },
+    { initialEnabled: true, returnedEnabled: false, returnedLegacy: true },
+  ])("reports a concurrent permission change instead of confirming the requested choice: %j", async ({ initialEnabled, returnedEnabled, returnedLegacy }) => {
+    const initial = { ...preference, schema_version: "portrait-automation/v2" as const, consent_policy_version: "2.0.0" as const, enabled: initialEnabled, legacy_enabled: false };
+    vi.mocked(getPortraitAutomation).mockResolvedValue(initial);
+    vi.mocked(setPortraitAutomation).mockResolvedValue({ ...initial, enabled: returnedEnabled, legacy_enabled: returnedLegacy });
+    const changed = vi.fn();
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} onChanged={changed} />);
+    await userEvent.click(await screen.findByRole("checkbox"));
+    expect(await screen.findByText("Your artwork permission changed. Review the current choice and try again.")).toBeInTheDocument();
+    expect(screen.queryByText(/^Automatic artwork is (on|off)\.$/)).not.toBeInTheDocument();
+    expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(returnedEnabled);
+    if (returnedLegacy) expect(screen.getByRole("button", { name: "Stop four-chapter automatic artwork" })).toBeEnabled();
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
   it.each(["disabled", "unknown"] as const)("does not save after stale permission refresh becomes %s and disallows enablement", async (grantStatus) => {
     const start = Date.now();
     const clock = vi.spyOn(Date, "now").mockReturnValue(start);

@@ -612,16 +612,16 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
         return;
       }
       const message = describeFailure(caught, "Your Pattern could not be loaded in this session.");
-      if (mode === "quiet" || stateRef.current) {
-        setAlert(message);
-        return;
-      }
       if (caught instanceof ApiError && [403, 404, 409, 410].includes(caught.status)) {
         ctx.current.clearPortraitSession();
         currentDocument.current = null;
         setDocument(null);
         setState(null);
         stateRef.current = null;
+        setObservation(null);
+      } else if (mode === "quiet" || stateRef.current) {
+        setAlert(message);
+        return;
       }
       setBlockingError(message);
       setAlert(message);
@@ -934,7 +934,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
         {heading}
         <div className={state.state === "failed" ? "pattern-chapters__failure" : "pattern-chapters__empty"}>
           <h3 data-readiness={presentation.pattern.code}>{title}</h3>
-          <p>{details[state.state] ?? "Your chart facts are unchanged."}</p>
+          {state.state !== "locale_confirmation_required" ? <p>{details[state.state] ?? "Your chart facts are unchanged."}</p> : null}
           {deletionReceipt ? (
             <p>
               {deletionReceipt === "accepted" ? "Deletion request accepted." : "The Pattern is already unavailable."}
@@ -950,7 +950,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
               embedded
               initialValue="en-US"
               requestId={null}
-              body="Patterns are written in English (United States). Confirm en-US. Another language tag is saved, and a Pattern cannot be published in it."
+              body={details.locale_confirmation_required}
               savedMessage="Language saved. Checking whether a Pattern can be written."
               onSaved={() => setAttempt((value) => value + 1)}
               onUnauthorized={onUnauthorized}

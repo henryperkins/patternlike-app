@@ -86,6 +86,17 @@ describe("ChartView location qualifications", () => {
     expect(screen.queryByText(/Cancer 12\.3 deg/i)).not.toBeInTheDocument();
   });
 
+  it("identifies missing birthplace without claiming an exact birth time is unknown", () => {
+    const value = chart([]);
+    value.uncertainty.suppressed_features = [{ feature_class: "angles", reason: "birthplace_unavailable" }];
+    render(<ChartView chart={value} onUnauthorized={vi.fn()} />);
+    expect(screen.getByText("Birthplace unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Not used without a birthplace")).toBeInTheDocument();
+    expect(screen.getByText("exact time")).toBeInTheDocument();
+    expect(screen.queryByText("Birth time unknown")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not used without a birth time")).not.toBeInTheDocument();
+  });
+
   it("omits the list when no location feature is qualified", () => {
     render(<ChartView chart={chart([
       { feature_id: "moon", qualification: "low_confidence_moon" },

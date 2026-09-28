@@ -126,7 +126,7 @@ export function PreferenceConfirm({
   };
 
   const form = (
-      <form className={embedded ? "pattern-locale-confirm" : "today-gate__form panel"} onSubmit={submit} noValidate>
+      <form className={embedded ? "today-gate__form pattern-locale-confirm" : "today-gate__form panel"} onSubmit={submit} noValidate>
         <p className="today-gate__body">{body ?? copy.body}</p>
 
         <label htmlFor={fieldId}>{copy.label}</label>

@@ -98,6 +98,46 @@ const generated: PatternResponseV7 = {
 const noop = () => undefined;
 
 describe("PatternExperience", () => {
+  it.each([403, 404, 409, 410])("clears an accepted reading after a quiet refresh is refused with %s", async (status) => {
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      const ready = stateDoc({ state: "ready", pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy } });
+      const responses: Record<string, MockResponse> = { [STATE]: { status: 200, body: ready }, [PATTERN]: { status: 200, body: generated } };
+      apiResponses(responses);
+      render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+      await screen.findByRole("heading", { name: "A standing emphasis" });
+      responses[STATE] = { status, body: { error: { code: "reading_unavailable", message: "This reading is no longer available." } } };
+      clock.mockReturnValue(now + 31_000);
+      const event = new Event("pageshow");
+      Object.defineProperty(event, "persisted", { value: true });
+      await act(async () => { window.dispatchEvent(event); });
+      await waitFor(() => expect(screen.queryByRole("heading", { name: "A standing emphasis" })).not.toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: "Delete this Pattern" })).not.toBeInTheDocument();
+      expect(capturedFor(STATE)).toHaveLength(2);
+    } finally { clock.mockRestore(); }
+  });
+
+  it.each([false, true])("retains an accepted reading during a temporary quiet refresh failure (transport: %s)", async (unreachable) => {
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      const ready = stateDoc({ state: "ready", pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy } });
+      const responses: Record<string, MockResponse> = { [STATE]: { status: 200, body: ready }, [PATTERN]: { status: 200, body: generated } };
+      apiResponses(responses);
+      render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+      await screen.findByRole("heading", { name: "A standing emphasis" });
+      responses[STATE] = { status: 503, unreachable, body: { error: { code: "unavailable", message: "Refresh temporarily unavailable." } } };
+      clock.mockReturnValue(now + 31_000);
+      const event = new Event("pageshow");
+      Object.defineProperty(event, "persisted", { value: true });
+      await act(async () => { window.dispatchEvent(event); });
+      await screen.findAllByText(unreachable ? "The Pattern/Like API could not be reached." : "Your Pattern could not be loaded in this session.");
+      expect(screen.getByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete this Pattern" })).toBeEnabled();
+    } finally { clock.mockRestore(); }
+  });
+
   it("clears accepted content immediately when the account scope changes, even with the same chart key", async () => {
     const ready = stateDoc({ state: "ready", pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy } });
     const responses: Record<string, MockResponse> = { [STATE]: { status: 200, body: ready }, [PATTERN]: { status: 200, body: generated } };
