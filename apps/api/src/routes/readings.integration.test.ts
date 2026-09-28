@@ -1960,6 +1960,26 @@ describe("reading history, detail, and Save routes", () => {
     }
   });
 
+  it("keeps Today, evidence, and resonance feedback responses private and unstored", async () => {
+    // History, detail, and Save already answered private, no-store. The same
+    // reading reached through Today, its evidence, or its feedback did not.
+    const readingId = await publish(USER_A);
+    const responses = [
+      await request("/v1/readings/today"),
+      await request("/v1/readings/today", { method: "PUT" }),
+      await request(`/v1/readings/${readingId}/evidence`),
+      await request(`/v1/readings/${readingId}/feedback`),
+      await request(`/v1/readings/${readingId}/feedback`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+    ];
+    for (const response of responses) {
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    }
+  });
+
   it("serves only owned readable detail and uses the same projection as Today", async () => {
     const readingId = await publish(USER_A);
     const todayResponse = await get<TodayBody>("/v1/readings/today");
