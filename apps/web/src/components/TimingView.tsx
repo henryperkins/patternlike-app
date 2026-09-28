@@ -503,82 +503,91 @@ export function TimingView({ onUnauthorized }: TimingViewProps) {
         {statusMessage}
       </p>
 
-      {failure ? (
-        <section className="timing-failure panel" aria-labelledby="timing-failure-heading">
-          <h2 id="timing-failure-heading">
-            {failure.kind === "not_implemented"
-              ? "Timing is not available on this server."
-              : failure.message}
-          </h2>
-          {failure.kind === "not_implemented" ? (
-            <p>
-              An installed or cached copy of the app may be newer than the
-              server answering it.
-            </p>
-          ) : (
-            <p>Nothing stored has changed. Try the request again.</p>
-          )}
-          {failure.requestId ? (
-            <small className="timing-failure__request">
-              Request {failure.requestId}
-            </small>
-          ) : null}
-          {failure.kind === "error" ? (
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={retry}
-              disabled={busy}
-              aria-busy={busy}
+      {!failure && response ? <Freshness response={response} /> : null}
+
+      {showFilters ? (
+        <section
+          className={`timing-filters${busy ? " timing-filters--busy" : ""}`}
+          aria-label="Timing filters"
+        >
+          <label>
+            <span>Phase</span>
+            <select
+              value={phase}
+              onChange={(event) =>
+                setPhase(event.currentTarget.value as "" | TimingPhaseFilter)
+              }
             >
-              Try again <Icon name="refresh" />
+              {PHASE_OPTIONS.map((option) => (
+                <option key={option.value || "all"} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Duration</span>
+            <select
+              value={duration}
+              onChange={(event) =>
+                setDuration(event.currentTarget.value as "" | TimingDurationFilter)
+              }
+            >
+              {DURATION_OPTIONS.map((option) => (
+                <option key={option.value || "all"} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      ) : null}
+
+      {failure ? (
+        <>
+          <section className="timing-failure panel" aria-labelledby="timing-failure-heading">
+            <h2 id="timing-failure-heading">
+              {failure.kind === "not_implemented"
+                ? "Timing is not available on this server."
+                : failure.message}
+            </h2>
+            {failure.kind === "not_implemented" ? (
+              <p>
+                An installed or cached copy of the app may be newer than the
+                server answering it.
+              </p>
+            ) : (
+              <p>Nothing stored has changed. Try the request again.</p>
+            )}
+            {failure.requestId ? (
+              <small className="timing-failure__request">
+                Request {failure.requestId}
+              </small>
+            ) : null}
+            {failure.kind === "error" ? (
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={retry}
+                disabled={busy}
+                aria-busy={busy}
+              >
+                Try again <Icon name="refresh" />
+              </button>
+            ) : null}
+          </section>
+          {isFiltered ? (
+            <button
+              className="button button--secondary timing-filters__reset"
+              type="button"
+              onClick={resetFilters}
+            >
+              Reset filters
             </button>
           ) : null}
-        </section>
+        </>
       ) : (
         <>
-          {response ? <Freshness response={response} /> : null}
-
-          {showFilters ? (
-            <section
-              className={`timing-filters${busy ? " timing-filters--busy" : ""}`}
-              aria-label="Timing filters"
-            >
-              <label>
-                <span>Phase</span>
-                <select
-                  value={phase}
-                  onChange={(event) =>
-                    setPhase(event.currentTarget.value as "" | TimingPhaseFilter)
-                  }
-                >
-                  {PHASE_OPTIONS.map((option) => (
-                    <option key={option.value || "all"} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Duration</span>
-                <select
-                  value={duration}
-                  onChange={(event) =>
-                    setDuration(
-                      event.currentTarget.value as "" | TimingDurationFilter,
-                    )
-                  }
-                >
-                  {DURATION_OPTIONS.map((option) => (
-                    <option key={option.value || "all"} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </section>
-          ) : null}
-
           {busy && !response ? (
             <div className="timing-loading" aria-hidden="true">
               <span />

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Icon, type IconName } from "./icons.js";
 
 export type ViewId = "today" | "history" | "pattern" | "timing" | "travel" | "privacy";
@@ -49,9 +49,16 @@ function NavItems({ activeView, mobile = false }: { activeView: ViewId; mobile?:
 }
 
 export function AppShell({ activeView, chartStatus, children }: AppShellProps) {
+  const contentRef = useRef<HTMLElement>(null);
+
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a className="skip-link" href="#main-content" onClick={(event) => {
+        // The hash belongs to the router. Skip within the current view without
+        // replacing that route or adding an entry to browser history.
+        event.preventDefault();
+        contentRef.current?.focus();
+      }}>
         Skip to content
       </a>
 
@@ -83,7 +90,7 @@ export function AppShell({ activeView, chartStatus, children }: AppShellProps) {
         <StatusMark status={chartStatus} />
       </header>
 
-      <main className="main-content" id="main-content">
+      <main className="main-content" id="main-content" ref={contentRef} tabIndex={-1}>
         {children}
       </main>
 

@@ -1,8 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { capturedFor, mockApiResponses, type MockResponse } from "../test/api-mock.js";
+import { capturedFor, deferred, mockApiResponses, type MockResponse } from "../test/api-mock.js";
 import { lifeEvent, travelResponse } from "../test/travel-fixture.js";
 import { TimeTravelView } from "./TimeTravelView.js";
 
@@ -241,6 +241,183 @@ describe("Time Travel", () => {
       screen.queryByRole("heading", { name: /Selected date against now/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Calculated now")).not.toBeInTheDocument();
+  });
+
+  it("hides the previous reconstruction while the selected date is loading", async () => {
+    const user = userEvent.setup();
+    const nextRequest = deferred();
+    const responses: Record<string, MockResponse> = {
+      [TRAVEL]: { status: 200, body: travelResponse() },
+      [EVENTS]: emptyEvents(),
+    };
+    mockApiResponses(responses);
+    render(<TimeTravelView onUnauthorized={noop} />);
+
+    expect(
+      await screen.findByRole("heading", { name: /Selected date against now/i }),
+    ).toBeInTheDocument();
+    responses[TRAVEL] = { status: 200, body: travelResponse(), gate: nextRequest.promise };
+
+    await user.click(screen.getByRole("button", { name: "Previous day" }));
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(2));
+
+    expect(screen.getByRole("status")).toHaveTextContent(/Reconstructing/i);
+    expect(screen.queryByRole("heading", { name: /Selected date against now/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Calculated now")).not.toBeInTheDocument();
+
+    nextRequest.release();
+    expect(
+      await screen.findByRole("heading", { name: /Selected date against now/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps observed timeline permission while another date loads", async () => {
+    const user = userEvent.setup();
+    const nextRequest = deferred();
+    const responses: Record<string, MockResponse> = {
+      [TRAVEL]: { status: 200, body: travelResponse({ life_event_source_state: "active" }) },
+      [EVENTS]: emptyEvents(),
+    };
+    mockApiResponses(responses);
+    render(<TimeTravelView onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("button", { name: /Add an event/i })).toBeEnabled();
+    responses[TRAVEL] = {
+      status: 200,
+      body: travelResponse({ life_event_source_state: "paused" }),
+      gate: nextRequest.promise,
+    };
+
+    await user.click(screen.getByRole("button", { name: "Previous day" }));
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(2));
+
+    expect(
+      screen.queryByRole("heading", { name: /Selected date against now/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add an event/i })).toBeEnabled();
+    expect(
+      screen.queryByText(/Adding an event needs the Life-event timeline permission/i),
+    ).not.toBeInTheDocument();
+
+    nextRequest.release();
+    expect(
+      await screen.findByRole("heading", { name: /Selected date against now/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add an event/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Adding and editing are off while this permission is not active/i),
+    ).toBeInTheDocument();
+  });
+
+  it("clears observed timeline permission when the new date is refused", async () => {
+    const user = userEvent.setup();
+    const nextRequest = deferred();
+    const responses: Record<string, MockResponse> = {
+      [TRAVEL]: { status: 200, body: travelResponse({ life_event_source_state: "active" }) },
+      [EVENTS]: emptyEvents(),
+    };
+    mockApiResponses(responses);
+    render(<TimeTravelView onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("button", { name: /Add an event/i })).toBeEnabled();
+    responses[TRAVEL] = {
+      ...refusal(403, "timezone_confirmation_required"),
+      gate: nextRequest.promise,
+    };
+
+    await user.click(screen.getByRole("button", { name: "Previous day" }));
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(2));
+    expect(screen.getByRole("button", { name: /Add an event/i })).toBeEnabled();
+
+    nextRequest.release();
+    expect(
+      await screen.findByRole("heading", { name: /Confirm your time zone/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add an event/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Adding an event needs the Life-event timeline permission/i),
+    ).toBeInTheDocument();
+  });
+
+  it("removes an old refusal and its recovery action as soon as the date changes", async () => {
+    const user = userEvent.setup();
+    const nextRequest = deferred();
+    const responses: Record<string, MockResponse> = {
+      [TRAVEL]: refusal(422, "skipped_local_date", { next_representable_date: "2026-03-09" }),
+      [EVENTS]: emptyEvents(),
+    };
+    mockApiResponses(responses);
+    render(<TimeTravelView onUnauthorized={noop} />);
+
+    expect(
+      await screen.findByRole("heading", { name: /skipped that calendar date entirely/i }),
+    ).toBeInTheDocument();
+    responses[TRAVEL] = { status: 200, body: travelResponse(), gate: nextRequest.promise };
+
+    await user.click(screen.getByRole("button", { name: "Previous day" }));
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(2));
+
+    expect(screen.getByRole("status")).toHaveTextContent(/Reconstructing/i);
+    expect(screen.queryByRole("heading", { name: /skipped that calendar date entirely/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Go to/i })).not.toBeInTheDocument();
+
+    nextRequest.release();
+    expect(
+      await screen.findByRole("heading", { name: /Selected date against now/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the retry button focused through a same-date reload", async () => {
+    const user = userEvent.setup();
+    const nextRequest = deferred();
+    const responses: Record<string, MockResponse> = {
+      [TRAVEL]: refusal(503, "calc_unavailable"),
+      [EVENTS]: emptyEvents(),
+    };
+    mockApiResponses(responses);
+    render(<TimeTravelView onUnauthorized={noop} />);
+
+    const retry = await screen.findByRole("button", { name: /Try again/i });
+    responses[TRAVEL] = { ...refusal(503, "calc_unavailable"), gate: nextRequest.promise };
+
+    await user.click(retry);
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(2));
+    expect(retry).toBeInTheDocument();
+    expect(retry).toBeDisabled();
+    expect(retry).toHaveFocus();
+
+    nextRequest.release();
+    await vi.waitFor(() => expect(retry).toBeEnabled());
+    expect(retry).toHaveFocus();
+  });
+
+  it("ignores a previous date's response after its request is aborted", async () => {
+    const firstRequest = deferred();
+    const nextRequest = deferred();
+    const nextResponse = travelResponse();
+    nextResponse.selected.cycles = [];
+    nextResponse.comparison = { continuing: [], selected_only: [], present_only: [], phase_changed: [] };
+    const responses: Record<string, MockResponse> = {
+      [TRAVEL]: { status: 200, body: travelResponse(), gate: firstRequest.promise },
+      [EVENTS]: emptyEvents(),
+    };
+    mockApiResponses(responses);
+    render(<TimeTravelView onUnauthorized={noop} />);
+
+    const dateField = screen.getByLabelText("Selected date") as HTMLInputElement;
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(1));
+    responses[TRAVEL] = { status: 200, body: nextResponse, gate: nextRequest.promise };
+    fireEvent.change(dateField, { target: { value: "2026-05-01" } });
+    await vi.waitFor(() => expect(capturedFor(TRAVEL)).toHaveLength(2));
+
+    nextRequest.release();
+    expect(await screen.findByText(/No calculated cycle overlaps this reference/i)).toBeInTheDocument();
+    expect(capturedFor(TRAVEL)[0].signal?.aborted).toBe(true);
+    await act(async () => {
+      firstRequest.release();
+      await firstRequest.promise;
+    });
+    expect(screen.getByText(/No calculated cycle overlaps this reference/i)).toBeInTheDocument();
   });
 
   it("hands a mid-visit 401 to the application", async () => {

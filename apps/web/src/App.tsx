@@ -96,6 +96,8 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   const [hasValidatedSession, setHasValidatedSession] = useState(false);
   const [preferenceSyncRevision, setPreferenceSyncRevision] = useState(0);
   const [correctingBirth, setCorrectingBirth] = useState(false);
+  const isDeletionStatus = view === "deletion-status";
+  const shouldLoadAccount = !isDeletionStatus && authState.status !== "signed-out";
 
   const chartRequestGeneration = useRef(0);
   const [sessionEpoch, setSessionEpoch] = useState(0);
@@ -211,17 +213,26 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   }, [view]);
 
   useEffect(() => {
-    if (isAuth0Redirect || currentView() === "deletion-status") return;
+    if (!isDeletionStatus) return;
+    // Receipt access has its own authority. Drop the old account observation
+    // and invalidate even chart reads started outside the mount effect.
+    chartRequestGeneration.current++;
+    setHasValidatedSession(false);
+    setChartState({ status: "loading" });
+  }, [isDeletionStatus]);
+
+  useEffect(() => {
+    if (isAuth0Redirect || !shouldLoadAccount) return;
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
-  }, [isAuth0Redirect, load]);
+  }, [isAuth0Redirect, shouldLoadAccount, load]);
 
   useEffect(() => {
     if (
       !isAuth0Redirect ||
       isAuth0Loading ||
-      currentView() === "deletion-status"
+      !shouldLoadAccount
     ) {
       return;
     }
@@ -260,6 +271,7 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     getIdTokenClaims,
     isAuth0Loading,
     isAuth0Redirect,
+    shouldLoadAccount,
     load,
   ]);
 

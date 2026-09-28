@@ -375,6 +375,10 @@ export function TimeTravelView({ onUnauthorized }: TimeTravelViewProps) {
   const today = useMemo(() => todayIsoDate(), []);
   const [date, setDate] = useState(today);
   const [response, setResponse] = useState<TimeTravelResponse | null>(null);
+  // Permission is account-level; a date change only invalidates the reconstruction.
+  const [sourceState, setSourceState] = useState<TimeTravelResponse["life_event_source_state"]>(
+    "never_granted",
+  );
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -399,6 +403,7 @@ export function TimeTravelView({ onUnauthorized }: TimeTravelViewProps) {
         if (controller.signal.aborted) return;
         if (!isTimeTravelResponse(result)) {
           setResponse(null);
+          setSourceState("never_granted");
           setFailure({
             kind: "refused",
             code: "unreadable_response",
@@ -411,6 +416,7 @@ export function TimeTravelView({ onUnauthorized }: TimeTravelViewProps) {
           return;
         }
         setResponse(result);
+        setSourceState(result.life_event_source_state);
         setFailure(null);
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -419,6 +425,7 @@ export function TimeTravelView({ onUnauthorized }: TimeTravelViewProps) {
         // another date's field, which reads as a stale answer to the new
         // question rather than as no answer.
         setResponse(null);
+        setSourceState("never_granted");
         if (error instanceof ApiError && error.status === 401) {
           setFailure(null);
           onUnauthorized();
@@ -486,7 +493,12 @@ export function TimeTravelView({ onUnauthorized }: TimeTravelViewProps) {
           : "Time Travel is ready to load.";
 
   const selectDate = (next: string) => {
-    if (next && next !== date) setDate(next);
+    if (!next || next === date) return;
+    setResponse(null);
+    setFailure(null);
+    setBusy(true);
+    setRestoreRetryFocus(false);
+    setDate(next);
   };
 
   return (
@@ -679,7 +691,7 @@ export function TimeTravelView({ onUnauthorized }: TimeTravelViewProps) {
       */}
       {failure?.kind === "not_implemented" ? null : (
         <LifeEventTimeline
-          sourceState={response?.life_event_source_state ?? "never_granted"}
+          sourceState={sourceState}
           selectedDate={date}
           onUnauthorized={onUnauthorized}
           onEventsChanged={reload}

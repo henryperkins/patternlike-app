@@ -212,6 +212,86 @@ afterEach(() => {
 });
 
 describe("web application shell", () => {
+  it.each([false, true])("loads the account when leaving a directly opened deletion-status route (Auth0 callback: %s)", async (isAuth0Redirect) => {
+    window.history.replaceState({}, "", "#deletion-status");
+    mockApiResponses({
+      "/v1/account/deletion-status": {
+        status: 401,
+        body: { error: { code: "unauthorized", message: "No deletion receipt in this browser" } },
+      },
+      "/v1/sessions": {
+        status: 201,
+        body: { token: "sess_test_only", expires_at: "2026-09-29T00:00:00Z" },
+      },
+      "/v1/chart": { status: 200, body: chart },
+    });
+    render(<App isAuth0Redirect={isAuth0Redirect} />);
+    await screen.findByRole("heading", { name: "Deletion status is unavailable." });
+    expect(capturedFor("/v1/chart")).toHaveLength(0);
+    expect(capturedFor("/v1/sessions")).toHaveLength(0);
+
+    await act(async () => { window.location.hash = "pattern"; });
+
+    expect(await screen.findByRole("heading", { name: /architecture of your chart/i }))
+      .toBeInTheDocument();
+    expect(capturedFor("/v1/chart")).toHaveLength(1);
+    expect(capturedFor("/v1/sessions")).toHaveLength(isAuth0Redirect ? 1 : 0);
+  });
+
+  it("cancels a pending account probe on the deletion-status route and reads it again on return", async () => {
+    const gate = deferred();
+    const responses: Record<string, MockResponse> = {
+      "/v1/chart": { status: 200, body: chart, gate: gate.promise },
+      "/v1/account/deletion-status": {
+        status: 401,
+        body: { error: { code: "unauthorized", message: "No deletion receipt in this browser" } },
+      },
+    };
+    mockApiResponses(responses);
+    render(<App />);
+    await waitFor(() => expect(capturedFor("/v1/chart")).toHaveLength(1));
+
+    await act(async () => { window.location.hash = "deletion-status"; });
+    await screen.findByRole("heading", { name: "Deletion status is unavailable." });
+    expect(capturedFor("/v1/chart")[0]!.signal?.aborted).toBe(true);
+    await act(async () => gate.release());
+    expect(preferenceSyncHarness.sync).not.toHaveBeenCalled();
+
+    responses["/v1/chart"] = {
+      status: 401,
+      body: { error: { code: "unauthorized", message: "Authentication required" } },
+    };
+    await act(async () => { window.location.hash = "pattern"; });
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(capturedFor("/v1/chart")).toHaveLength(2);
+    expect(screen.queryByText("Taurus 24.1 deg")).not.toBeInTheDocument();
+  });
+
+  it("returns to sign-in after deletion completes without reloading the account", async () => {
+    window.history.replaceState({}, "", "#deletion-status");
+    mockApiResponses({
+      "/v1/account/deletion-status": {
+        status: 200,
+        body: {
+          schema_version: "0.6.0",
+          deletion_request_id: "del_completed_0001",
+          status: "completed",
+          requested_at: "2026-09-28T00:00:00.000Z",
+          status_updated_at: "2026-09-28T00:01:00.000Z",
+          completed_at: "2026-09-28T00:01:00.000Z",
+          error_class: null,
+        },
+      },
+      "/v1/chart": { status: 200, body: chart },
+    });
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "Your account has been deleted." });
+    expect(await screen.findByRole("button", { name: /Sign in/i }, { timeout: 3000 }))
+      .toBeInTheDocument();
+    expect(capturedFor("/v1/chart")).toHaveLength(0);
+  });
+
   it("loads deletion status directly without probing the frozen account chart", async () => {
     window.location.hash = "deletion-status";
     mockApiResponses({

@@ -248,6 +248,74 @@ describe("TimingView", () => {
     await waitFor(() => expect(capturedFor(TIMING).at(-1)!.search).toBe(""));
   });
 
+  it("keeps filters usable after a filtered request fails so another filter can recover", async () => {
+    const user = userEvent.setup();
+    const responses: Record<string, MockResponse> = {
+      [TIMING]: ok(TIMING_RESPONSE),
+    };
+    renderTiming(responses);
+    await screen.findByRole("heading", { name: "Saturn square your Sun" });
+
+    responses[TIMING] = {
+      status: 500,
+      body: {
+        error: {
+          code: "internal_error",
+          message: "Timing could not be loaded.",
+          request_id: "req_filtered_failure",
+        },
+      },
+    };
+    await user.selectOptions(screen.getByLabelText("Phase"), "building");
+    expect(
+      await screen.findByRole("heading", { name: "Timing could not be loaded." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Request req_filtered_failure/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Phase")).toHaveValue("building");
+    expect(screen.getByLabelText("Duration")).toBeInTheDocument();
+
+    responses[TIMING] = ok(
+      timingResponseFixture({
+        filters: { phase: "building", duration: "short" },
+      }),
+    );
+    await user.selectOptions(screen.getByLabelText("Duration"), "short");
+    await waitFor(() =>
+      expect(capturedFor(TIMING).at(-1)!.search).toBe("?phase=building&duration=short"),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Saturn square your Sun" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Request req_filtered_failure/i)).not.toBeInTheDocument();
+  });
+
+  it("can reset filters after a filtered request fails with no retry action", async () => {
+    const user = userEvent.setup();
+    const responses: Record<string, MockResponse> = {
+      [TIMING]: ok(TIMING_RESPONSE),
+    };
+    renderTiming(responses);
+    await screen.findByRole("heading", { name: "Saturn square your Sun" });
+
+    responses[TIMING] = notImplemented("Timing cycles (M3)", "req_filtered_rollback");
+    await user.selectOptions(screen.getByLabelText("Phase"), "peak");
+    expect(
+      await screen.findByRole("heading", {
+        name: "Timing is not available on this server.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Phase")).toHaveValue("peak");
+    expect(screen.getByRole("button", { name: "Reset filters" })).toBeInTheDocument();
+
+    responses[TIMING] = ok(TIMING_RESPONSE);
+    await user.click(screen.getByRole("button", { name: "Reset filters" }));
+    await waitFor(() => expect(capturedFor(TIMING).at(-1)!.search).toBe(""));
+    expect(
+      await screen.findByRole("heading", { name: "Saturn square your Sun" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Phase")).toHaveValue("");
+  });
+
   it("reports unreadable artifacts with facts and with no readable cycles", async () => {
     const first = renderTiming({
       [TIMING]: ok(timingResponseFixture({ unreadableCycleCount: 1 })),
