@@ -1,0 +1,19 @@
+{
+  "schema_version": "daily-edition-reissue/v1",
+  "status": "reserved",
+  "target": {
+    "reading_id": "rdg_01JAMPLEREADING00001",
+    "revision": 1,
+    "local_date": "2026-09-28",
+    "generation_family": "constrained_model"
+  },
+  "successor": {
+    "reading_id": "rdg_01JAMPLEREADING00004",
+    "revision": 2,
+    "revision_reason": "safety_correction",
+    "status": "pending",
+    "job_id": "job_01JAMPLEJOB000000001",
+    "headline": "A narrower commitment"
+  },
+  "dispatched": true
+}

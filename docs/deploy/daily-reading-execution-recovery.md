@@ -38,6 +38,47 @@ with `SERVICE_AUTH_TOKEN`, and read the current reservation before submitting
 a replacement. A `202 replaced` response establishes dispatch, not publication.
 Confirm the successor job, provider state, and published reading separately.
 
+## Reissuing a published edition
+
+To correct a reading that is still published, use
+`POST /internal/readings/edition-reissue`
+([`contracts/daily-edition-reissue-v1`](../../contracts/daily-edition-reissue-v1/README.md)).
+It reserves one successor in the family the Worker derives from the edition's
+retained evidence. Name the edition exactly:
+
+```json
+{
+  "schema_version": "daily-edition-reissue/v1",
+  "user_id": "usr_…",
+  "target": {
+    "reading_id": "rdg_…",
+    "revision": 1,
+    "local_date": "2026-09-28",
+    "generation_family": "constrained_model"
+  },
+  "revision_reason": "safety_correction"
+}
+```
+
+Read the row first. Its `revision`, `local_date`, and `assembly_mode` are the
+target coordinates, and a mismatch is refused rather than corrected. A
+`constrained_model` edition accepts only `safety_correction` or
+`defect_repair`, must be for the reader's current or next local day, and
+needs a live `ai_synthesis` grant. `consent_revoked` never starts a model
+call. Withdraw a factually stale edition with
+`POST /internal/readings/invalidate` instead. A `deterministic` edition must be
+for the current local day and needs an active content release.
+
+The edition stays published until the successor publishes and supersedes it in
+one batch. Repeating the same request answers `200 replayed` with the same
+successor and never freezes another command. A failed successor is recovered
+only through the bounded replacement path: the scheduler for automatically
+replaceable failures, or `/internal/readings/replace` with
+`actor: "operator"`. `POST /internal/readings/reissue` is unchanged and still
+freezes a deterministic command whatever the edition's family, so do not use it
+for constrained-model editions. A `202 reserved` establishes dispatch, not
+publication.
+
 Scheduler candidate exceptions now emit `scheduler_candidate_unprocessable`
 with a closed `lane`, a closed `error_class`, and a random trace ID. Queue
 `generation_threw` events include the same error category. For example,

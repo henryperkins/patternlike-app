@@ -21,6 +21,14 @@ import {
   invalidatePublishedReading,
   reserveFactRepair,
 } from "../services/reading-invalidation.js";
+import { validateDailyEditionReissueRequest } from "../generated/strict-validators.js";
+import {
+  EDITION_REISSUE_MESSAGES,
+  EDITION_REISSUE_SCHEMA_VERSION,
+  EDITION_REISSUE_STATUS,
+  reissuePublishedEdition,
+  type EditionReissueErrorCode,
+} from "../services/edition-reissue.js";
 
 /**
  * Operator and scheduler entry points for daily-reading generation.
@@ -182,6 +190,56 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
       dispatched: result.dispatched,
     },
     202,
+  );
+});
+
+/**
+ * The family-aware successor to `/readings/reissue`
+ * (`contracts/daily-edition-reissue-v1`).
+ *
+ * The route above keeps its deterministic-only builder until it is migrated on
+ * purpose. This one names the exact published edition and its generation
+ * family, derives the family from the edition's retained evidence, and freezes
+ * the successor with that family's builder. Every refusal answers a closed code
+ * with a fixed message, so no builder or D1 detail reaches the caller.
+ */
+internalGenerationRoutes.post("/readings/edition-reissue", async (c) => {
+  const requestId = c.get("requestId");
+  const refusal = (code: EditionReissueErrorCode) =>
+    c.json(
+      {
+        error: {
+          code,
+          message: EDITION_REISSUE_MESSAGES[code],
+          request_id: requestId,
+        },
+      },
+      EDITION_REISSUE_STATUS[code],
+    );
+
+  const body = await readJson(c);
+  if (!validateDailyEditionReissueRequest(body)) return refusal("invalid_body");
+
+  const outcome = await reissuePublishedEdition(c.env, body);
+  if (!outcome.ok) {
+    if (outcome.reason === "conflict") safeLog({ event: "internal_generation_failed" });
+    return refusal(outcome.reason);
+  }
+  return c.json(
+    {
+      schema_version: EDITION_REISSUE_SCHEMA_VERSION,
+      status: outcome.status,
+      target: body.target,
+      successor: {
+        reading_id: outcome.successor.readingId,
+        revision: outcome.successor.revision,
+        revision_reason: outcome.successor.revisionReason,
+        status: outcome.successor.status,
+        job_id: outcome.successor.jobId,
+      },
+      dispatched: outcome.dispatched,
+    },
+    outcome.status === "reserved" ? 202 : 200,
   );
 });
 

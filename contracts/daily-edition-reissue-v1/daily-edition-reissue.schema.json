@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json",
+  "title": "Family-aware Daily edition reissue v1",
+  "description": "Operator request and result shapes for POST /internal/readings/edition-reissue. The operation reserves exactly one successor to one named published Daily edition, in the generation family the Worker derives from that edition's retained evidence. It is additive: POST /internal/readings/reissue keeps its deterministic-only semantics, and invalidation and failed-command replacement remain separate operations. JSON Schema binds the public shape and the family/reason matrix; the Worker binds ownership, the exact stored edition, date scope, consent, and publication at runtime.",
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "daily-edition-reissue/v1"
+    },
+    "userId": {
+      "type": "string",
+      "pattern": "^usr_[A-Za-z0-9_-]{1,124}$"
+    },
+    "readingId": {
+      "type": "string",
+      "pattern": "^rdg_[A-Za-z0-9_-]{1,124}$"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^job_[A-Za-z0-9_-]{1,124}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "localDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "generationFamily": {
+      "type": "string",
+      "enum": ["deterministic", "constrained_model"],
+      "description": "The retained assembly_mode of the named edition. deterministic editions are reissued by the V1 assembler against an active content release; constrained_model editions are reissued by a new V2 constrained-model command."
+    },
+    "revisionReason": {
+      "type": "string",
+      "enum": ["chart_recalculated", "consent_revoked", "safety_correction", "defect_repair"],
+      "description": "Why the successor revision exists. initial is never a reissue reason."
+    },
+    "constrainedModelReason": {
+      "type": "string",
+      "enum": ["safety_correction", "defect_repair"],
+      "description": "The only reasons that may start a new constrained-model generation. A consent revocation never authorizes a model call by itself, and a chart correction must withdraw the stale edition through invalidation and fact repair rather than leave it published while a successor is generated."
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reading_id", "revision", "local_date", "generation_family"],
+      "properties": {
+        "reading_id": { "$ref": "#/$defs/readingId" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "local_date": { "$ref": "#/$defs/localDate" },
+        "generation_family": { "$ref": "#/$defs/generationFamily" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "user_id", "target", "revision_reason"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "user_id": { "$ref": "#/$defs/userId" },
+        "target": { "$ref": "#/$defs/target" },
+        "revision_reason": { "$ref": "#/$defs/revisionReason" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "target": {
+                "type": "object",
+                "properties": {
+                  "generation_family": { "const": "constrained_model" }
+                },
+                "required": ["generation_family"]
+              }
+            },
+            "required": ["target"]
+          },
+          "then": {
+            "properties": {
+              "revision_reason": { "$ref": "#/$defs/constrainedModelReason" }
+            }
+          }
+        }
+      ]
+    },
+    "successorStatus": {
+      "type": "string",
+      "enum": ["pending", "published", "failed", "superseded", "invalidated"],
+      "description": "The successor row's current lifecycle state. A reserved or replayed successor is dispatch evidence only; publication is confirmed separately."
+    },
+    "successor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reading_id", "revision", "revision_reason", "status", "job_id"],
+      "properties": {
+        "reading_id": { "$ref": "#/$defs/readingId" },
+        "revision": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 2147483647
+        },
+        "revision_reason": { "$ref": "#/$defs/revisionReason" },
+        "status": { "$ref": "#/$defs/successorStatus" },
+        "job_id": { "$ref": "#/$defs/jobId" }
+      }
+    },
+    "accepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "status", "target", "successor", "dispatched"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "status": {
+          "type": "string",
+          "enum": ["reserved", "replayed"],
+          "description": "reserved (202): this request reserved the successor. replayed (200): the named edition already has the matching successor, and nothing new was frozen or reserved."
+        },
+        "target": { "$ref": "#/$defs/target" },
+        "successor": { "$ref": "#/$defs/successor" },
+        "dispatched": {
+          "type": "boolean",
+          "description": "Whether the successor's active job has been handed to the queue. Never evidence of publication."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "reserved" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "successor": {
+                "type": "object",
+                "properties": { "status": { "const": "pending" } },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "target": {
+                "type": "object",
+                "properties": {
+                  "generation_family": { "const": "constrained_model" }
+                },
+                "required": ["generation_family"]
+              }
+            },
+            "required": ["target"]
+          },
+          "then": {
+            "properties": {
+              "successor": {
+                "type": "object",
+                "properties": {
+                  "revision_reason": { "$ref": "#/$defs/constrainedModelReason" }
+                },
+                "required": ["revision_reason"]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "operationErrorCode": {
+      "type": "string",
+      "enum": [
+        "invalid_body",
+        "account_not_active",
+        "account_processing_required",
+        "target_not_found",
+        "target_mismatch",
+        "family_mismatch",
+        "target_evidence_invalid",
+        "stale_target",
+        "reissue_conflict",
+        "reason_not_supported",
+        "day_out_of_scope",
+        "rollout_disabled",
+        "publisher_not_configured",
+        "timezone_confirmation_required",
+        "locale_confirmation_required",
+        "chart_not_found",
+        "release_not_active",
+        "release_unreadable",
+        "release_hash_mismatch",
+        "calc_unavailable",
+        "daily_sky_unavailable",
+        "cycle_scan_refused",
+        "assembly_failed",
+        "ai_synthesis_consent_required",
+        "policy_unsupported",
+        "context_ineligible",
+        "skipped_local_date",
+        "conflict"
+      ],
+      "description": "The closed refusal vocabulary of this operation. A refusal reserves nothing and starts no calculation, provider, or model work that outlives the request."
+    },
+    "errorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "request_id"],
+          "properties": {
+            "code": { "$ref": "#/$defs/operationErrorCode" },
+            "message": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "request_id": {
+              "oneOf": [
+                { "type": "string", "minLength": 1, "maxLength": 128 },
+                { "type": "null" }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "middlewareErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["code", "message"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": ["unauthorized", "service_auth_not_configured", "configuration_error"]
+            },
+            "message": { "type": "string" },
+            "request_id": {
+              "oneOf": [{ "type": "string" }, { "type": "null" }]
+            }
+          }
+        }
+      },
+      "description": "Answered by the shared /internal configuration guard or service-token middleware before the operation runs."
+    }
+  }
+}

@@ -1526,7 +1526,7 @@
           "leaves": [
             {
               "id": "leaf-operator-generation-and-repair-1",
-              "text": "POST /internal/readings/generate and ordinary /internal/readings/reissue both call the legacy buildGenerationCommand. Reissue requires user_id, an expected still-published reading, and chart_recalculated, consent_revoked, safety_correction, or defect_repair as its reason. It loads predecessor ID, revision, and status without deriving the generation family, then freezes a deterministic V1 successor that requires an active editorial content release. Separate V2 repair paths do not make ordinary published-target reissue family-aware.",
+              "text": "POST /internal/readings/generate and the legacy /internal/readings/reissue both call buildGenerationCommand. Reissue requires user_id, an expected still-published reading, and chart_recalculated, consent_revoked, safety_correction, or defect_repair as its reason. It loads predecessor ID, revision, and status without deriving the generation family, then freezes a deterministic V1 successor that requires an active editorial content release. That legacy route is deliberately unchanged; the family-aware successor is POST /internal/readings/edition-reissue.",
               "evidence_ids": [
                 "evidence-b6-reissue-reasons",
                 "evidence-b6-reissue-validation",
@@ -1559,6 +1559,35 @@
                 "evidence-b6-reservation-reason-mapping",
                 "evidence-b6-replace-actor",
                 "evidence-b6-failed-replacement-family"
+              ]
+            },
+            {
+              "id": "leaf-operator-generation-and-repair-4",
+              "text": "POST /internal/readings/edition-reissue (contract daily-edition-reissue/v1) admits only a body its generated validator accepts. It names the exact published edition and its family, reads the family from the edition's retained assembly_mode, requires the decrypted envelope to agree, and freezes the successor with that family's builder: a V2 manual_reissue command for constrained_model or a V1 command for deterministic. A constrained-model edition accepts only safety_correction or defect_repair, so consent_revoked never starts a model call. Deterministic editions must be for the current local day, and constrained-model editions for the current or next one.",
+              "evidence_ids": [
+                "evidence-b6-edition-reissue-route",
+                "evidence-b6-edition-reissue-validator",
+                "evidence-b6-edition-reissue-family",
+                "evidence-b6-edition-reissue-retained-evidence",
+                "evidence-b6-edition-reissue-v2-builder",
+                "evidence-b6-edition-reissue-v1-builder",
+                "evidence-b6-edition-reissue-reason-matrix",
+                "evidence-b6-edition-reissue-contract-matrix",
+                "evidence-b6-edition-reissue-deterministic-window",
+                "evidence-b6-edition-reissue-constrained-window"
+              ]
+            },
+            {
+              "id": "leaf-operator-generation-and-repair-5",
+              "text": "The edition itself is the idempotency identity, because uq_daily_readings_successor admits one successor per predecessor. An identical request replays that successor, compared against its generation-1 command, and freezes nothing new; a different reason or family, or a fact-repair successor, is a conflict. It never re-freezes a failed successor, which stays with bounded replacement. Caller guards in reserveReissue's batch re-assert the exact published edition, the account-processing grant, and the frozen ai_synthesis grant, and the edition stays published until the successor's own publication supersedes it.",
+              "evidence_ids": [
+                "evidence-b6-successor-unique-index",
+                "evidence-b6-edition-reissue-original-command",
+                "evidence-b6-edition-reissue-replay-reason",
+                "evidence-b6-edition-reissue-guard-call",
+                "evidence-b6-reserve-reissue-guards",
+                "evidence-b6-ai-grant-assertion",
+                "evidence-b6-v5-predecessor-transition"
               ]
             }
           ]
@@ -1642,13 +1671,14 @@
             },
             {
               "id": "leaf-committed-production-switches-5",
-              "text": "POST /internal/readings/generate and /internal/readings/reissue build V1 commands, which run on the deterministic executor, pin no model, and pass no READING_V5_ROLLOUT gate; that gate applies only to constrained-model reservations.",
+              "text": "POST /internal/readings/generate and /internal/readings/reissue build V1 commands, which run on the deterministic executor, pin no model, and pass no READING_V5_ROLLOUT gate; that gate applies only to constrained-model reservations. POST /internal/readings/edition-reissue applies that gate, for its internal entry point, only when the named edition is constrained-model.",
               "evidence_ids": [
                 "evidence-b6-generate-route-v1",
                 "evidence-b6-generate-v1-builder",
                 "evidence-b6-reissue-v1-builder",
                 "evidence-b6-daily-executor-by-version",
-                "evidence-b6-constrained-rollout-gate"
+                "evidence-b6-constrained-rollout-gate",
+                "evidence-b6-edition-reissue-rollout"
               ]
             },
             {
@@ -2097,7 +2127,7 @@
           "leaves": [
             {
               "id": "leaf-schemas-and-ordered-migrations-1",
-              "text": "contracts/ holds the frozen M0 baseline and later packages: M3 to M9, geocoder-v2, portrait-v1 and v2, portrait-mesh-v1 and v2, portrait-state-v1, daily-uncertainty-v1, reader-relationships-v1, reading-feedback-v1, and runtime-health-v1, with JSON Schemas and fixtures. The Daily uncertainty package versions request/command input to 0.5.1 while frozen published output schemas remain unchanged.",
+              "text": "contracts/ holds the frozen M0 baseline and later packages: M3 to M9, geocoder-v2, portrait-v1 and v2, portrait-mesh-v1 and v2, portrait-state-v1, daily-uncertainty-v1, reader-relationships-v1, reading-feedback-v1, runtime-health-v1, and daily-edition-reissue-v1, with JSON Schemas and fixtures. The Daily uncertainty package versions request/command input to 0.5.1 while frozen published output schemas remain unchanged.",
               "evidence_ids": [
                 "evidence-b8-m0-status-frozen",
                 "evidence-b8-contract-registry",
@@ -9652,7 +9682,7 @@
       "kind": "source",
       "path": "contracts/validate_schemas.py",
       "selector": {
-        "text": "    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, PORTRAIT_STATE_V1, DAILY_UNCERTAINTY_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):"
+        "text": "    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, PORTRAIT_STATE_V1, DAILY_UNCERTAINTY_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1, DAILY_EDITION_REISSUE_V1):"
       },
       "observed_at": null
     },
@@ -11111,6 +11141,168 @@
       "path": "apps/api/src/db/pattern-ontology.ts",
       "selector": {
         "text": "export async function loadActiveOntology(env: Env): Promise<ActiveOntology | null> {\n  const pointer = await env.DB.prepare(\n    `SELECT p.active_version AS version, r.bundle_hash, r.corpus_release_hash,\n            r.locale, r.object_key, r.status,\n            ${ONTOLOGY_ACTIVATION_SCOPE_SQL}\n     FROM pattern_ontology_pointer p\n     LEFT JOIN pattern_ontology_releases r ON r.version = p.active_version\n     LEFT JOIN pattern_ontology_pipeline_evidence e\n       ON e.ontology_version = r.version AND e.bundle_hash = r.bundle_hash\n     WHERE p.id = 1`,\n"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-route",
+      "kind": "source",
+      "path": "apps/api/src/routes/internal-generation.ts",
+      "selector": {
+        "text": "internalGenerationRoutes.post(\"/readings/edition-reissue\", async (c) => {"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-validator",
+      "kind": "source",
+      "path": "apps/api/src/routes/internal-generation.ts",
+      "selector": {
+        "text": "if (!validateDailyEditionReissueRequest(body)) return refusal(\"invalid_body\");"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-family",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "if (target.assembly_mode !== named.generation_family) {"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-retained-evidence",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "if (!(await retainedEvidenceAgrees(env, identity, target))) {"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-v2-builder",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "reservationReason: \"manual_reissue\","
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-v1-builder",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": ": await buildGenerationCommand(env, identity.userId, {"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-reason-matrix",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "constrained_model: [\"safety_correction\", \"defect_repair\"],"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-contract-matrix",
+      "kind": "source",
+      "path": "contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json",
+      "selector": {
+        "text": "\"constrainedModelReason\": {\n      \"type\": \"string\",\n      \"enum\": [\"safety_correction\", \"defect_repair\"],"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-deterministic-window",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "return resolveLocalDay(zone, now).targetLocalDate === localDate;"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-constrained-window",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "return localDate === today || localDate === nextLocalDate(today);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-successor-unique-index",
+      "kind": "source",
+      "path": "db/d1/0003_m5_openai_reading_publisher.sql",
+      "selector": {
+        "text": "CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_readings_successor\n  ON daily_readings(supersedes_reading_id) WHERE supersedes_reading_id IS NOT NULL;"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-original-command",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": ".bind(JOB_TYPE, identity.userId, generationIdempotencyKey(family, localDate, revision, 1))"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-replay-reason",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "? isCommandV2(original) && original.reservation_reason === \"manual_reissue\""
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-guard-call",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "const reserved = await reserveReissue(env, identity, command, target.id, guards);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-reserve-reissue-guards",
+      "kind": "source",
+      "path": "apps/api/src/db/generation.ts",
+      "selector": {
+        "text": "      encryptedJob.fence,\n      ...guards,"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-ai-grant-assertion",
+      "kind": "source",
+      "path": "apps/api/src/db/consents.ts",
+      "selector": {
+        "text": "SELECT 1, 'the frozen ai_synthesis grant is no longer the current grant'"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-v5-predecessor-transition",
+      "kind": "source",
+      "path": "apps/api/src/services/generate-daily-reading-v5.ts",
+      "selector": {
+        "text": "    predecessor: command.supersedes_reading_id\n      ? command.reservation_reason === \"fact_repair\"\n        ? { kind: \"retain_invalidated\", readingId: command.supersedes_reading_id }\n        : { kind: \"supersede_published\", readingId: command.supersedes_reading_id }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-edition-reissue-rollout",
+      "kind": "source",
+      "path": "apps/api/src/services/edition-reissue.ts",
+      "selector": {
+        "text": "if (rollout === null || !rolloutAllows(rollout, \"internal\")) {"
       },
       "observed_at": null
     }

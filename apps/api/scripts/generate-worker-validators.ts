@@ -88,6 +88,7 @@ export declare const validateEvidenceGraphV5: ValidateFunction;
       "m7/pattern-ontology-record", "m7/pattern-ontology-evaluation",
       "m7/pattern-ontology-release", "m7/pattern-erasure-replay-event",
       "m9/common", "m9/pattern-regeneration-replay-event",
+      "daily-edition-reissue-v1/daily-edition-reissue",
     ],
     validators: {
       validateContentReleaseV3: "m3/content-release#/$defs/contentReleaseIngestionRequest",
@@ -97,6 +98,7 @@ export declare const validateEvidenceGraphV5: ValidateFunction;
       validateNatalPredicate: "m4/natal-feature#/$defs/natalPredicate",
       validateReplayEvent: "m7/pattern-erasure-replay-event",
       validateRegenerationReplayEvent: "m9/pattern-regeneration-replay-event",
+      validateDailyEditionReissueRequest: "daily-edition-reissue-v1/daily-edition-reissue#/$defs/request",
     },
     types: `import type { ValidateFunction } from "ajv";
 import type {
@@ -104,6 +106,7 @@ import type {
   PatternErasureReplayEvent, PatternRegenerationReplayEvent,
 } from "@patternlike/shared";
 import type { ContentReleaseIngestionRequest } from "../services/content-release.js";
+import type { DailyEditionReissueRequest } from "../services/edition-reissue.js";
 export declare const validateContentReleaseV3: ValidateFunction<ContentReleaseIngestionRequest>;
 export declare const validateContentReleaseV4: ValidateFunction<ContentReleaseIngestionRequest>;
 export declare const validateSourceCorpusRelease: ValidateFunction;
@@ -111,6 +114,7 @@ export declare const validateOntologyRelease: ValidateFunction<PatternOntologyRe
 export declare const validateNatalPredicate: ValidateFunction<PatternOntologyRecord["feature_predicate"]>;
 export declare const validateReplayEvent: ValidateFunction<PatternErasureReplayEvent>;
 export declare const validateRegenerationReplayEvent: ValidateFunction<PatternRegenerationReplayEvent>;
+export declare const validateDailyEditionReissueRequest: ValidateFunction<DailyEditionReissueRequest>;
 `,
   },
   {

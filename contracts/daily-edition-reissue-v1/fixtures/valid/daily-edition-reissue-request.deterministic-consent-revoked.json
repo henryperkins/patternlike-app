@@ -1,0 +1,11 @@
+{
+  "schema_version": "daily-edition-reissue/v1",
+  "user_id": "usr_01JAMPLEUSER0000001",
+  "target": {
+    "reading_id": "rdg_01JAMPLEREADING00003",
+    "revision": 1,
+    "local_date": "2026-09-28",
+    "generation_family": "deterministic"
+  },
+  "revision_reason": "consent_revoked"
+}

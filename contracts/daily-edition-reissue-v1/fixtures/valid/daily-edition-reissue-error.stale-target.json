@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "stale_target",
+    "message": "The named edition is no longer the published reading for its day",
+    "request_id": "0d6f1c1e-6a0b-4b8f-9d51-3f7f2c7d9a10"
+  }
+}
