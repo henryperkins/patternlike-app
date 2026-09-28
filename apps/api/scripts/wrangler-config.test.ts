@@ -145,15 +145,18 @@ test("production parks the machine pipeline and configures Pattern for every acc
     assert.equal("PATTERN_INTERNAL_ACCOUNT_IDS" in block.vars, false);
   }
 
+  // Committed configuration is the only thing between this source and live v2
+  // reservations, and 0033 must be applied before a Worker that admits them.
+  // Production admits them since 2026-09-28; the development block does not.
+  assert.equal(development.vars.PATTERN_ADAPTIVE_PORTRAITS_ENABLED, "0");
+  assert.equal(production.vars.PATTERN_ADAPTIVE_PORTRAITS_ENABLED, "1");
+
   // Both deployable blocks name the one deployable publisher.
   // `resolvePatternPublisherConfiguration` refuses anything else, and it
   // expects CODEX_PROVIDER_TIMEOUT_MS on every pass: the OpenAI 120000 values
   // fail the pin check rather than running long.
   for (const block of [development, production]) {
     assert.equal(block.vars.PATTERN_GENERATION_ENABLED, "1");
-    // Committed configuration is the only thing between this source and live v2
-    // reservations, and 0033 must be applied before a Worker that admits them.
-    assert.equal(block.vars.PATTERN_ADAPTIVE_PORTRAITS_ENABLED, "0");
     assert.equal(block.vars.PATTERN_PUBLISHER, "codex");
     assert.equal(block.vars.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "900000");
     assert.equal(block.vars.OPENAI_PATTERN_WRITER_TIMEOUT_MS, "900000");

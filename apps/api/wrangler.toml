@@ -320,8 +320,9 @@ binding = "CF_VERSION_METADATA"
 # and 0027 and install the compatible image/mesh runner before this release.
 PATTERN_PORTRAIT_ENABLED = "1"
 PATTERN_PORTRAIT_MESH_ENABLED = "1"
-# Producer admission stays off until migration, compatible runner and consent rollout.
-PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "0"
+# Admits new v2 reservations (0033 applied; the installed runner advertises v2).
+# Each reservation still requires the reader's explicit policy 2.0.0 action.
+PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "1"
 ENVIRONMENT = "production"
 # Workers Builds must override this with --var RELEASE_GIT_SHA:$WORKERS_CI_COMMIT_SHA.
 RELEASE_GIT_SHA = "0000000000000000000000000000000000000000"

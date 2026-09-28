@@ -5,10 +5,17 @@ implementation and the required deployment order; it is not a deployment receipt
 
 **Dated migration evidence:** the 2026-09-11 19:59 UTC entry in
 [`MIGRATIONS.json`](../../db/d1/MIGRATIONS.json) records `0033` applied in
-production (78 commands). Both committed Wrangler blocks still set
-`PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "0"`. Confirm the live migration ledger
-before the sequence below; the recorded apply does not establish current
-rollout state or authorize applying the migration again.
+production (78 commands). Confirm the live migration ledger before the
+sequence below; the recorded apply does not establish current rollout state or
+authorize applying the migration again.
+
+**Production admission (2026-09-28):** the owner approved step 6, and committed
+`[env.production.vars]` now sets `PATTERN_ADAPTIVE_PORTRAITS_ENABLED = "1"`;
+the default block keeps `"0"`. The precondition checks and the consented
+canary are recorded in
+[`docs/reviews/2026-09-28-adaptive-portrait-admission.md`](../reviews/2026-09-28-adaptive-portrait-admission.md).
+The committed value is not evidence of the deployed one; read the live version's
+bindings before relying on it.
 
 V2 reserves the accepted Pattern's three-to-six-chapter count and creates one
 image job per chapter. Explicit automation consent also permits one mesh job per
@@ -22,7 +29,7 @@ with four of each under v1. No additional chapters are synthesized or omitted.
 
 | Setting | Committed value | Meaning |
 | --- | --- | --- |
-| `PATTERN_ADAPTIVE_PORTRAITS_ENABLED` | `0` in default and production vars | Exact `1` permits new v2 reservations. Any other value fails adaptive admission closed. |
+| `PATTERN_ADAPTIVE_PORTRAITS_ENABLED` | Production `1` (since 2026-09-28), `0` in default vars | Exact `1` permits new v2 reservations. Any other value fails adaptive admission closed. |
 | `PATTERN_PORTRAIT_ENABLED` | Production `1`, absent locally | Existing image service availability. |
 | `PATTERN_PORTRAIT_MESH_ENABLED` | Production `1`, absent locally | Existing mesh service availability. |
 

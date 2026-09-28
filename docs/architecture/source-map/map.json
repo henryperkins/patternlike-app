@@ -1101,7 +1101,7 @@
           "leaves": [
             {
               "id": "leaf-images-derived-from-chapters-1",
-              "text": "Adaptive portrait v2 supports published Patterns with three to six chapters; v1 admits exactly four. Both committed adaptive switches remain 0, so new v2 reservations are unavailable. Portrait state separates supported protocols, new-generation availability, and permitted create or retry actions; the image control offers only permitted actions. Accepted reservations retain their protocol and may retry under their existing consent and retry rules even after adaptive admission stops.",
+              "text": "Adaptive portrait v2 supports published Patterns with three to six chapters; v1 admits exactly four. Committed production configuration sets the adaptive switch to 1, so new v2 reservations can be admitted there; the default block keeps it 0. Portrait state separates supported protocols, new-generation availability, and permitted create or retry actions; the image control offers only permitted actions. Accepted reservations retain their protocol and may retry under their existing consent and retry rules even after adaptive admission stops.",
               "evidence_ids": [
                 "evidence-b5-portrait-chapter-count-gate",
                 "evidence-b5-portrait-chapter-count-range",
@@ -1572,7 +1572,7 @@
             },
             {
               "id": "leaf-committed-production-switches-4",
-              "text": "PATTERN_ADAPTIVE_PORTRAITS_ENABLED is committed as 0, so a new v2 artwork reservation returns 503 adaptive_portrait_unavailable, while v1 artwork for four-chapter Patterns can still start. CATEGORIZED_FEEDBACK_EFFECTS_ENABLED is not set in committed configuration, and the Daily publisher resolves it to the non-categorical prompt 1.1.0.",
+              "text": "Committed production configuration sets PATTERN_ADAPTIVE_PORTRAITS_ENABLED to 1, so new v2 artwork reservations are admitted there; without exact 1, a new v2 reservation returns 503 adaptive_portrait_unavailable, while v1 artwork for four-chapter Patterns can still start. CATEGORIZED_FEEDBACK_EFFECTS_ENABLED is not set in committed configuration, and the Daily publisher resolves it to the non-categorical prompt 1.1.0.",
               "evidence_ids": [
                 "evidence-b6-production-portrait-flags",
                 "evidence-b5-adaptive-admission-503",
@@ -6564,7 +6564,7 @@
       "kind": "source",
       "path": "apps/api/wrangler.toml",
       "selector": {
-        "text": "PATTERN_ADAPTIVE_PORTRAITS_ENABLED = \"0\"\nENVIRONMENT = \"production\""
+        "text": "PATTERN_ADAPTIVE_PORTRAITS_ENABLED = \"1\"\nENVIRONMENT = \"production\""
       },
       "observed_at": null
     },
@@ -8121,7 +8121,7 @@
       "kind": "source",
       "path": "apps/api/wrangler.toml",
       "selector": {
-        "text": "PATTERN_PORTRAIT_ENABLED = \"1\"\nPATTERN_PORTRAIT_MESH_ENABLED = \"1\"\n# Producer admission stays off until migration, compatible runner and consent rollout.\nPATTERN_ADAPTIVE_PORTRAITS_ENABLED = \"0\""
+        "text": "PATTERN_PORTRAIT_ENABLED = \"1\"\nPATTERN_PORTRAIT_MESH_ENABLED = \"1\"\n# Admits new v2 reservations (0033 applied; the installed runner advertises v2).\n# Each reservation still requires the reader's explicit policy 2.0.0 action.\nPATTERN_ADAPTIVE_PORTRAITS_ENABLED = \"1\""
       },
       "observed_at": null
     },
