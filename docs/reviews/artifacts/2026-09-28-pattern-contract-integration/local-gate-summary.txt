@@ -1,0 +1,23 @@
+==== SUMMARY ====
+commit  72c7d3f on integration/pattern-contracts-20260928
+note    local 3.14.4, ci.yml pinned 3.12
+PATTERNLIKE_CI_SUMMARY_V1_BEGIN
+node v22.23.2 npm 10.9.8 python 3.14.4
+pass	contracts: npm run test:contracts
+pass	monorepo: npm ci (install or dry-run)
+pass	monorepo: ephemeris download
+pass	monorepo: npm run typecheck
+pass	monorepo: test @patternlike/shared
+pass	monorepo: test @patternlike/reading-engine
+pass	monorepo: test @patternlike/calc-stub
+pass	monorepo: test @patternlike/ontology-signer
+pass	monorepo: test @patternlike/api
+pass	monorepo: test @patternlike/web
+pass	monorepo: npm run build
+pass	extra: test @patternlike/pattern-engine
+pass	extra: test @patternlike/codex-runner
+pass	extra: npm run test:content
+pass	extra: npm run test:source-map
+pass	extra: npm run map:check:current
+PATTERNLIKE_CI_SUMMARY_V1_PASSED
+PATTERNLIKE_CI_SUMMARY_V1_END

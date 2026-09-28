@@ -84,4 +84,48 @@ source-tested; installed runner rollout is separate evidence.
 
 ## Full local merge gate
 
-The final gate receipt and exact summary will be recorded here before merging.
+The complete second run passed all **16 required lanes**, with exit 0 and no
+source drift. The [receipt](artifacts/2026-09-28-pattern-contract-integration/local-gate-02.json)
+and [exact summary](artifacts/2026-09-28-pattern-contract-integration/local-gate-summary.txt)
+bind source commit `72c7d3f65467d2a533c06bc8cd261d3165e526d2` and source digest
+`fe962d775cfbce5a0600c030612602268a8e274ced0ef5c6d450b6ce97b27e2e`.
+The later evidence-only commit changes files excluded from that source identity;
+receipt verification checks the final source and built artifacts again.
+
+The API suite passed 2,806 tests plus its one-test compatibility suite and script
+checks; the web suite passed 948 tests. The API log emitted a Vitest Worker
+`EnvironmentTeardownError` while closing a pending module-resolution RPC; the
+suite reported all tests passing and returned exit 0. Local Python was 3.14.4,
+while ci.yml pins 3.12; Node v22.23.2 matches `.nvmrc`.
+
+The first full-gate attempt was terminated with exit 143 as the API lane started.
+It produced no completed receipt and supplies no passing gate claim. Its raw log
+and empty reserved receipt are retained in the host recovery directory. The
+passing second run is a complete uninterrupted gate, not combined partial runs.
+Its complete raw output is retained there as `ci-local-02.log`.
+
+```text
+==== SUMMARY ====
+commit  72c7d3f on integration/pattern-contracts-20260928
+note    local 3.14.4, ci.yml pinned 3.12
+PATTERNLIKE_CI_SUMMARY_V1_BEGIN
+node v22.23.2 npm 10.9.8 python 3.14.4
+pass	contracts: npm run test:contracts
+pass	monorepo: npm ci (install or dry-run)
+pass	monorepo: ephemeris download
+pass	monorepo: npm run typecheck
+pass	monorepo: test @patternlike/shared
+pass	monorepo: test @patternlike/reading-engine
+pass	monorepo: test @patternlike/calc-stub
+pass	monorepo: test @patternlike/ontology-signer
+pass	monorepo: test @patternlike/api
+pass	monorepo: test @patternlike/web
+pass	monorepo: npm run build
+pass	extra: test @patternlike/pattern-engine
+pass	extra: test @patternlike/codex-runner
+pass	extra: npm run test:content
+pass	extra: npm run test:source-map
+pass	extra: npm run map:check:current
+PATTERNLIKE_CI_SUMMARY_V1_PASSED
+PATTERNLIKE_CI_SUMMARY_V1_END
+```
