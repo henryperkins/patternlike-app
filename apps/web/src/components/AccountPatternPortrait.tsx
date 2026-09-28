@@ -23,6 +23,7 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
   const chapterCount = document.core_chapters.length;
   const eligible = patternMatchesDocument(pattern, document) && isPortraitChapterCount(document.core_chapters.length);
   const [response, setResponse] = useState<PatternPortraitResponse | null>(null);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,7 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
   const acceptResponse = useCallback((next: PatternPortraitResponse) => {
     validateResponse(next, chartId, document);
     setResponse(next);
+    setObservedAt(Date.now());
     setError(null);
   }, [chartId, document]);
 
@@ -59,6 +61,7 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
     }).catch((caught: unknown) => {
       if (controller.signal.aborted) return;
       setResponse(null);
+      setObservedAt(null);
       setOpen(false);
       reportError(caught);
     }).finally(() => {
@@ -70,6 +73,12 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
       if (statusRequest.current === controller) statusRequest.current = null;
     };
   }, [eligible, attempt, acceptResponse, reportError]);
+
+  useEffect(() => {
+    if (observedAt === null) return;
+    const timer = window.setTimeout(() => setObservedAt(null), Math.max(0, observedAt + 60_001 - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [observedAt]);
 
   useEffect(() => {
     if (response?.status !== "generating") return;
@@ -128,7 +137,7 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
   }, [open]);
 
   const create = async () => {
-    if (busy || actionRequest.current || !eligible || !canCreate || !isPortraitChapterCount(chapterCount)) return;
+    if (busy || actionRequest.current || !eligible || !canCreate || !mayGenerate || observedAt === null || Date.now() - observedAt > 60_000 || !isPortraitChapterCount(chapterCount)) return;
     const controller = new AbortController();
     actionRequest.current = controller;
     createKey.current ??= newIdempotencyKey("web-pattern-portrait");
@@ -165,6 +174,9 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
     finally { if (!controller.signal.aborted) { setDownloading(false); downloadRequest.current = null; } }
   };
 
+  const mayGenerate = observedAt !== null && (response?.capabilities
+    ? response.capabilities.allowed_actions.includes(response.status === "failed" ? "retry" : "create")
+    : response?.schema_version === "pattern-portrait/v1" && (response.status === "not_started" || response.retryable));
   return <>
     {eligible ? <section className="account-portrait" aria-label="Your constellation">
       <div className="account-portrait__heading"><p className="kicker">Your constellation</p><h3>Your complete reading, a shape of your own</h3></div>
@@ -174,7 +186,8 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
         <p>Creating a constellation sends each chapter’s text to Codex to generate one object image. The {chapterCount} saved images shape your constellation, arranged with your calculated Sun sign when available.</p>
         <p>Your images are saved privately with this Pattern. Opening it again reuses them.</p>
         {response.status === "failed" ? <p role="status">The constellation could not be completed. {response.completed_chapters} of {chapterCount} chapter images are saved.</p> : null}
-        {canCreate && (response.status === "not_started" || response.retryable) ? <button className="button" type="button" disabled={busy} onClick={() => void create()}>{response.status === "failed" ? "Retry constellation creation" : "Create my constellation"}</button> : <p>New image creation is unavailable. Your published reading remains available.</p>}
+        {canCreate && mayGenerate ? <button className="button" type="button" disabled={busy} onClick={() => void create()}>{response.status === "failed" ? "Retry constellation creation" : "Create my constellation"}</button> : <p>New image creation is unavailable. Your published reading remains available.</p>}
+        {observedAt === null ? <button className="button button--secondary" type="button" disabled={busy} onClick={() => setAttempt(value => value + 1)}>Refresh constellation status</button> : null}
       </> : null}
       {response?.status === "generating" ? <><p role="status">Creating your constellation · {response.completed_chapters} of {chapterCount} chapter images saved.</p><p>You can keep reading or return later.</p></> : null}
       {saved ? <>

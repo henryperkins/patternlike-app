@@ -49,6 +49,45 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("account Pattern portrait", () => {
+  it("allows an authorized retry while new reservations are disabled", async () => {
+    vi.mocked(getPatternPortrait).mockResolvedValue(response({ status: "failed", retryable: true, portrait_id: "portrait-current",
+      capabilities: { supported_protocols: ["v1", "v2"], generation_available: false, allowed_actions: ["retry"] } }));
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Retry constellation creation" }));
+    expect(startPatternPortraitGeneration).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/Creating your constellation/)).toBeInTheDocument();
+  });
+
+  it("expires generation capability before another user action", async () => {
+    vi.mocked(getPatternPortrait).mockResolvedValue(response({ capabilities: { supported_protocols: ["v1", "v2"], generation_available: true, allowed_actions: ["create"] } }));
+    vi.useFakeTimers();
+    show();
+    await act(async () => undefined);
+    expect(screen.getByRole("button", { name: "Create my constellation" })).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_001); });
+    expect(screen.queryByRole("button", { name: "Create my constellation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh constellation status" })).toBeInTheDocument();
+    expect(startPatternPortraitGeneration).not.toHaveBeenCalled();
+  });
+
+  it("does not infer adaptive generation support from an older response without capabilities", async () => {
+    vi.mocked(getPatternPortrait).mockResolvedValue({ ...response(), schema_version: "pattern-portrait/v2", chapter_count: 4, graph: null });
+    show();
+    await screen.findByText(/New image creation is unavailable/);
+    expect(screen.queryByRole("button", { name: "Create my constellation" })).not.toBeInTheDocument();
+    expect(startPatternPortraitGeneration).not.toHaveBeenCalled();
+  });
+
+  it("offers no image action when the current protocol cannot generate artwork", async () => {
+    vi.mocked(getPatternPortrait).mockResolvedValue({ ...response(), schema_version: "pattern-portrait/v2", chapter_count: 4, graph: null,
+      capabilities: { supported_protocols: ["v1", "v2"], generation_available: false, allowed_actions: [] } });
+    show();
+    await screen.findByText(/New image creation is unavailable/);
+    expect(screen.queryByRole("button", { name: "Create my constellation" })).not.toBeInTheDocument();
+    expect(startPatternPortraitGeneration).not.toHaveBeenCalled();
+    expect(screen.getByText("Published reading remains available.")).toBeInTheDocument();
+  });
+
   it("discloses chapter text sharing and creates only after the explicit action", async () => {
     show();
     const create = await screen.findByRole("button", { name: "Create my constellation" });
@@ -261,9 +300,10 @@ describe("account Pattern portrait", () => {
 import { adaptiveFixture } from "../test/adaptive-portrait-fixture.js";
 it.each([3, 4, 5, 6] as const)("requests explicit complete-reading generation for %i chapters", async count => {
   const f = adaptiveFixture(count);
-  const notStarted = { ...f.portrait, status: "not_started" as const, completed_chapters: 0, chapters: [], graph: null };
+  const notStarted = { ...f.portrait, status: "not_started" as const, completed_chapters: 0, chapters: [], graph: null,
+    capabilities: { supported_protocols: ["v1", "v2"] as Array<"v1" | "v2">, generation_available: true, allowed_actions: ["create"] as Array<"create"> } };
   vi.mocked(getPatternPortrait).mockResolvedValue(notStarted);
-  vi.mocked(startPatternPortraitGeneration).mockResolvedValue({ ...notStarted, status: "generating" });
+  vi.mocked(startPatternPortraitGeneration).mockResolvedValue({ ...notStarted, status: "generating", capabilities: { ...notStarted.capabilities, allowed_actions: [] } });
   show({ chartId: "chart-fictional", document: f.document, pattern: { ...pattern, pattern_id: f.document.pattern_id, generated_at: f.document.generated_at } });
   await userEvent.click(await screen.findByRole("button", { name: "Create my constellation" }));
   expect(startPatternPortraitGeneration).toHaveBeenCalledWith(expect.objectContaining({ chapter_count: count, consent_policy_version: "2.0.0" }), expect.any(String), expect.any(AbortSignal));

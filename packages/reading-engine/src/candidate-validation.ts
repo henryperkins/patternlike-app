@@ -53,6 +53,7 @@ import {
   type UnitKind,
 } from "./candidate-policy.js";
 import { validateFactSupport } from "./claim-support.js";
+import { uncertaintyDisclosureFailure } from "./uncertainty-disclosure.js";
 
 interface CandidateUnit {
   kind: UnitKind;
@@ -275,19 +276,6 @@ function vocabularyFailure(text: string, vocabulary: Vocabulary): string | null 
   return null;
 }
 
-/** The words a required uncertainty note has to actually use. */
-function uncertaintyTerms(prepared: PreparedConstrainedReadingInput): RegExp[] {
-  const terms: RegExp[] = [/\bbirth time\b/i];
-  for (const feature of prepared.request.suppressed_features) {
-    if (feature === "houses") terms.push(/\bhouses?\b/i);
-    if (feature === "angles" || feature === "angle_transits") {
-      terms.push(/\bangles?\b|\bascendant\b|\bmidheaven\b|\brising\b/i);
-    }
-    if (feature === "moon_time_sensitive") terms.push(/\bmoon\b/i);
-  }
-  return terms;
-}
-
 export function validateReadingCandidate(
   candidate: ReadingGenerationOutput,
   prepared: PreparedConstrainedReadingInput,
@@ -411,8 +399,9 @@ export function validateReadingCandidate(
     const note = candidate.uncertainty_note;
     if (!note || note.text.trim().length === 0) {
       fail("uncertainty", "required_note_missing");
-    } else if (!uncertaintyTerms(prepared).some((term) => term.test(note.text))) {
-      fail("uncertainty", "note_names_nothing");
+    } else {
+      const reason = uncertaintyDisclosureFailure(note.text, prepared.request.uncertainty_disclosure);
+      if (reason) fail("uncertainty", reason);
     }
   } else if (candidate.uncertainty_note !== null) {
     fail("uncertainty", "unrequested_note");

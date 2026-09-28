@@ -167,6 +167,7 @@ test("portrait polling is opt-in and skips empty text slots within a pass", asyn
     },
     execute: async () => ({ ok: true, output: "{}", providerRequestId: "thread", inputTokens: 0, outputTokens: 0 }),
     portraits: {
+      checkCompatibility: async () => true,
       client: { claim: async () => { order.push("portrait claim"); abort.abort(); return { status: "empty" }; }, complete: async () => assert.fail("no image"), fail: async () => assert.fail("no failure") },
       execute: async () => assert.fail("no portrait work"),
     },
@@ -184,7 +185,7 @@ test("portrait failure is submitted once and fatal authentication stops polling"
     complete: async () => assert.fail("no completion after failure"),
     fail: async (job: string, body: unknown) => { calls.push({ job, body }); },
   };
-  await assert.rejects(runOnePortraitJob({ client, execute: async () => ({ ok: false, code: "authentication_failed", fatal: true }) }), /authentication or executable/);
+  await assert.rejects(runOnePortraitJob({ client, checkCompatibility: async () => true, execute: async () => ({ ok: false, code: "authentication_failed", fatal: true }) }), /authentication or executable/);
   assert.deepEqual(calls, [{ job: claim.job_id, body: { lease_token: claim.lease_token, code: "authentication_failed" } }]);
 });
 
@@ -201,6 +202,39 @@ const PORTRAIT_COMPLETION: CodexPortraitCompletion = {
   provider_request_id: "thread:turn", image_request_id: "native-image", image_model: "gpt-image-2",
 };
 
+test("portrait compatibility is checked before claiming, and refusal or failed checks consume no image attempt", async () => {
+  for (const result of ["supported", "unsupported", "error"] as const) {
+    const order: string[] = [];
+    const client = new CodexPortraitClient({ apiOrigin: "https://api.example.test", runnerToken: "machine-token", fetchImpl: async () => {
+      order.push("claim");
+      return new Response(null, { status: 204 });
+    } });
+    assert.equal(await runOnePortraitJob({ client, checkCompatibility: async () => {
+      order.push("check");
+      if (result === "error") throw new Error("local inspection failed");
+      return result === "supported";
+    }, execute: async () => assert.fail("no job") }), "empty");
+    assert.deepEqual(order, result === "supported" ? ["check", "claim"] : ["check"]);
+  }
+});
+
+test("an incompatible image lane does not stop text and mesh polling", async () => {
+  const order: string[] = [];
+  const abort = new AbortController();
+  await runCodexPollLoop({
+    client: { claim: async () => { order.push("text"); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() },
+    execute: async () => assert.fail(),
+    portraits: {
+      checkCompatibility: async () => { order.push("image check"); return false; },
+      client: { claim: async () => { order.push("image claim"); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() },
+      execute: async () => assert.fail(),
+    },
+    meshes: { client: { claim: async () => { order.push("mesh"); abort.abort(); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() }, execute: async () => assert.fail() },
+    signal: abort.signal, pollMs: 250,
+  });
+  assert.deepEqual(order, ["text", "image check", "mesh"]);
+});
+
 test("a definitive portrait completion rejection reports image_invalid with the same lease", async () => {
   const requests: Array<{ operation: string; body: unknown }> = [];
   let state = "running";
@@ -214,7 +248,7 @@ test("a definitive portrait completion rejection reports image_invalid with the 
     state = "failed";
     return Response.json({ schema_version: "codex-portrait-terminal/v1", status: "accepted" });
   } });
-  assert.equal(await runOnePortraitJob({ client, execute: async () => ({ ok: true, completion: PORTRAIT_COMPLETION }) }), "processed");
+  assert.equal(await runOnePortraitJob({ client, checkCompatibility: async () => true, execute: async () => ({ ok: true, completion: PORTRAIT_COMPLETION }) }), "processed");
   assert.equal(state, "failed");
   assert.deepEqual(requests.map(({ operation }) => operation), ["claim", "complete", "fail"]);
   assert.deepEqual(requests[2]!.body, { lease_token: PORTRAIT_CLAIM.lease_token, code: "image_invalid" });
@@ -224,6 +258,7 @@ test("accepted or uncertain portrait completions are never overwritten with imag
   for (const completionError of [null, new CodexProviderClientError("server unavailable", 503), new CodexProviderClientError("transport failed"), new CodexProviderClientError("invalid acknowledgement", 200), new CodexProviderClientError("already terminal", 409)]) {
     const calls: string[] = [];
     const run = runOnePortraitJob({
+      checkCompatibility: async () => true,
       client: {
         claim: async () => ({ status: "claimed", claim: PORTRAIT_CLAIM }),
         complete: async () => { calls.push("complete"); if (completionError) throw completionError; },
@@ -246,7 +281,7 @@ test("mesh polling is separately opt-in and follows empty text and portrait slot
   await runCodexPollLoop({
     client: { claim: async () => { order.push("text"); return ++polls === 1 ? { status: "claimed", claim: CLAIM } : { status: "empty" }; }, complete: async () => undefined, fail: async () => assert.fail("text failure") },
     execute: async () => ({ ok: true, output: "{}", providerRequestId: "thread", inputTokens: 0, outputTokens: 0 }),
-    portraits: { client: { claim: async () => { order.push("image"); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() }, execute: async () => assert.fail() },
+    portraits: { checkCompatibility: async () => true, client: { claim: async () => { order.push("image"); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() }, execute: async () => assert.fail() },
     meshes: { client: { claim: async () => { order.push("mesh"); abort.abort(); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() }, execute: async () => assert.fail() },
     signal: abort.signal, pollMs: 250, sleep: async () => undefined,
   });
@@ -351,6 +386,7 @@ function pollHarness() {
       return { ok: true, output: "{}", providerRequestId: "thread", inputTokens: 11, outputTokens: 7 };
     },
     portraits: {
+      checkCompatibility: async () => true,
       client: {
         claim: () => claim("portrait", PORTRAIT_CLAIM),
         complete: (job, body) => terminal("portrait", "complete", job, body),

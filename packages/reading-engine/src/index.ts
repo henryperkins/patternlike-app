@@ -111,3 +111,5 @@ export const SCHEMA_VERSION = "0.3.0" as const;
  * is inside the hash rather than beside it.
  */
 export const ASSEMBLY_POLICY_VERSION = "1.1.0" as const;
+
+export { normalizeDailyUncertainty } from "./uncertainty-disclosure.js";

@@ -212,6 +212,29 @@ async function recoverPortraitLeases(env: Env, now: Date) {
 }
 
 export async function readPortrait(env: Env, userId: string, protocol: PortraitProtocol = "v1"): Promise<PatternPortraitResponse> {
+  const schemaAvailable = await adaptivePortraitSchema(env);
+  const response = schemaAvailable ? await readPortraitContent(env, userId, protocol) : portraitEmpty("unavailable", protocol);
+  const selectedProtocol = response.schema_version === PORTRAIT_V2_SCHEMA_VERSION ? "v2" : "v1";
+  // Existing reservations retain their protocol and retry policy after adaptive
+  // admission stops. A new v2 reservation always requires adaptive admission.
+  const generationAvailable = schemaAvailable && portraitEnabled(env)
+    && (selectedProtocol === "v1" || adaptivePortraitsEnabled(env));
+  response.capabilities = { supported_protocols: ["v1", "v2"], generation_available: generationAvailable, allowed_actions: [] };
+  if ((generationAvailable && response.status === "not_started") || (schemaAvailable && portraitEnabled(env) && response.status === "failed" && response.retryable)) {
+    const now = new Date();
+    const [processing, pattern, writable, existing] = await Promise.all([
+      loadLiveAccountProcessingGrant(env, userId, now), loadPatternGenerationGrant(env, userId, now),
+      env.DB.prepare("SELECT 1 FROM users WHERE id=? AND status='active' AND crypto_write_fence IS NULL").bind(userId).first(),
+      response.portrait_id ? portraitById(env, response.portrait_id) : null,
+    ]);
+    if (processing && pattern && writable && (!existing || (existing.processing_consent_id === processing.consentId && existing.pattern_consent_id === pattern.consentId))) {
+      response.capabilities.allowed_actions.push(response.status === "failed" ? "retry" : "create");
+    }
+  }
+  return response;
+}
+
+async function readPortraitContent(env: Env, userId: string, protocol: PortraitProtocol): Promise<PatternPortraitResponse> {
   if (!portraitEnabled(env)) return portraitEmpty("unavailable", protocol);
   const current = await currentPattern(env, userId);
   if (!current) return portraitEmpty("unavailable", protocol);
@@ -223,7 +246,7 @@ export async function readPortrait(env: Env, userId: string, protocol: PortraitP
   // unavailable -- the same word the v1 path above uses for a Pattern it cannot
   // serve. An already reserved portrait keeps reporting its real status, because
   // disabling admission must not hide accepted work.
-  if (!row && protocol === "v2" && current.chapterCount !== 4 && !adaptivePortraitsEnabled(env)) return portraitEmpty("unavailable", protocol);
+  if (!row && protocol === "v2" && !adaptivePortraitsEnabled(env)) return portraitEmpty("unavailable", protocol);
   const base: PatternPortraitResponse = { ...portraitEmpty("not_started", row?.protocol_version ?? protocol), pattern_id: current.document.id, generated_at: current.document.generated_at, chart_id: current.chart.id, document_revision: current.revision, sun_sign: current.sunSign };
   if (base.schema_version === PORTRAIT_V2_SCHEMA_VERSION) base.chapter_count = current.chapterCount;
   if (!row) return base;

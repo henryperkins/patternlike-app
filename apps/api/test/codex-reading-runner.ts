@@ -249,7 +249,7 @@ export function candidateFor(packet: ReadingGenerationRequest): ReadingGeneratio
     },
     uncertainty_note: packet.composition.uncertainty_note_required
       ? {
-          text: "Without a confirmed birth time this reading leaves houses out entirely.",
+          text: packet.uncertainty_disclosure.disclosures.map((entry) => entry.statement).join(" "),
           fact_ids: [],
           context_refs: [],
         }

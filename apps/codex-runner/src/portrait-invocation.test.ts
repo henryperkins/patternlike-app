@@ -5,8 +5,10 @@ import { join } from "node:path";
 import test from "node:test";
 import sharp from "sharp";
 import { createHash } from "node:crypto";
-import { runPortraitInvocation, preparePortraitImage } from "./portrait-invocation.js";
-import { parsePortraitClaim } from "./portrait-client.js";
+import { checkPortraitCompatibility, runPortraitInvocation, preparePortraitImage } from "./portrait-invocation.js";
+import { CodexPortraitClient, parsePortraitClaim } from "./portrait-client.js";
+import { main } from "./index.js";
+import { runOnePortraitJob } from "./runner.js";
 import type { CodexPortraitClaim } from "@patternlike/shared";
 import { installPortableTestScriptSpawn } from "./portable-script-spawn.test-helper.js";
 
@@ -105,6 +107,92 @@ test("requires one completed native image and successful turn, preserves image p
     assert.deepEqual(await readdir(join(f.home, "generated_images")), []);
     assert.deepEqual(await readFile(join(f.root, "untouched.png")), f.png);
   } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("image preflight checks the real effective configuration without a thread or turn, even with a wider options object", async () => {
+  const f = await fixture();
+  try {
+    assert.equal(await checkPortraitCompatibility(f.options), true);
+    const record = JSON.parse(await readFile(join(f.root, "record.json"), "utf8"));
+    assert.equal(record.args[0], "app-server");
+    assert.equal(JSON.stringify(record).includes(CLAIM.prompt), false);
+    for (const name of ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_RUNNER_TOKEN"]) assert.equal(record.env[name], undefined);
+    await assert.rejects(readFile(join(f.root, "thread.json")), { code: "ENOENT" });
+    await assert.rejects(readFile(join(f.root, "turn.json")), { code: "ENOENT" });
+    assert.deepEqual(await readdir(join(f.root, "attempts")), []);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+for (const mode of ["success", "version", "auth", "notify", "managedinstructions", "host-instructions"]) {
+  test(`portrait admission with ${mode} CLI state checks compatibility before any image endpoint`, async () => {
+    const f = await fixture(mode);
+    const requests: string[] = [];
+    try {
+      if (mode === "host-instructions") await writeFile(join(f.home, "AGENTS.md"), "Unrelated host instructions.");
+      const client = new CodexPortraitClient({ apiOrigin: "https://api.example.test", runnerToken: "machine-token", fetchImpl: async (url) => {
+        requests.push(String(url));
+        return new Response(null, { status: 204 });
+      } });
+      assert.equal(await runOnePortraitJob({ client, checkCompatibility: () => checkPortraitCompatibility(f.options), execute: async () => assert.fail("no work was offered") }), "empty");
+      assert.deepEqual(requests, mode === "success" ? ["https://api.example.test/codex-provider/v1/portraits/claim"] : []);
+      await assert.rejects(readFile(join(f.root, "thread.json")), { code: "ENOENT" });
+      await assert.rejects(readFile(join(f.root, "turn.json")), { code: "ENOENT" });
+      if (["version", "auth", "host-instructions"].includes(mode)) await assert.rejects(readFile(join(f.root, "record.json")), { code: "ENOENT" });
+    } finally { await rm(f.root, { recursive: true, force: true }); }
+  });
+}
+
+for (const drift of ["version", "notify", "mcpavailable"]) {
+  test(`image execution still rejects ${drift} drift after a successful preclaim check`, async () => {
+    const f = await fixture();
+    const failures: unknown[] = [];
+    try {
+      await assert.rejects(runOnePortraitJob({
+        checkCompatibility: () => checkPortraitCompatibility(f.options),
+        client: {
+          claim: async () => {
+            const source = await readFile(f.executable, "utf8");
+            await writeFile(f.executable, source.replace('const mode="success"', `const mode=${JSON.stringify(drift)}`));
+            return { status: "claimed", claim: CLAIM };
+          },
+          complete: async () => assert.fail("changed runtime must not complete"),
+          fail: async (jobId, failure) => { failures.push({ jobId, failure }); },
+        },
+        execute: (claim) => runPortraitInvocation({ ...f.options, claim }),
+      }), /authentication or executable/);
+      assert.deepEqual(failures, [{ jobId: CLAIM.job_id, failure: { lease_token: CLAIM.lease_token, code: "generation_failed" } }]);
+      await assert.rejects(readFile(join(f.root, "turn.json")), { code: "ENOENT" });
+    } finally { await rm(f.root, { recursive: true, force: true }); }
+  });
+}
+
+test("production portrait flag with CLI 0.153.4 leaves image endpoints untouched while text and mesh keep polling", async () => {
+  const f = await fixture("version");
+  const previousFetch = globalThis.fetch;
+  const values = {
+    PATTERNLIKE_API_ORIGIN: "https://api.example.test", CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz",
+    CODEX_BIN: f.executable, CODEX_HOME: f.home, CODEX_RUNNER_PORTRAITS: "1", CODEX_RUNNER_MESHES: "1",
+  };
+  const previous = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+  const requests: string[] = [];
+  try {
+    Object.assign(process.env, values);
+    globalThis.fetch = async (url) => {
+      const path = new URL(String(url)).pathname;
+      requests.push(path);
+      if (path.includes("portrait-meshes") || path.includes("/portraits/")) process.emit("SIGTERM");
+      return new Response(null, { status: 204 });
+    };
+    await main();
+    assert.deepEqual(requests, ["/codex-provider/v1/jobs/claim", "/codex-provider/v1/portrait-meshes/claim"]);
+    await assert.rejects(readFile(join(f.root, "record.json")), { code: "ENOENT" });
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+    await rm(f.root, { recursive: true, force: true });
+  }
 });
 
 test("adaptive image completion carries the exact claimed last-chapter binding without adding metadata to the model prompt", async () => {

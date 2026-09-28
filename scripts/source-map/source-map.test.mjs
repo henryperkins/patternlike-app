@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { run } from "./snapshot.mjs";
 const checkout = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const definition = "docs/architecture/source-map/map.json";
 const fixed = ["scripts/source-map/model.mjs", "scripts/source-map/snapshot.mjs", "scripts/source-map/cli.mjs", "scripts/pattern-release/candidates.mjs", "package.json", ".nvmrc"];
@@ -29,6 +30,58 @@ test("captures deterministic siblings and detects dirty referenced bytes", (t) =
   const changed = f.invoke("check", p); assert.equal(changed.exitCode, 1); assert.ok(changed.result.problems.some(p => p.code === "source_changed"));
 });
 function fails(result, code, exit = 1) { assert.equal(result.exitCode, exit, JSON.stringify(result)); assert.ok(result.result.problems.some(p => p.code === code), JSON.stringify(result)); }
+const currentPointer = "docs/architecture/source-map/current.json";
+test("the current-map pointer selects one snapshot and rejects stale source bytes", t => {
+  const f = fixture(t); const capture = f.capture(); assert.equal(capture.exitCode, 0);
+  f.put(currentPointer, JSON.stringify({ schema_version: "patternlike-source-map-current.v1", snapshot_path: capture.result.snapshot_path }));
+  const checked = f.invoke("check-current");
+  assert.equal(checked.exitCode, 0, JSON.stringify(checked));
+  assert.equal(checked.result.snapshot_path, capture.result.snapshot_path);
+  f.put(f.model.evidence[0].path, "export const answer = 99;\n");
+  fails(f.invoke("check-current"), "source_changed");
+});
+test("the current-map check rejects missing, malformed, and unsafe pointers", t => {
+  const f = fixture(t);
+  fails(f.invoke("check-current"), "current_pointer_invalid");
+  for (const pointer of [
+    "not JSON",
+    JSON.stringify({ schema_version: "wrong", snapshot_path: "docs/architecture/source-map/snapshots/2026-09-09-fixture" }),
+    JSON.stringify({ schema_version: "patternlike-source-map-current.v1", snapshot_path: "../outside" }),
+    JSON.stringify({ schema_version: "patternlike-source-map-current.v1", snapshot_path: "docs/architecture/source-map/snapshots/2026-09-09-fixture", extra: true }),
+  ]) {
+    f.put(currentPointer, pointer);
+    fails(f.invoke("check-current"), "current_pointer_invalid");
+  }
+});
+test("the current-map check refuses a symlink pointer", t => {
+  const f = fixture(t); const capture = f.capture();
+  f.put("pointer.json", JSON.stringify({ schema_version: "patternlike-source-map-current.v1", snapshot_path: capture.result.snapshot_path }));
+  symlinkSync(resolve(f.root, "pointer.json"), resolve(f.root, currentPointer));
+  fails(f.invoke("check-current"), "path_unsafe", 2);
+});
+test("the current-map check rejects a pointer changed during verification", t => {
+  const f = fixture(t); const capture = f.capture();
+  f.put(currentPointer, JSON.stringify({ schema_version: "patternlike-source-map-current.v1", snapshot_path: capture.result.snapshot_path }));
+  const checked = run("check-current", undefined, { cwd: f.root, beforeRecheck: () => f.put(currentPointer, "{}") });
+  fails(checked, "source_changed_during_check");
+});
+test("capture and current-map checking work below a searchable unreadable ancestor", t => {
+  const f = fixture(t);
+  const parent = mkdtempSync(resolve(tmpdir(), "source-map-search-only-"));
+  const root = resolve(parent, "checkout");
+  cpSync(f.root, root, { recursive: true });
+  chmodSync(parent, 0o111);
+  try {
+    const capture = run("capture", "2026-09-10-search-only", { cwd: root });
+    assert.equal(capture.exitCode, 0, JSON.stringify(capture));
+    writeFileSync(resolve(root, currentPointer), JSON.stringify({ schema_version: "patternlike-source-map-current.v1", snapshot_path: capture.result.snapshot_path }));
+    const checked = run("check-current", undefined, { cwd: root });
+    assert.equal(checked.exitCode, 0, JSON.stringify(checked));
+  } finally {
+    chmodSync(parent, 0o700);
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
 for (const [name, change] of [
   ["unknown field", m => { m.extra = true; }], ["duplicate IDs", m => { m.evidence[0].id = "leaf"; }],
   ["dangling evidence", m => { m.branches[0].topics[0].leaves[0].evidence_ids = ["missing"]; }],
@@ -73,7 +126,6 @@ test("closed usage and historical schema return bounded safe JSON", t => {
   const f = fixture(t); fails(f.invoke("capture", "2026-02-30-bad"), "usage_invalid", 2); fails(f.invoke("check", "../private-secret"), "path_unsafe", 2);
   const a = f.capture(); assert.equal(a.exitCode, 0); f.put(`${a.result.snapshot_path}/source-snapshot.json`, JSON.stringify({ schema_version: "historical" })); fails(f.invoke("check", a.result.snapshot_path), "snapshot_version_unsupported");
 });
-const { run } = await import("./snapshot.mjs");
 const { createHash } = await import("node:crypto");
 const { canonicalJson } = await import("../pattern-release/candidates.mjs");
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");

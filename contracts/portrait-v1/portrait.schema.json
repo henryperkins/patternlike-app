@@ -265,6 +265,7 @@
         "graph"
       ],
       "properties": {
+        "capabilities": { "$ref": "https://patternlike.app/contracts/portrait-state-v1/portrait-state.schema.json#/$defs/generationCapabilities" },
         "schema_version": {
           "const": "pattern-portrait/v1"
         },

@@ -57,6 +57,9 @@ export async function main(): Promise<void> {
       }),
       ...(portraitModules ? { portraits: {
         client: new portraitModules[0].CodexPortraitClient({ apiOrigin: config.apiOrigin, runnerToken: config.runnerToken }),
+        checkCompatibility: () => portraitModules[1].checkPortraitCompatibility({
+          codexBin: config.codexBin, signal: controller.signal,
+        }),
         execute: (claim: import("@patternlike/shared").CodexPortraitClaim) => portraitModules[1].runPortraitInvocation({
           claim, codexBin: config.codexBin, signal: controller.signal,
         }),

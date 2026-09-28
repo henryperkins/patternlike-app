@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFileSync, mkdirSync, writeFileSync, readdirSync, realpathSync, openSync, closeSync, fstatSync, constants } from "node:fs";
 import { canonicalJson } from "../pattern-release/candidates.mjs";
-import { DEFINITION, SNAPSHOTS, TOOLING, MapError, fail, closed, utc, captureId, safePath, validateModel, render } from "./model.mjs";
+import { CURRENT, DEFINITION, SNAPSHOTS, TOOLING, MapError, fail, closed, utc, captureId, safePath, validateModel, render } from "./model.mjs";
 export const SCOPE = "referenced_files_and_map_inputs_only";
 const FILES = ["map-input.json", "patternlike-source-mindmap.md", "source-evidence.md", "source-snapshot.json"];
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -15,6 +15,8 @@ const parse = (bytes, code) => { try { return JSON.parse(new TextDecoder("utf-8"
 // openFile receives fd-relative single-component paths, and readFile/writeFile
 // receive already opened descriptors whose ownership remains with this module.
 export function run(command, argument, { cwd = process.cwd(), beforeRecheck, openFile = openSync, readFile = readFileSync, writeFile = writeFileSync, now = () => new Date() } = {}) {
+  const checkCurrent = command === "check-current";
+  let currentPointer;
   let root; let rootFd; let snapshotPath = null; let snapshot; let head = null; let evidencePaths = new Set();
   const git = args => execFileSync("git", args, { cwd: root ?? cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const headNow = () => git(["rev-parse", "HEAD"]);
@@ -23,6 +25,10 @@ export function run(command, argument, { cwd = process.cwd(), beforeRecheck, ope
   // the kernel-owned fd reference, which pins the previously validated inode.
   const fdPath = fd => `/proc/self/fd/${fd}`;
   const directoryFlags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
+  // Linux O_PATH is a stable ABI flag (not exposed by node:fs). Ancestors
+  // need search permission, not permission to list another user's directory.
+  // O_DIRECTORY | O_NOFOLLOW still refuses a symlink at every component.
+  const ancestorFlags = 0o10000000 | constants.O_DIRECTORY | constants.O_NOFOLLOW;
   const ioError = (error, path, missing = "source_missing") => {
     if (error instanceof MapError) throw error;
     if (error.code === "ELOOP" || error.code === "ENOTDIR") fail("path_unsafe", path, null, 2);
@@ -110,16 +116,19 @@ export function run(command, argument, { cwd = process.cwd(), beforeRecheck, ope
   } });
   try {
     if (process.versions.node.split(".")[0] !== "22") fail("node_version_unsupported", null, null, 2);
-    if (!["capture", "check"].includes(command) || typeof argument !== "string") fail("usage_invalid", null, null, 2);
+    if (checkCurrent) {
+      if (argument !== undefined) fail("usage_invalid", null, null, 2);
+      command = "check";
+    } else if (!["capture", "check"].includes(command) || typeof argument !== "string") fail("usage_invalid", null, null, 2);
     if (command === "capture") { if (!captureId(argument)) fail("usage_invalid", null, null, 2); snapshotPath = `${SNAPSHOTS}/${argument}`; }
-    else { safePath(argument); if (!argument.startsWith(`${SNAPSHOTS}/`) || !captureId(argument.slice(SNAPSHOTS.length + 1))) fail("path_unsafe", null, null, 2); snapshotPath = argument; }
+    else if (!checkCurrent) { safePath(argument); if (!argument.startsWith(`${SNAPSHOTS}/`) || !captureId(argument.slice(SNAPSHOTS.length + 1))) fail("path_unsafe", null, null, 2); snapshotPath = argument; }
     try { root = realpathSync(git(["rev-parse", "--show-toplevel"])); head = headNow(); } catch { fail("repository_unavailable", null, null, 2); }
     // Fail closed on hosts without the exact descriptor-relative capability.
     if (process.platform !== "linux" || !constants.O_NOFOLLOW || !constants.O_DIRECTORY) fail("io_failed", null, null, 2);
     try {
-      rootFd = openFile("/", directoryFlags);
+      rootFd = openFile("/", ancestorFlags);
       for (const component of root.split("/").filter(Boolean)) {
-        const next = openFile(`${fdPath(rootFd)}/${component}`, directoryFlags);
+        const next = openFile(`${fdPath(rootFd)}/${component}`, ancestorFlags);
         closeSync(rootFd); rootFd = next;
       }
       const probe = openFile(`${fdPath(rootFd)}/.`, directoryFlags);
@@ -129,6 +138,14 @@ export function run(command, argument, { cwd = process.cwd(), beforeRecheck, ope
       if (e instanceof MapError) throw e;
       if (e.code === "ELOOP" || e.code === "ENOTDIR") fail("path_unsafe", null, null, 2);
       fail("io_failed", null, null, 2);
+    }
+    if (checkCurrent) {
+      currentPointer = read(CURRENT, { missing: "current_pointer_invalid" });
+      const pointer = parse(currentPointer.bytes, "current_pointer_invalid");
+      if (!closed(pointer, ["schema_version", "snapshot_path"]) || pointer.schema_version !== "patternlike-source-map-current.v1"
+        || typeof pointer.snapshot_path !== "string" || !pointer.snapshot_path.startsWith(`${SNAPSHOTS}/`)
+        || !captureId(pointer.snapshot_path.slice(SNAPSHOTS.length + 1))) fail("current_pointer_invalid", CURRENT);
+      snapshotPath = pointer.snapshot_path;
     }
     if (command === "capture") {
       if (checked(snapshotPath, { allowAbsent: true })) fail("output_exists", snapshotPath, null, 2);
@@ -199,7 +216,7 @@ export function run(command, argument, { cwd = process.cwd(), beforeRecheck, ope
     for (const p of FILES.slice(0, 3)) if (!equal(bundle[p].identity, snapshot.identity.outputs[p])) problems.push(problem("bundle_changed", `${snapshotPath}/${p}`));
     if (!derived.problems.length && Object.keys(derived.anchors).length === model.evidence.length) for (const [p, bytes] of Object.entries(render(model, derived.anchors))) if (!bytes.equals(bundle[p].bytes)) problems.push(problem("bundle_changed", `${snapshotPath}/${p}`));
     // Include bundle bytes in the final stability pass as well as consumed inputs.
-    recheck({ ...files, ...Object.fromEntries(FILES.map(p => [`${snapshotPath}/${p}`, bundle[p]])) }, head, "source_changed_during_check");
+    recheck({ ...files, ...(currentPointer ? { [CURRENT]: currentPointer } : {}), ...Object.fromEntries(FILES.map(p => [`${snapshotPath}/${p}`, bundle[p]])) }, head, "source_changed_during_check");
     return result(problems);
   } catch (e) { return result(e instanceof MapError ? e.problems : [problem("io_failed")], e instanceof MapError ? e.exitCode : 2); }
   finally { if (rootFd !== undefined) closeSync(rootFd); }

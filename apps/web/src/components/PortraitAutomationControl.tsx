@@ -26,6 +26,17 @@ export function PortraitAutomationControl({ chartId, canEnable = true, onUnautho
       || typeof value.available !== "boolean" || typeof value.enabled !== "boolean"
       || (value.schema_version === "portrait-automation/v2" && (typeof value.legacy_enabled !== "boolean" || (value.legacy_enabled && value.enabled)))
       || ((value.available || value.enabled || (value.schema_version === "portrait-automation/v2" && value.legacy_enabled)) && value.chart_id !== chartId)) throw new Error("The portrait preference no longer matches this chart. Refresh to continue.");
+    const state = value.state;
+    if (state && (!Array.isArray(state.supported_protocols) || state.supported_protocols.some(protocol => !["v1", "v2"].includes(protocol))
+      || typeof state.generation_available !== "boolean" || state.generation_available !== value.available
+      || !["enabled", "disabled", "unknown"].includes(state.grant_status)
+      || !Array.isArray(state.allowed_actions) || state.allowed_actions.some(action => !["enable", "disable"].includes(action))
+      || (state.grant_status === "enabled" ? !["1.1.0", "2.0.0"].includes(state.grant_policy_version!)
+        || value.chart_id !== chartId || !(value.enabled || (value.schema_version === "portrait-automation/v2" && value.legacy_enabled))
+        : state.grant_policy_version !== null || value.enabled || (value.schema_version === "portrait-automation/v2" && value.legacy_enabled))
+      || (state.grant_status === "unknown" && (state.generation_available || state.allowed_actions.length))
+      || (state.allowed_actions.includes("enable") && !state.generation_available)
+      || (state.allowed_actions.includes("disable") && state.grant_status !== "enabled"))) throw new Error("The portrait preference no longer matches this chart. Refresh to continue.");
     return value;
   };
   useEffect(() => {
@@ -37,7 +48,9 @@ export function PortraitAutomationControl({ chartId, canEnable = true, onUnautho
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return;
       if (cause instanceof ApiError && cause.status === 401) onUnauthorized();
-      else if (!(cause instanceof ApiError && [404, 503].includes(cause.status))) setError(cause instanceof Error ? cause.message : "Automatic portrait settings could not be loaded.");
+      else setError(cause instanceof ApiError && [404, 503].includes(cause.status)
+        ? "Automatic artwork permission could not be checked. Your saved choice is unknown."
+        : cause instanceof Error ? cause.message : "Automatic portrait settings could not be loaded.");
     });
     return () => { controller.abort(); action.current?.abort(); onSavingChange?.(false); };
   }, [chartId, onUnauthorized, onSavingChange, attempt, accountScope]);
@@ -48,15 +61,21 @@ export function PortraitAutomationControl({ chartId, canEnable = true, onUnautho
     return () => window.clearTimeout(timer);
   }, [fresh, observedAt]);
   const legacyEnabled = preference?.schema_version === "portrait-automation/v2" ? preference.legacy_enabled : false;
+  const mayEnable = preference?.state ? preference.state.allowed_actions.includes("enable") : !!preference?.available;
+  const mayDisable = preference?.state ? preference.state.allowed_actions.includes("disable") : !!preference?.enabled || legacyEnabled;
   const change = async (enabled: boolean) => {
-    if (busy || !fresh || observedAt === null || Date.now() - observedAt > 60_000 || !preference || preference.chart_id !== chartId || (enabled && (!canEnable || !preference.available))) { setFresh(false); return; }
+    if (busy || !fresh || observedAt === null || Date.now() - observedAt > 60_000 || !preference || preference.chart_id !== chartId || (enabled ? !canEnable || !mayEnable : !mayDisable)) { setFresh(false); return; }
     const controller = new AbortController(); action.current = controller;
     setBusy(true); setError(null); onSavingChange?.(true);
     if (!intentKey.current || intentKey.current.chartId !== chartId || intentKey.current.enabled !== enabled) intentKey.current = { chartId, enabled, key: newIdempotencyKey("web-portrait-automation") };
     try {
       const next = await setPortraitAutomation({ chart_id: chartId, enabled, consent_policy_version: enabled ? preference.consent_policy_version : legacyEnabled ? "1.1.0" : preference.consent_policy_version,
         confirm: enabled ? "ENABLE AUTOMATIC PORTRAITS" : "DISABLE AUTOMATIC PORTRAITS" }, intentKey.current.key, controller.signal);
-      if (!controller.signal.aborted) { setPreference(valid(next)); setFresh(true); setObservedAt(Date.now()); setSaved(true); intentKey.current = null; onChanged?.(); }
+      if (!controller.signal.aborted) {
+        valid(next);
+        if (next.state?.grant_status === "unknown") throw new Error("Automatic artwork permission could not be checked. Your saved choice is unknown.");
+        setPreference(next); setFresh(true); setObservedAt(Date.now()); setSaved(true); intentKey.current = null; onChanged?.();
+      }
     } catch (cause) {
       if (!controller.signal.aborted) {
         setFresh(false);
@@ -72,13 +91,17 @@ export function PortraitAutomationControl({ chartId, canEnable = true, onUnautho
   const scope = { ...accountScope, chartId };
   const readiness = selectReaderReadiness({ scope, requestGeneration: requestGeneration.current, now: Date.now(),
     automation: preference && observedAt !== null ? { scope, requestGeneration: requestGeneration.current, observedAt, evidence: fresh ? "known" : "unavailable", value: preference } : null }).artwork;
-  if (!preference || (!preference.available && !preference.enabled && !legacyEnabled) || preference.chart_id !== chartId) return error ? <p role="status">{error}</p> : null;
+  if (preference?.state?.grant_status === "unknown") return <section className="portrait-automation" aria-label="Automatic visual portrait">
+    <p role="status">Automatic artwork permission could not be checked. Your saved choice is unknown.</p>
+    <button type="button" onClick={() => setAttempt(value => value + 1)}>Check again</button>
+  </section>;
+  if (!preference || (!preference.available && !preference.enabled && !legacyEnabled) || preference.chart_id !== chartId) return error ? <div><p role="status">{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Check again</button></div> : null;
   return <section className="portrait-automation" aria-label="Automatic visual portrait">
     {legacyEnabled && <div><p>Automatic artwork is enabled under your earlier four-chapter permission.</p>
-      <button type="button" disabled={busy || !fresh} onClick={() => void change(false)}>Stop four-chapter automatic artwork</button>
+      <button type="button" disabled={busy || !fresh || !mayDisable} onClick={() => void change(false)}>Stop four-chapter automatic artwork</button>
       <p>Renew below to include every chapter in readings with three to six chapters.</p></div>}
     <label className="portrait-automation__choice">
-      <input type="checkbox" checked={preference.enabled} disabled={busy || !fresh || (!preference.enabled && (!canEnable || !preference.available))} aria-describedby={description} onChange={(event) => void change(event.target.checked)} />
+      <input type="checkbox" checked={preference.enabled} disabled={busy || !fresh || (preference.enabled ? !mayDisable : !canEnable || !mayEnable)} aria-describedby={description} onChange={(event) => void change(event.target.checked)} />
       <span>{legacyEnabled ? "Renew automatic artwork for every chapter" : "Automatically create my 3D portrait"}</span>
     </label>
     <div id={description} className="portrait-automation__terms">
@@ -88,7 +111,7 @@ export function PortraitAutomationControl({ chartId, canEnable = true, onUnautho
         : <p>This server supports automatic artwork for four-chapter Patterns. Enabling this choice creates one image and one 3D model for each of those four chapters. Saved artwork is reused privately.</p>}
       {preference.schema_version === "portrait-automation/v2" && !preference.enabled && <p>This choice grants permission for the complete reading. Any earlier four-chapter permission is not expanded until you enable it here. Saved artwork remains available.</p>}
       <ReaderConsequences action="disable_artwork" observedAt={observedAt} evidence={fresh ? "known" : "unavailable"} />
-      {!canEnable && !preference.enabled && <p>New portrait creation is unavailable right now. Your reading remains available.</p>}
+      {(!canEnable || !preference.available) && <p>New portrait creation is unavailable right now. Your reading remains available.</p>}
     </div>
     {busy ? <p role="status">Saving your choice…</p> : null}
     {!fresh && <ReaderReadiness presentation={readiness} onAction={() => setAttempt(value => value + 1)} />}

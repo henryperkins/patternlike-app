@@ -62,7 +62,6 @@ async function json(request: Request, max: number): Promise<unknown> {
   }
 }
 async function respond(c: Ctx, work: () => Promise<Response>) {
-  c.header("cache-control", "private, no-store");
   c.header("x-content-type-options", "nosniff");
   c.header("Vary", PORTRAIT_PROTOCOL_HEADER);
   try {

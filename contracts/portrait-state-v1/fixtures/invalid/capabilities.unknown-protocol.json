@@ -1,0 +1,7 @@
+{
+  "supported_protocols": [
+    "v3"
+  ],
+  "generation_available": false,
+  "allowed_actions": []
+}

@@ -9,7 +9,7 @@ import { prepareFreshReadingEvaluation, runFreshReadingEvaluation } from "./fres
 test("fresh evaluation prepares every synthetic profile with the real prompt and frozen validator inputs", async () => {
   const plan = await prepareFreshReadingEvaluation();
   assert.equal(plan.cases.length, 8);
-  assert.equal(plan.pin.prompt_version, "1.0.3");
+  assert.equal(plan.pin.prompt_version, "1.1.0");
   assert.equal(new Set(plan.cases.map((entry) => entry.shape)).size, 6);
   for (const entry of plan.cases) {
     assert(entry.claim.invocation.prompt.includes(JSON.stringify(entry.prepared.request)));

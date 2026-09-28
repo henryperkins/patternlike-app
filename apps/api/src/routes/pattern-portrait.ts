@@ -56,7 +56,7 @@ function completion(value: unknown, protocol: PortraitProtocol): CodexPortraitCo
   return value as unknown as CodexPortraitCompletion;
 }
 async function respond(c: Ctx, work: () => Promise<Response>) {
-  c.header("cache-control","private, no-store"); c.header("x-content-type-options","nosniff");
+  c.header("x-content-type-options","nosniff");
   c.header("vary", PORTRAIT_PROTOCOL_HEADER, { append: true });
   try { portraitProtocol(c.req.header(PORTRAIT_PROTOCOL_HEADER)); return await work(); } catch (error) {
     if (error instanceof PortraitError) return c.json({ error:{ code:error.code,message:"Portrait request could not be completed",request_id:c.get("requestId") } },error.status);

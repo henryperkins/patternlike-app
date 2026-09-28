@@ -1,0 +1,10 @@
+{
+  "supported_protocols": [
+    "v1",
+    "v2"
+  ],
+  "generation_available": false,
+  "allowed_actions": [
+    "create"
+  ]
+}

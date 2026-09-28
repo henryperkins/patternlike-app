@@ -13,6 +13,27 @@ beforeEach(() => {
 });
 
 describe("automatic portrait permission", () => {
+  it("shows unknown permission with a reload action when the grant store is unavailable", async () => {
+    vi.mocked(getPortraitAutomation).mockResolvedValue({ ...preference, available: false,
+      state: { supported_protocols: ["v1", "v2"], generation_available: false, grant_status: "unknown", grant_policy_version: null, allowed_actions: [] } });
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    await screen.findByText(/Automatic artwork permission could not be checked/);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(getPortraitAutomation).toHaveBeenCalledTimes(2);
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+  });
+
+  it("respects the allowed actions when generation is operational but enablement is not permitted", async () => {
+    vi.mocked(getPortraitAutomation).mockResolvedValue({ ...preference,
+      state: { supported_protocols: ["v1", "v2"], generation_available: true, grant_status: "disabled", grant_policy_version: null, allowed_actions: [] } });
+    render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);
+    const choice = await screen.findByRole("checkbox");
+    expect(choice).toBeDisabled();
+    await userEvent.click(choice);
+    expect(setPortraitAutomation).not.toHaveBeenCalled();
+  });
+
   it("requires a read-only status reload after an ambiguous save before another mutation", async () => {
     vi.mocked(setPortraitAutomation).mockRejectedValue(new Error("Network outcome unknown"));
     render(<PortraitAutomationControl chartId="chart-current" onUnauthorized={vi.fn()} />);

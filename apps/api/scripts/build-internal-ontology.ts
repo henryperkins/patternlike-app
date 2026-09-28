@@ -16,7 +16,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { compileOntologyRelease } from "@patternlike/pattern-engine";
+import { compileOntologyCandidate } from "@patternlike/pattern-engine";
 import type {
   PatternFeaturePredicate,
   PatternOntologyRecord,
@@ -25,7 +25,7 @@ import type {
 } from "@patternlike/shared";
 
 // Changed extraction content gets a new default candidate identity.
-const ONTOLOGY_VERSION = process.env.ONTOLOGY_VERSION ?? "pattern-ontology-en-us-internal-0.1.2";
+const ONTOLOGY_VERSION = process.env.ONTOLOGY_VERSION ?? "pattern-ontology-en-us-internal-0.1.3";
 
 interface CorpusFragment {
   id: string;
@@ -192,19 +192,17 @@ const release: PatternOntologyRelease = {
   // design, not an oversight.
   status: "candidate",
   records,
-  // For this synthetic_internal origin, compiler_passed is checked by the
-  // actual compile below. evaluator_passed=true and unevaluated_fixture_count=0
-  // are compatibility fields, not an independent evaluation or coverage receipt.
-  // No machine evaluator or regression rehearsal runs; regression_passed=false
-  // records that distinction. These values do not certify editorial quality.
+  // No evaluator or regression run took place. The frozen evidence schema has
+  // no "not_run" verdict, so use its fail-closed representation. Zero counts
+  // fixtures supplied to this compiler, not completed evaluation coverage.
+  // Only compiler_passed is established by the actual compile below. This
+  // candidate cannot pass compileOntologyRelease's release-admission checks.
   evaluation: {
     schema_version: "0.7.0",
     ontology_version: ONTOLOGY_VERSION,
-    verdict: "pass",
+    verdict: "reject",
     compiler_passed: true,
-    evaluator_passed: true,
-    // No rehearsal ran. The field is on the frozen contract and is not read on
-    // the synthetic path, which never had a regression stage to pass.
+    evaluator_passed: false,
     regression_passed: false,
     unevaluated_fixture_count: 0,
   },
@@ -214,7 +212,7 @@ const release: PatternOntologyRelease = {
   },
 };
 
-const compiled = compileOntologyRelease(release);
+const compiled = compileOntologyCandidate(release);
 if (!compiled.ok) {
   console.error(`compile failed with ${compiled.failures.length} failure(s):`);
   for (const failure of compiled.failures.slice(0, 20)) {
@@ -226,5 +224,5 @@ if (!compiled.ok) {
 writeFileSync(outPath, `${JSON.stringify(release, null, 2)}\n`);
 console.log(
   `ok: ${records.length} records, ${skipped} fragments skipped (no predicate), ` +
-    `locale ${release.locale}`,
+    `locale ${release.locale}; compile-only, evaluation and regression not run, not admissible for release`,
 );

@@ -128,12 +128,19 @@ async function seedEligibleContext(): Promise<void> {
   ]);
 }
 
-async function reserve(options: { context?: boolean; accuracy?: "exact" | "unknown" } = {}) {
+interface ReserveOptions {
+  context?: boolean;
+  accuracy?: "exact" | "unknown";
+  qualifiedFeatures?: Array<{ feature_id: string; qualification: string }>;
+}
+
+async function reserve(options: ReserveOptions = {}) {
   await resetDb();
   await seedUser(IDENTITY_A);
   await confirmPreferences(USER_A, ZONE);
   await seedChart(IDENTITY_A, {
     accuracy: options.accuracy,
+    qualifiedFeatures: options.qualifiedFeatures,
     suppressedFeatures:
       options.accuracy === "unknown"
         ? [
@@ -165,7 +172,7 @@ async function reserve(options: { context?: boolean; accuracy?: "exact" | "unkno
   return enqueued;
 }
 
-async function claimReserved(options: { context?: boolean; accuracy?: "exact" | "unknown" } = {}) {
+async function claimReserved(options: ReserveOptions = {}) {
   const enqueued = await reserve(options);
   const claim = await claimJob(enabledEnv(), enqueued.jobId);
   if (!claim) throw new Error("job did not claim");
@@ -356,12 +363,12 @@ describe("V5 execution", () => {
       model: {
         provider: "codex",
         model: OPENAI_READING_MODEL,
-        prompt_version: "1.0.3",
+        prompt_version: "1.1.0",
         provider_request_id: expect.any(String),
         input_tokens: 4210,
         output_tokens: 512,
       },
-      validation: { status: "passed", policy_version: "1.1.1" },
+      validation: { status: "passed", policy_version: "1.2.0" },
     });
     expect(JSON.stringify(stored)).not.toContain("cpjob_");
     expect(stored.evidence_header.model).not.toHaveProperty("provider_job_id");
@@ -470,7 +477,7 @@ describe("V5 execution", () => {
     expect(claimed!.job.reasoningEffort).toBe("xhigh");
     expect(claimed!.job.promptVersion).toBe(command.publisher.prompt_version);
     expect(claimed!.job.model).not.toBe("a-new-current-model");
-    expect(command.publisher.prompt_version).toBe("1.0.3");
+    expect(command.publisher.prompt_version).toBe("1.1.0");
     expect(claimed!.packet.prompt_version).toBe(command.publisher.prompt_version);
   });
 
@@ -725,8 +732,8 @@ describe("V5 execution", () => {
     expect(rejections[0]![1]).toMatchObject({
       provider: "codex",
       model: "gpt-5.6-sol",
-      prompt_version: "1.0.3",
-      validation_policy_version: "1.1.1",
+      prompt_version: "1.1.0",
+      validation_policy_version: "1.2.0",
       provider_response_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       failures,
     });
@@ -746,8 +753,49 @@ describe("V5 execution", () => {
     expect(providerCalls).toBe(1);
   });
 
+  it("publishes an exact-time civil-zone qualification with every stored reason", async () => {
+    // This normalized report is emitted for historical-zone or ambiguous
+    // civil time, without retaining which detailed code produced it.
+    const { enqueued, claim } = await claimReserved({ accuracy: "exact", qualifiedFeatures: [
+      { feature_id: "birth_instant", qualification: "technique_specific" },
+      { feature_id: "birthplace", qualification: "technique_specific" },
+    ] });
+    expect((claim.command as GenerateDailyReadingCommandV2).chart.effective_accuracy).toBe("exact");
+    const { result } = await withProvider((candidate) => ({ ...candidate, uncertainty_note: {
+      text: "The time-zone mapping of your local birth time needs confirmation. Your birthplace needs confirmation.",
+      fact_ids: [], context_refs: [],
+    } }), () => dispatchGeneration(enabledEnv(), claim));
+    expect(result).toMatchObject({ ok: true });
+    const stored = await decryptReading(enqueued.readingId);
+    expect(stored.reading.paragraphs.find((paragraph) => paragraph.role === "uncertainty_notice")?.text)
+      .toBe("The time-zone mapping of your local birth time needs confirmation. Your birthplace needs confirmation.");
+    expect(stored.evidence_header.validation.policy_version).toBe("1.2.0");
+  });
+
+  it.each([
+    "Your birthplace needs confirmation.",
+    "The time-zone mapping of your local birth time needs confirmation. Your birthplace needs confirmation. Your birth time is unknown.",
+  ])("refuses an incomplete or invented qualified disclosure: %s", async (text) => {
+    const { claim } = await claimReserved({ qualifiedFeatures: [
+      { feature_id: "birth_instant", qualification: "technique_specific" },
+      { feature_id: "birthplace", qualification: "technique_specific" },
+    ] });
+    const { result } = await withProvider((candidate) => ({ ...candidate,
+      uncertainty_note: { text, fact_ids: [], context_refs: [] },
+    }), () => dispatchGeneration(enabledEnv(), claim));
+    expect(result).toMatchObject({ ok: false, reason: "publisher_output_invalid" });
+  });
+
   it("refuses unsupported frozen policy and compiler pins before OpenAI", async () => {
     const mutations: Array<(command: GenerateDailyReadingCommandV2) => void> = [
+      (command) => {
+        command.schema_version = "0.5.0" as GenerateDailyReadingCommandV2["schema_version"];
+      },
+      (command) => {
+        command.publisher.prompt_version = "1.0.3";
+        command.publisher.selection_policy_version = "1.3.0";
+        command.publisher.validation_policy_version = "1.1.1";
+      },
       (command) => {
         command.publisher.prompt_version = "1.0.2";
       },

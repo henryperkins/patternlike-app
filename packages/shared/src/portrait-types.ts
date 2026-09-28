@@ -66,6 +66,14 @@ export interface PatternPortraitResponseV1 {
   retryable: boolean;
   chapters: PatternPortraitChapter[];
   graph: PortraitGraphV1 | null;
+  /** Optional on older servers. Capability is scoped to this response, never consent. */
+  capabilities?: PortraitGenerationCapabilities;
+}
+
+export interface PortraitGenerationCapabilities {
+  supported_protocols: Array<"v1" | "v2">;
+  generation_available: boolean;
+  allowed_actions: Array<"create" | "retry">;
 }
 
 export interface PatternPortraitGenerationRequestV1 {

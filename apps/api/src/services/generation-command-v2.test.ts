@@ -9,6 +9,9 @@ import m3AssemblyIdentity from "../../../../contracts/m3/assembly-identity.schem
 import m5Common from "../../../../contracts/m5/common.schema.json";
 import m5GenerationCommand from "../../../../contracts/m5/generation-command.schema.json";
 import m5ReadingGenerationRequest from "../../../../contracts/m5/reading-generation-request.schema.json";
+import dailyUncertainty from "../../../../contracts/daily-uncertainty-v1/uncertainty.schema.json";
+import dailyGenerationRequest from "../../../../contracts/daily-uncertainty-v1/reading-generation-request.schema.json";
+import dailyGenerationCommand from "../../../../contracts/daily-uncertainty-v1/generation-command.schema.json";
 import m5ReadingGenerationOutput from "../../../../contracts/m5/reading-generation-output.schema.json";
 
 import {
@@ -50,14 +53,17 @@ for (const schema of [
   m5ReadingGenerationOutput,
   m5ReadingGenerationRequest,
   m5GenerationCommand,
+  dailyUncertainty,
+  dailyGenerationRequest,
+  dailyGenerationCommand,
 ]) {
   ajv.addSchema(schema);
 }
 const validateCommandV2 = ajv.getSchema(
-  `${m5GenerationCommand.$id}#/$defs/generateDailyReadingCommandV2`,
+  `${dailyGenerationCommand.$id}#/$defs/generateDailyReadingCommandV2`,
 )!;
 const validateRequest = ajv.getSchema(
-  `${m5ReadingGenerationRequest.$id}#/$defs/readingGenerationRequest`,
+  `${dailyGenerationRequest.$id}#/$defs/readingGenerationRequest`,
 )!;
 
 /** The publisher configuration a real enabled deployment carries. */
@@ -296,16 +302,7 @@ describe("V2 command", () => {
     expect(built).toMatchObject({ ok: false, reason: "ai_synthesis_consent_required" });
   });
 
-  it("refuses a chart whose mandatory disclosure the grammar cannot express, before any provider call", async () => {
-    // The production shape behind rdg_8e544ee…: an exact birth time, nothing
-    // suppressed, and two surviving location qualifications. calc-stub emits
-    // these whenever the birthplace resolves below high confidence or the civil
-    // time is ambiguous, at EVERY accuracy — so the note is mandatory while the
-    // accepted disclosure forms, built only from suppressed_features and the
-    // approximate-time sentence, have nothing to say. Left unguarded this costs
-    // two provider calls per attempt and automatically replaces the command
-    // until the generation cap is spent, which is how one reader reached
-    // command_generation 3 with no reading.
+  it("builds an exact chart with location and civil-time qualifications under the successor contract", async () => {
     await rows("DELETE FROM chart_snapshots WHERE user_id = ?", USER_A);
     await rows("DELETE FROM birth_profiles WHERE user_id = ?", USER_A);
     await seedChart(IDENTITY_A, {
@@ -317,15 +314,22 @@ describe("V2 command", () => {
       ],
     });
     const built = await build();
-    expect(built).toMatchObject({ ok: false, reason: "context_ineligible" });
-    if (built.ok) throw new Error("expected refusal");
-    expect(built.detail).toMatch(/uncertainty disclosure/i);
+    if (!built.ok) throw new Error(built.detail);
+    expect(built.request.birth_time_accuracy).toBe("exact");
+    expect(built.request.suppressed_features).toEqual([]);
+    expect(built.request.uncertainty_disclosure.disclosures).toEqual([
+      { kind: "qualification", feature_id: "birth_instant", qualification: "technique_specific",
+        statement: "The time-zone mapping of your local birth time needs confirmation." },
+      { kind: "qualification", feature_id: "birthplace", qualification: "technique_specific",
+        statement: "Your birthplace needs confirmation." },
+    ]);
+    expect(validateCommandV2(built.command), JSON.stringify(validateCommandV2.errors)).toBe(true);
+    expect(validateRequest(built.request), JSON.stringify(validateRequest.errors)).toBe(true);
+    expect(built.command.publisher).toMatchObject({ prompt_version: "1.1.0", selection_policy_version: "1.5.0", validation_policy_version: "1.2.0" });
   });
 
   it("still builds when the same qualifications ride a chart that can disclose", async () => {
-    // The guard must be exactly as wide as the gap. An unknown birth time
-    // suppresses four feature classes, so a suppression sentence is available
-    // and the identical qualifications are no longer fatal.
+    // Every suppression and qualification survives together in the plan.
     await rows("DELETE FROM chart_snapshots WHERE user_id = ?", USER_A);
     await rows("DELETE FROM birth_profiles WHERE user_id = ?", USER_A);
     await seedChart(IDENTITY_A, {
@@ -344,6 +348,16 @@ describe("V2 command", () => {
     const built = await build();
     if (!built.ok) throw new Error(built.detail);
     expect(built.command.chart.uncertainty.qualified_features).toHaveLength(2);
+    expect(built.request.uncertainty_disclosure.disclosures).toHaveLength(7);
+  });
+
+  it("refuses unsupported stored qualification pairs", async () => {
+    await rows("DELETE FROM chart_snapshots WHERE user_id = ?", USER_A);
+    await rows("DELETE FROM birth_profiles WHERE user_id = ?", USER_A);
+    await seedChart(IDENTITY_A, { accuracy: "approximate", qualifiedFeatures: [
+      { feature_id: "birthplace", qualification: "approximate_only" },
+    ] });
+    expect(await build()).toMatchObject({ ok: false, reason: "context_ineligible", detail: "unsupported stored uncertainty" });
   });
 
   it("refuses while the publisher is not configured", async () => {

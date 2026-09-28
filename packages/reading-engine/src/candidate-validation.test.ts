@@ -15,11 +15,11 @@ import type { DailySkyFact, ReadingGenerationOutput } from "@patternlike/shared"
 import { isSupportedReadingLocale } from "./candidate-policy.js";
 import {
   VALIDATION_POLICY_VERSION,
+  SELECTION_POLICY_VERSION,
   type ConstrainedReadingInput,
 } from "./constrained-types.js";
 import { prepareConstrainedReadingInput } from "./constrained-input.js";
 import { validateReadingCandidate } from "./candidate-validation.js";
-import { uncertaintyDisclosureRepresentable } from "./claim-support.js";
 import type { NormalizedCycle } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -123,10 +123,10 @@ const CONTACT: DailySkyFact = {
 
 function input(overrides: Partial<ConstrainedReadingInput> = {}): ConstrainedReadingInput {
   return {
-    schema_version: "0.5.0",
+    schema_version: "0.5.1",
     prompt_version: "1.0.0",
     output_schema: "daily-reading-v5",
-    selection_policy_version: "1.0.0",
+    selection_policy_version: SELECTION_POLICY_VERSION,
     validation_policy_version: VALIDATION_POLICY_VERSION,
     context_max_bytes: 98304,
     target_local_date: "2026-07-30",
@@ -482,7 +482,8 @@ test("qualified approximate data supports an honest note without inventing suppr
     } },
   });
   for (const [text, expected] of [
-    ["Your birth time is approximate, so time-sensitive details remain uncertain.", true],
+    ["Your birth time is approximate. House details are approximate.", true],
+    ["Your birth time is approximate, so time-sensitive details remain uncertain.", false],
     ["Your birth time is approximate, so this reading omits houses.", false],
     ["Your birth time is unknown, so time-sensitive details remain uncertain.", false],
   ] as const) {
@@ -491,50 +492,33 @@ test("qualified approximate data supports an honest note without inventing suppr
   }
 });
 
-/**
- * The production shape behind `rdg_8e544ee…`: `birth_time_accuracy` exact,
- * `suppressed_features` empty, and two surviving location qualifications.
- *
- * `prepareConstrainedReadingInput` now refuses this packet outright, so the
- * rejection can no longer be reached through the eligibility path. The reason
- * it refuses still has to be demonstrable, and this is the demonstration: with
- * this request shape the grammar accepts nothing, so the mandatory note could
- * only ever be spent on a candidate that fails. Deleting it would leave the
- * guard asserting a rule with no evidence behind it.
- */
-test("exact location qualifications leave the disclosure grammar with nothing to accept", () => {
+test("exact civil-time and location qualifications accept all stored reasons and reject invented precision", () => {
   const base = input();
-  const carrier = prepareConstrainedReadingInput({
-    ...base,
-    chart: { ...base.chart, effective_accuracy: "unknown", uncertainty: {
-      accuracy: "unknown", window_plus_minus_minutes: null,
-      suppressed_features: [{ feature_class: "houses", feature_id: null, reason: "unknown_birth_time" }],
-      qualified_features: [],
-    } as unknown as ConstrainedReadingInput["chart"]["uncertainty"] },
-  });
-  const calculated = {
-    ...carrier,
-    request: { ...carrier.request, birth_time_accuracy: "exact" as const, suppressed_features: [] },
-  } as typeof carrier;
-
+  const calculated = prepareConstrainedReadingInput({ ...base, chart: { ...base.chart, uncertainty: {
+    ...base.chart.uncertainty,
+    qualified_features: [
+      { feature_id: "birth_instant", qualification: "technique_specific" },
+      { feature_id: "birthplace", qualification: "technique_specific" },
+    ],
+  } } });
   assert.equal(calculated.request.birth_time_accuracy, "exact");
-  assert.deepEqual(calculated.request.suppressed_features, []);
-  assert.equal(calculated.request.composition.uncertainty_note_required, true);
-
-  for (const text of [
-    "Your birth time is exact, so this reading omits houses.",
-    "Your birth time is exact, so this reading claims nothing about angles.",
-    "This reading omits angle transits because those facts are unavailable.",
-    "Without a confirmed birth time this reading leaves time-sensitive Moon details out.",
-    "Your birth time is approximate, so time-sensitive details remain uncertain.",
-  ]) {
-    const result = validateReadingCandidate(candidate({
-      uncertainty_note: { text, fact_ids: [], context_refs: [] },
-    }), calculated);
-    assert.equal(result.ok, false, `${text}: expected the packet to be unsatisfiable`);
-    if (!result.ok) assert.ok(result.failures.some((failure) =>
-      failure.code === "grounding" && failure.detail_code === "unsupported_uncertainty_disclosure"));
+  for (const [text, accepted] of [
+    ["The time-zone mapping of your local birth time needs confirmation. Your birthplace needs confirmation.", true],
+    ["Your birthplace needs confirmation. The time-zone mapping of your local birth time needs confirmation.", true],
+    ["Your birthplace needs confirmation.", false],
+    ["The time-zone mapping of your local birth time needs confirmation.", false],
+    ["Your birth time is unknown. Your birthplace needs confirmation.", false],
+    ["Your birthplace needs confirmation. Your historical time zone was incorrect.", false],
+    ["Your birthplace needs confirmation. Your local birth time was ambiguous.", false],
+    ["The time-zone mapping of your local birth time needs confirmation. Your birthplace needs confirmation. Your birthplace needs confirmation.", false],
+    ["Some things are unclear.", false],
+  ] as const) {
+    const result = validateReadingCandidate(candidate({ uncertainty_note: { text, fact_ids: [], context_refs: [] } }), calculated);
+    assert.equal(result.ok, accepted, `${text}: ${JSON.stringify(result)}`);
   }
+  const missing = validateReadingCandidate(candidate(), calculated);
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.ok(missing.failures.some((failure) => failure.detail_code === "required_note_missing"));
 });
 
 // ---------------------------------------------------------------------------
@@ -1016,8 +1000,8 @@ test("a bounded suppressed-Moon disclosure uses the uncertainty record without i
   });
   assert.equal(JSON.stringify(withNote.selected_facts).includes("moon"), false);
   for (const [text, expected] of [
-    ["Your birth time is unknown, so this reading omits angles, houses, and time-sensitive Moon details.", true],
-    ["Your birth time is unknown, so this reading omits time-sensitive Moon details.", true],
+    ["Your birth time is unknown. Angles are omitted because your birth time is unknown. Houses are omitted because your birth time is unknown. Time-sensitive Moon details are omitted because your birth time is unknown.", true],
+    ["Your birth time is unknown. Time-sensitive Moon details are omitted because your birth time is unknown.", false],
     ["Your birth time is exact, so this reading omits time-sensitive Moon details.", false],
     ["Your birth time is unknown, so this reading omits time-sensitive Moon details, and the Moon is in Aries.", false],
     ["Your birth time is unknown, so this reading omits time-sensitive Moon details. The Moon is waxing gibbous.", false],
@@ -1079,7 +1063,7 @@ test("a required uncertainty note must be present and must name what is missing"
     {
       ...base,
       uncertainty_note: {
-        text: "Without a confirmed birth time this reading leaves houses out entirely.",
+        text: "Your birth time is unknown. Houses are omitted because your birth time is unknown.",
         fact_ids: [],
         context_refs: [],
       },
@@ -1159,76 +1143,66 @@ test("a failing candidate reports closed check codes and no candidate prose", ()
   }
 });
 
-// ---------------------------------------------------------------------------
-// Disclosure representability, cross-checked against the real grammar
-//
-// `uncertaintyDisclosureRepresentable` lets `prepareConstrainedReadingInput`
-// refuse a packet whose mandatory note no candidate could satisfy. It is a
-// second statement of a rule that `uncertaintyDisclosure` already owns, and
-// this defect began with exactly that shape of duplication -- the M3
-// qualification enum was narrowed from a partial reading of the same function
-// it was meant to mirror. So the predicate is not trusted here: the grammar is
-// driven with every sentence it can generate, and the two must agree.
-// ---------------------------------------------------------------------------
-
-const DISCLOSURE_FEATURES = ["houses", "angles", "angle transits", "time-sensitive moon details"] as const;
-const SUPPRESSION_CLASSES = ["houses", "angles", "angle_transits", "moon_time_sensitive"] as const;
-
-/** Every sentence the accepted disclosure forms can produce, for one accuracy. */
-function generatedDisclosures(accuracy: string): string[] {
-  const scopes: string[] = [];
-  for (let mask = 1; mask < 1 << DISCLOSURE_FEATURES.length; mask += 1) {
-    const picked = DISCLOSURE_FEATURES.filter((_, i) => mask & (1 << i));
-    scopes.push(picked.length === 1 ? picked[0]! : `${picked.slice(0, -1).join(", ")} and ${picked.at(-1)}`);
-  }
-  const sentences = ["your birth time is approximate, so time-sensitive details remain uncertain"];
-  for (const scope of scopes) {
-    sentences.push(
-      `without a confirmed birth time this reading leaves ${scope} out`,
-      `without a confirmed birth time this reading leaves ${scope} out entirely`,
-      `your birth time is ${accuracy}, so this reading omits ${scope}`,
-      `your birth time is ${accuracy}, so this reading claims nothing about ${scope}`,
-      `this reading omits ${scope} because those facts are unavailable`,
-    );
-  }
-  return sentences;
-}
-
-test("the representability predicate agrees with the disclosure grammar it stands in for", () => {
-  // One packet that legitimately requires a note, then probed at every
-  // (accuracy, suppression) shape. Built this way because the eligibility path
-  // now refuses the unrepresentable shapes outright.
-  const base = input();
-  const carrier = prepareConstrainedReadingInput({
-    ...base,
-    chart: { ...base.chart, effective_accuracy: "unknown", uncertainty: {
-      accuracy: "unknown", window_plus_minus_minutes: null,
-      suppressed_features: SUPPRESSION_CLASSES.map((feature_class) => ({
-        feature_class, feature_id: null, reason: "unknown_birth_time",
-      })) as unknown as ConstrainedReadingInput["chart"]["uncertainty"]["suppressed_features"],
-      qualified_features: [],
-    } },
-  });
-  assert.equal(carrier.request.composition.uncertainty_note_required, true);
-
-  const suppressionSets = [[], ...SUPPRESSION_CLASSES.map((c) => [c]), [...SUPPRESSION_CLASSES]];
+// Every supported qualification and combination must remain expressible. The
+// literals below are independently specified policy expectations, not rendered
+// by the helper the compiler/validator share.
+test("every supported qualification combination requires every reason exactly once", () => {
+  const qualifications = [
+    { feature_id: "birth_instant", qualification: "technique_specific", statement: "The time-zone mapping of your local birth time needs confirmation." },
+    { feature_id: "birthplace", qualification: "technique_specific", statement: "Your birthplace needs confirmation." },
+    { feature_id: "houses", qualification: "approximate_only", statement: "House details are approximate." },
+    { feature_id: "moon", qualification: "low_confidence_moon", statement: "Time-sensitive Moon details have low confidence." },
+  ] as const;
   for (const accuracy of ["exact", "approximate", "unknown"] as const) {
-    for (const suppressed of suppressionSets) {
-      const prepared = {
-        ...carrier,
-        request: { ...carrier.request, birth_time_accuracy: accuracy, suppressed_features: suppressed },
-      } as typeof carrier;
-      const anyAccepted = generatedDisclosures(accuracy).some((text) =>
-        validateReadingCandidate(
-          candidate({ uncertainty_note: { text, fact_ids: [], context_refs: [] } }),
-          prepared,
-        ).ok,
-      );
-      assert.equal(
-        anyAccepted,
-        uncertaintyDisclosureRepresentable(accuracy, suppressed),
-        `predicate and grammar disagree for accuracy=${accuracy} suppressed=[${suppressed.join(",")}]`,
-      );
+    const available = accuracy === "approximate" ? qualifications : qualifications.slice(0, 2);
+    for (let mask = 0; mask < (1 << available.length); mask += 1) {
+      const selected = available.filter((_, index) => mask & (1 << index));
+      const base = input();
+      const calculated = prepareConstrainedReadingInput({ ...base, chart: { ...base.chart,
+        effective_accuracy: accuracy,
+        uncertainty: { accuracy, window_plus_minus_minutes: accuracy === "approximate" ? 30 : null,
+          suppressed_features: [], qualified_features: selected.map(({ feature_id, qualification }) =>
+            ({ feature_id, qualification })) as ConstrainedReadingInput["chart"]["uncertainty"]["qualified_features"],
+        },
+      } });
+      const statements = accuracy === "exact" ? [] : [`Your birth time is ${accuracy}.`];
+      statements.push(...selected.map((entry) => entry.statement));
+      const result = validateReadingCandidate(candidate({ uncertainty_note: statements.length ? {
+        text: statements.join(" "), fact_ids: [], context_refs: [],
+      } : null }), calculated);
+      assert.equal(result.ok, true, `${accuracy}/${mask}: ${JSON.stringify(result)}`);
+      for (let omitted = 0; omitted < statements.length; omitted += 1) {
+        const missing = validateReadingCandidate(candidate({ uncertainty_note: {
+          text: statements.filter((_, index) => index !== omitted).join(" "), fact_ids: [], context_refs: [],
+        } }), calculated);
+        assert.equal(missing.ok, false, `${accuracy}/${mask}: accepted omitted disclosure ${omitted}`);
+      }
+      for (const invented of qualifications.filter((entry) => !selected.includes(entry))) {
+        const result = validateReadingCandidate(candidate({ uncertainty_note: {
+          text: [...statements, invented.statement].join(" "), fact_ids: [], context_refs: [],
+        } }), calculated);
+        assert.equal(result.ok, false, `${accuracy}/${mask}: invented ${invented.feature_id}`);
+      }
     }
+  }
+});
+
+test("exact-time birthplace suppression names its actual cause and keeps suppressed facts unavailable", () => {
+  const base = input();
+  const calculated = prepareConstrainedReadingInput({ ...base, chart: { ...base.chart, uncertainty: {
+    ...base.chart.uncertainty,
+    suppressed_features: ["houses", "angles", "angle_transits"].map((feature_class) => ({
+      feature_class, feature_id: null, reason: "birthplace_unavailable",
+    })) as ConstrainedReadingInput["chart"]["uncertainty"]["suppressed_features"],
+  } } });
+  const text = "Angle transits are omitted because your birthplace is unavailable. Angles are omitted because your birthplace is unavailable. Houses are omitted because your birthplace is unavailable.";
+  assert.equal(calculated.request.birth_time_accuracy, "exact");
+  assert.equal(validateReadingCandidate(candidate({ uncertainty_note: { text, fact_ids: [], context_refs: [] } }), calculated).ok, true);
+  for (const invalid of [
+    text.replaceAll("your birthplace is unavailable", "your birth time is unknown"),
+    `${text} Your natal Sun is in the first house.`,
+    `${text} The Moon is in Aries.`,
+  ]) {
+    assert.equal(validateReadingCandidate(candidate({ uncertainty_note: { text: invalid, fact_ids: [], context_refs: [] } }), calculated).ok, false);
   }
 });

@@ -1,5 +1,25 @@
 # Daily reading uncertainty disclosure
 
+## Successor implemented 2026-09-28
+
+The local implementation now uses the [Daily uncertainty successor](../../contracts/daily-uncertainty-v1/README.md).
+Its request and encrypted command are version `0.5.1`; published M5 readings
+and evidence remain `0.5.0`. The engine derives one typed disclosure plan from
+every supported stored suppression and qualification. It preserves exact birth
+time, includes the plan in the generation identity and provider packet, and
+requires every reason exactly once during candidate validation.
+
+Prompt `1.1.0` (categorical `1.1.1`), selection `1.5.0` (categorical `1.6.0`), and
+candidate validation `1.2.0` bind the new semantics. Earlier commands fail
+`policy_unsupported` and remain subject to the existing bounded scheduler
+replacement rules. Unknown reason pairs still fail closed. The generic civil-time
+qualification is disclosed at its stored precision: no historical-zone or
+ambiguity code is invented when the report does not retain that code.
+
+This is a source change with local verification, not deployment or recovery
+evidence. The exhausted historical reading remains untouched. The following
+sections preserve the diagnosis and stop-gap behavior recorded before this repair.
+
 ## The gap
 
 `prepareConstrainedReadingInput` requires an uncertainty note whenever the chart

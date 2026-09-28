@@ -43,10 +43,6 @@ export const readingRoutes = new Hono<{
   Variables: AppVariables;
 }>();
 
-function privateNoStore(c: { header(name: string, value: string): void }): void {
-  c.header("cache-control", "private, no-store");
-}
-
 function readingNotFound(requestId: string | undefined) {
   return {
     error: {
@@ -519,7 +515,6 @@ readingRoutes.get("/v1/readings/today", async (c) => {
 });
 
 readingRoutes.get("/v1/readings", async (c) => {
-  privateNoStore(c);
   const query = parseHistoryQuery(c.req.url);
   if (!query) {
     return c.json(
@@ -541,7 +536,6 @@ readingRoutes.get("/v1/readings", async (c) => {
 });
 
 readingRoutes.get("/v1/readings/:id", async (c) => {
-  privateNoStore(c);
   const identity: UserIdentity = {
     userId: c.get("userId"),
     cryptoSubject: c.get("cryptoSubject"),
@@ -659,7 +653,6 @@ readingRoutes.post("/v1/readings/:id/feedback", async (c) => {
 });
 
 readingRoutes.get("/v1/readings/:id/save", async (c) => {
-  privateNoStore(c);
   const state = await getReadingSaveState(
     c.env,
     c.get("userId"),
@@ -670,7 +663,6 @@ readingRoutes.get("/v1/readings/:id/save", async (c) => {
 });
 
 readingRoutes.put("/v1/readings/:id/save", async (c) => {
-  privateNoStore(c);
   if (await requestHasBody(c.req.raw)) {
     return c.json(
       {
@@ -689,7 +681,6 @@ readingRoutes.put("/v1/readings/:id/save", async (c) => {
 });
 
 readingRoutes.delete("/v1/readings/:id/save", async (c) => {
-  privateNoStore(c);
   await unsaveReading(c.env, c.get("userId"), c.req.param("id"));
   return c.body(null, 204);
 });

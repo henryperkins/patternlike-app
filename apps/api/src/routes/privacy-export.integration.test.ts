@@ -587,7 +587,7 @@ describe("account export", () => {
     expect(download.status, downloadText).toBe(200);
     expect(download.headers.get("content-type")).toContain("application/json");
     expect(download.headers.get("content-disposition")).toContain("attachment");
-    expect(download.headers.get("cache-control")).toBe("no-store");
+    expect(download.headers.get("cache-control")).toBe("private, no-store");
     const artifact = JSON.parse(downloadText) as Record<string, unknown>;
     expect(artifact).toMatchObject({
       schema_version: FEEDBACK_EXPORT_SCHEMA_VERSION,
@@ -1206,6 +1206,7 @@ describe("account export", () => {
       { headers: { "x-user-id": USER_A } },
     );
     expect(download.status).toBe(410);
+    expect(download.headers.get("cache-control")).toBe("private, no-store");
     expect(await download.json()).toMatchObject({
       error: { code: "export_expired" },
     });

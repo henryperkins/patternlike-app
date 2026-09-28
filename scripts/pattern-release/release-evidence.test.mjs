@@ -6,26 +6,14 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { REPO_ROOT } from "./candidates.mjs";
+import { CI_LANES as lanes, CI_SUMMARY_PASSED, formatCiSummary } from "./ci-summary.mjs";
 import * as evidence from "./release-evidence.mjs";
 
 const executable = join(REPO_ROOT, "scripts/pattern-release/release-evidence.mjs");
-const lanes = [
-  "contracts: npm run test:contracts",
-  "monorepo: npm ci --dry-run (lockfile agrees with package.json)",
-  "monorepo: ephemeris download",
-  "monorepo: npm run typecheck",
-  "monorepo: test @patternlike/shared",
-  "monorepo: test @patternlike/reading-engine",
-  "monorepo: test @patternlike/calc-stub",
-  "monorepo: test @patternlike/ontology-signer",
-  "monorepo: test @patternlike/api",
-  "monorepo: test @patternlike/web",
-  "monorepo: npm run build",
-  "extra: test @patternlike/pattern-engine",
-  "extra: test @patternlike/codex-runner",
-  "extra: npm run test:content",
-];
-const summary = ["════ SUMMARY ════", "node    v22.23.2   npm 10.9.4   python 3.12.3", ...lanes.map((lane) => `  pass   ${lane}`), "ALL STEPS PASSED — safe to merge on local evidence."].join("\n");
+const summary = formatCiSummary({
+  toolchain: { node: "v22.23.2", npm: "10.9.4", python: "3.12.3" },
+  lanes: lanes.map((name) => ({ name, result: "pass" })),
+});
 
 function repository() {
   const root = mkdtempSync(join(tmpdir(), "release-evidence-test-"));
@@ -104,19 +92,34 @@ test("source comparison rejects a forged partial or malformed source manifest", 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("the gate parser requires the complete final summary and all fourteen distinct passing lanes", () => {
+test("the gate parser requires the canonical producer summary and every ordered passing lane", () => {
   assert.equal(typeof evidence.parseCiSummary, "function");
-  const parsed = evidence.parseCiSummary("Private test output must not be copied.\n" + summary);
+  const parsed = evidence.parseCiSummary("Private test output must not be copied.\n" + summary, 0);
   assert.equal(parsed.passed, true);
-  assert.equal(parsed.lanes.length, 14);
+  assert.equal(parsed.lanes.length, 16);
+  assert.doesNotMatch(summary, /[^\x00-\x7f]/);
   assert.doesNotMatch(JSON.stringify(parsed), /Private test output/);
   for (const log of [
-    summary.replace(`  pass   ${lanes[13]}\n`, ""),
-    summary.replace(`  pass   ${lanes[13]}`, `  pass   ${lanes[0]}`),
-    summary.replace(`  pass   ${lanes[8]}`, `  FAIL   ${lanes[8]}`),
-    summary.replace("ALL STEPS PASSED — safe to merge on local evidence.", ""),
-    "ALL STEPS PASSED — safe to merge on local evidence.",
-  ]) assert.equal(evidence.parseCiSummary(log).passed, false);
+    summary.replace(`pass\t${lanes[15]}\n`, ""),
+    summary.replace(`pass\t${lanes[15]}`, `pass\t${lanes[0]}`),
+    summary.replace(`pass\t${lanes[8]}`, `FAIL\t${lanes[8]}`),
+    summary.replace(`pass\t${lanes[0]}`, `skip\t${lanes[0]}`),
+    summary.replace(`pass\t${lanes[0]}\npass\t${lanes[1]}`, `pass\t${lanes[1]}\npass\t${lanes[0]}`),
+    summary.replace(CI_SUMMARY_PASSED, ""),
+    CI_SUMMARY_PASSED,
+  ]) assert.equal(evidence.parseCiSummary(log, 0).passed, false);
+});
+
+test("a success-looking summary cannot replace observed process success or hide malformed work", () => {
+  for (const exitCode of [undefined, null, 1, 7]) {
+    assert.equal(evidence.parseCiSummary(summary, exitCode).passed, false);
+  }
+  for (const output of [
+    summary.replace(`pass\t${lanes[8]}`, `pass\t${lanes[8]}\nskip\trequired OpenAPI validation`),
+    summary.replace(`pass\t${lanes[8]}`, `pass\t${lanes[8]}\nmalformed summary entry`),
+    summary + "\nUnexpected trailing output",
+    summary + "\n" + summary,
+  ]) assert.equal(evidence.parseCiSummary(output, 0).passed, false);
 });
 
 test("the committed CI script emits a success summary accepted by the release recorder", () => {
@@ -124,6 +127,8 @@ test("the committed CI script emits a success summary accepted by the release re
   try {
     mkdirSync(join(root, "scripts"));
     writeFileSync(join(root, "scripts/ci-local.sh"), readFileSync(join(REPO_ROOT, "scripts/ci-local.sh")));
+    mkdirSync(join(root, "scripts/pattern-release"));
+    writeFileSync(join(root, "scripts/pattern-release/ci-summary.mjs"), readFileSync(join(REPO_ROOT, "scripts/pattern-release/ci-summary.mjs")));
     mkdirSync(join(root, ".venv/bin"), { recursive: true });
     writeFileSync(join(root, ".venv/bin/python"), "#!/bin/sh\nprintf 'Python 3.12.3\\n'\n", { mode: 0o755 });
     // Stub the expensive lanes, keeping the committed runner and summary real.
@@ -132,11 +137,29 @@ test("the committed CI script emits a success summary accepted by the release re
       "export -f npm",
       "exec bash scripts/ci-local.sh",
     ].join("\n");
-    const result = spawnSync("bash", ["-c", command], { cwd: root, encoding: "utf8" });
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-    const parsed = evidence.parseCiSummary(result.stdout);
-    assert.equal(parsed.passed, true, result.stdout);
-    assert.equal(parsed.lanes.length, 14);
+    for (const flags of ["", " --clean", " --skip-ephe"]) {
+      const result = spawnSync("bash", ["-c", command + flags], { cwd: root, encoding: "utf8" });
+      const skipped = flags === " --skip-ephe";
+      assert.equal(result.status, skipped ? 1 : 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /^PATTERNLIKE_CI_SUMMARY_V1_BEGIN$/m);
+      assert.match(result.stdout, skipped ? /^PATTERNLIKE_CI_SUMMARY_V1_FAILED$/m : /^PATTERNLIKE_CI_SUMMARY_V1_PASSED$/m);
+      const parsed = evidence.parseCiSummary(result.stdout, result.status);
+      assert.equal(parsed.passed, !skipped, result.stdout);
+      assert.equal(parsed.lanes.length, 16);
+      assert.equal(parsed.lanes[2].result, skipped ? "skip" : "pass");
+    }
+    for (const [failedCommand, failedLane] of [
+      ["run test:contracts", lanes[0]],
+      ["run test:source-map", lanes[14]],
+      ["run map:check:current", lanes[15]],
+    ]) {
+      const failureCommand = command.replace("return 0;", `if [ \"$*\" = \"${failedCommand}\" ]; then return 9; fi; return 0;`);
+      const result = spawnSync("bash", ["-c", failureCommand], { cwd: root, encoding: "utf8" });
+      assert.equal(result.status, 1, result.stdout + result.stderr);
+      const parsed = evidence.parseCiSummary(result.stdout, result.status);
+      assert.equal(parsed.passed, false);
+      assert.deepEqual(parsed.lanes.filter((lane) => lane.result === "FAIL"), [{ name: failedLane, result: "FAIL" }]);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -157,7 +180,7 @@ function prepareGate(root, { mutate = false, partial = false, exit = 0 } = {}) {
       }
       ${mutate ? 'fs.writeFileSync("source.ts", "changed after the gate started");' : ""}
       console.log("Private gate output marker");
-      console.log(${JSON.stringify(partial ? summary.replace(`  pass   ${lanes[13]}\n`, "") : summary)});
+      console.log(${JSON.stringify(partial ? summary.replace(`pass\t${lanes[15]}\n`, "") : summary)});
       process.exitCode = ${exit};\n`,
   };
   for (const [path, value] of Object.entries(files)) {
@@ -175,7 +198,7 @@ test("a real child gate binds source, process exit, summary, build artifacts, an
     const raw = readFileSync(join(root, "docs/reviews/gate.json"), "utf8");
     const receipt = JSON.parse(raw);
     assert.equal(receipt.gate.exit_code, 0);
-    assert.equal(receipt.gate.summary.lanes.length, 14);
+    assert.equal(receipt.gate.summary.lanes.length, 16);
     assert.equal(receipt.source_unchanged, true);
     assert.equal(receipt.artifacts.status, "observed");
     assert.equal(receipt.repository_identity.pins[0].values.OPENAI_READING_MODEL, "fixture-model");

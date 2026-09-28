@@ -11,7 +11,6 @@ const error = (c: FeedbackContext, code: string, message: string) => ({ error: {
 const validId = (id: string) => /^[A-Za-z0-9_-]{1,128}$/.test(id);
 
 feedbackEventRoutes.get("/v1/readings/:id/feedback-options", async (c) => {
-  c.header("Cache-Control", "private, no-store");
   const params = new URL(c.req.url).searchParams;
   const revision = params.get("revision") ?? "";
   const paragraphId = params.get("paragraph_id");
@@ -25,7 +24,6 @@ feedbackEventRoutes.get("/v1/readings/:id/feedback-options", async (c) => {
 });
 
 feedbackEventRoutes.post("/v1/readings/:id/feedback-events", async (c) => {
-  c.header("Cache-Control", "private, no-store");
   let value: unknown;
   try { value = await c.req.json(); } catch { value = null; }
   const request = parseReadingFeedbackEventRequest(value);

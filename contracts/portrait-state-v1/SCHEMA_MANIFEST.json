@@ -1,0 +1,10 @@
+{
+  "package": "contracts/portrait-state-v1",
+  "schema_version": "portrait-state/v1",
+  "document_date": "2026-09-28",
+  "status": "additive_preview",
+  "schemas": [
+    "portrait-state.schema.json"
+  ],
+  "note": "Optional state metadata on existing portrait and automation projections; existing identities, required fields, grant policies, requests, claims and saved assets are unchanged."
+}
