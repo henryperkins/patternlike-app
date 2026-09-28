@@ -13,7 +13,7 @@ import type { Env, PatternGenerationMessage } from "../env.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { loadPreferences } from "../db/preferences.js";
 import { ensureNatalFeatureSet } from "../db/natal-features.js";
-import { loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
+import { loadActiveOntology, ontologyServesAccount, patternLocaleServesReader } from "../db/pattern-ontology.js";
 import {
   insertPatternConsentGrant,
   latestPatternConsentVersion,
@@ -199,6 +199,14 @@ export async function enqueuePatternGeneration(
       status: 409,
       code: "ontology_unavailable",
       message: "No activated Pattern ontology is available",
+    };
+  }
+  if (!patternLocaleServesReader(ontology, preferences.locale)) {
+    return {
+      ok: false,
+      status: 409,
+      code: "locale_unsupported",
+      message: "Patterns are written in the language of the active interpretation set. Confirm that language before a Pattern is written.",
     };
   }
 

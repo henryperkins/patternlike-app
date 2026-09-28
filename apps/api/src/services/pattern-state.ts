@@ -16,7 +16,7 @@ import {
   type PatternClaimRow,
 } from "../db/pattern-claims.js";
 import { loadPatternGenerationGrant, patternConsentDocument } from "../db/pattern-consents.js";
-import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
+import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount, patternLocaleServesReader } from "../db/pattern-ontology.js";
 import { decryptUnderContentKey, unwrapContentKey } from "./pattern-crypto.js";
 import {
   patternFailureIsRetryable,
@@ -220,6 +220,9 @@ export async function buildPatternState(
         failure_class: string | null;
       }>();
     if (failed) {
+      if (ontologyServesAccount(ontology) && !patternLocaleServesReader(ontology, preferences.locale)) {
+        return emptyState("locale_confirmation_required", chartBlock, consent);
+      }
       return {
         schema_version: M9_SCHEMA_VERSION,
         state: "failed",
@@ -250,7 +253,8 @@ export async function buildPatternState(
       patternGenerationIsEnabled(env) &&
       sourceChanged &&
       consent.status === "granted" &&
-      ontologyServesAccount(ontology);
+      ontologyServesAccount(ontology) &&
+      patternLocaleServesReader(ontology, preferences.locale);
     let regeneration: PatternStateDocumentV9["regeneration"] = {
       eligible: canRegenerate,
       generation: null,
@@ -288,9 +292,10 @@ export async function buildPatternState(
          FROM pattern_generation_jobs
          WHERE user_id = ? AND chart_fingerprint_hash = ?
            AND reservation_reason = 'source_update' AND stage = 'failed'
+           AND created_at > ?
          ORDER BY updated_at DESC, generation_id DESC LIMIT 1`,
       )
-        .bind(identity.userId, fingerprintHash)
+        .bind(identity.userId, fingerprintHash, document.generated_at)
         .first<{
           generation_id: string;
           stage: PatternDomainStage;
@@ -379,6 +384,9 @@ export async function buildPatternState(
 
   if (!ontologyServesAccount(ontology)) {
     return emptyState("ontology_unavailable", chartBlock, consent);
+  }
+  if (!patternLocaleServesReader(ontology, preferences.locale)) {
+    return emptyState("locale_confirmation_required", chartBlock, consent);
   }
   if (consent.status !== "granted") {
     return emptyState("consent_required", chartBlock, consent);

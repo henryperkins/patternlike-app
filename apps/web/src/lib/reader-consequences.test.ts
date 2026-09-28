@@ -12,7 +12,7 @@ describe("documented reader consequences", () => {
   it("preserves completed content while withdrawing future permission", () => {
     const result = selectReaderConsequences("withdraw_pattern", { observedAt: 10, evidence: "known" });
     expect(result.effects.pattern).toEqual({ content: "retained", unfinished: "stops", future: "requires_permission" });
-    expect(result.effects.artwork.content).toBe("retained");
+    expect(result.effects.artwork).toEqual({ content: "retained", unfinished: "stops", future: "requires_permission" });
   });
   it("does not turn saved permission or accepted deletion into erasure completion", () => {
     const result = selectReaderConsequences("delete_pattern", { observedAt: 10, evidence: "known", receipt: "accepted" });

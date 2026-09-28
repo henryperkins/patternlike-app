@@ -84,9 +84,9 @@ describe("Pattern consent terms", () => {
     render(<PatternConsentTerms consent={consent()} />);
     const text = terms();
 
-    expect(text).toContain("Writing one Pattern for this chart, and nothing else.");
+    expect(text).toContain("Writing your Pattern, one per chart.");
     expect(text).toContain("Birth date, time, place, and coordinates are not sent as fields");
-    expect(text).toContain("Calculated natal features are still sensitive derived data");
+    expect(text).toContain("The calculated positions that are sent can be used to reconstruct them.");
     expect(text).toContain(
       "Daily check-ins, life events, journal entries, prior readings, and a biography are not sent",
     );
@@ -96,12 +96,10 @@ describe("Pattern consent terms", () => {
     render(<PatternConsentTerms consent={consent()} />);
     const text = terms();
 
-    expect(text).toContain("A successful Pattern is not a rerollable reading.");
-    expect(text).toContain(
-      "If Pattern/Like's creation source changes, you can explicitly replace it",
-    );
-    expect(text).toContain("Deleting your Pattern is permanent.");
-    expect(text).toContain("Withdrawing stops unfinished and future Pattern generation.");
+    expect(text).toContain("A Pattern is written once for a chart.");
+    expect(text).toContain("you can choose to replace this one");
+    expect(text).toContain("Encrypted provider copies follow the 30-day deletion schedule");
+    expect(text).toContain("Withdrawing stops unfinished and future Pattern generation, and it turns automatic artwork off.");
     expect(text).toContain("An already accepted Pattern stays readable until you delete it.");
   });
 
@@ -111,6 +109,7 @@ describe("Pattern consent terms", () => {
     unmount();
 
     render(<PatternConsentTerms consent={consent()} privacyLink />);
-    expect(terms()).toContain("You can review or withdraw this later in Context & privacy.");
+    expect(terms()).toContain("You can review or withdraw this later in");
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "#privacy");
   });
 });

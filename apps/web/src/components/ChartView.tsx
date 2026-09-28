@@ -54,10 +54,17 @@ interface ChartViewProps {
 export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
   const sky = useMemo(() => createPortraitSky(chart, chart.id), [chart]);
   const positionByBody = new Map(chart.positions.map((position) => [position.body, position]));
+  const suppressed = new Set(chart.uncertainty.suppressed_features.map((feature) => feature.feature_class));
+  const unknownTime = chart.uncertainty.accuracy === "unknown";
+  const moonHidden = unknownTime || suppressed.has("moon_time_sensitive");
+  const anglesHidden = unknownTime || suppressed.has("angles");
   const anchors: CelestialBody[] = ["sun", "moon", "ascendant"];
-  const visiblePositions = chart.positions.filter(
-    (position) => position.body !== "ascendant" && position.body !== "midheaven",
-  );
+  const visiblePositions = chart.positions.filter((position) => {
+    if (position.body === "ascendant" || position.body === "midheaven") return false;
+    if (position.body === "moon" && moonHidden) return false;
+    return true;
+  });
+  const wheelPositions = chart.positions.filter((position) => !(position.body === "moon" && moonHidden));
 
   return (
     <div className="chart-page page-enter">
@@ -70,7 +77,7 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
       <header className="page-header chart-page__header">
         <div>
           <p className="eyebrow">Your birth chart</p>
-          <h2 aria-label="The architecture of your chart.">The architecture of your chart.</h2>
+          <h2>The architecture of your chart.</h2>
         </div>
         <div className="calculation-stamp">
           <span>Last calculated</span>
@@ -82,14 +89,15 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
       <section className="anchor-strip" aria-label="Chart anchors">
         {anchors.map((body, index) => {
           const position = positionByBody.get(body);
+          const hidden = (body === "moon" && moonHidden) || (body === "ascendant" && anglesHidden);
           return (
             <article className="anchor" key={body}>
               <span className="anchor__number">0{index + 1}</span>
               <div>
                 <p>{BODY_NAMES[body]}</p>
-                <strong>{positionLabel(position)}</strong>
+                <strong>{hidden ? "Birth time unknown" : positionLabel(position)}</strong>
                 <small>
-                  {position?.house ? `House ${position.house}` : body === "ascendant" ? "Birth time dependent" : "No house used"}
+                  {hidden ? "Not used without a birth time" : position?.house ? `House ${position.house}` : body === "ascendant" ? "Birth time dependent" : "No house used"}
                 </small>
               </div>
             </article>
@@ -107,7 +115,7 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
             <span className="panel-code">TROPICAL / GEOCENTRIC</span>
           </div>
           <ChartWheel
-            positions={chart.positions}
+            positions={wheelPositions}
             aspects={chart.aspects}
             houseCusps={chart.houses?.cusps_deg ?? null}
           />
@@ -118,7 +126,7 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
           </div>
         </section>
 
-        <aside className="chart-side">
+        <aside className="chart-side" aria-label="Chart notes">
           <section className="uncertainty-card">
             <div className="uncertainty-card__top">
               <Icon name="shield" />

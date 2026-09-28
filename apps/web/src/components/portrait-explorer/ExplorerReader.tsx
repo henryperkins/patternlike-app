@@ -100,7 +100,7 @@ export function ExplorerReader({ chapters, chapterCount, facet, activePassages, 
         {chapterPassages(chapter, facet).map((text, index) => <div className="explorer-passage" data-active={index === (activePassages[chapter.id] ?? 0)} key={`${facet}-${index}`}>
           <div className="explorer-passage-caption"><span>Passage {index + 1}</span>{" "}<span className="explorer-passage-selection" aria-hidden={!graphicsAvailable || index !== (activePassages[chapter.id] ?? 0)} style={{ visibility: graphicsAvailable && index === (activePassages[chapter.id] ?? 0) ? "visible" : "hidden" }}>Selected in portrait</span></div>
           <p tabIndex={-1} ref={(element) => passageRef(chapter.id, index, element)}>{text}</p>
-          <button className="explorer-text-button" disabled={!graphicsAvailable} aria-description={`${chapter.title} · ${facets.find(item => item.id === facet)!.label}`} onClick={() => onPassage(chapter.id, index)}>Show passage {index + 1} in portrait <span aria-hidden="true">↗</span></button>
+          <button className="explorer-text-button" disabled={!graphicsAvailable} aria-description={`${chapter.title} · ${facets.find(item => item.id === facet)!.label}`} onClick={() => onPassage(chapter.id, index)}>Show passage {index + 1} in portrait</button>
         </div>)}
       </section>)}
     </div>
@@ -120,7 +120,7 @@ export function CompleteReading({ manifest, embedded = false }: { manifest: Port
   const ChapterHeading = embedded ? "h3" : "h2";
   const FacetHeading = embedded ? "h4" : "h3";
   return <section className="explorer-complete" aria-label="Complete Pattern reading">
-    <Heading>{manifest.chapters.length === 4 ? "Four chapters. One portrait." : "Your complete Pattern."}</Heading><p className="explorer-chapter-meta">Your Pattern · complete reading</p>
+    <Heading>Your complete Pattern.</Heading><p className="explorer-chapter-meta">Your Pattern · complete reading</p>
     {manifest.uncertainty && <p className="explorer-uncertainty">{manifest.uncertainty}</p>}
     {manifest.chapters.map((chapter) => <CompleteChapter key={chapter.id} chapter={chapter} embedded={embedded} />)}
     {manifest.signatures.length > 0 && <section><ChapterHeading>Additional signatures</ChapterHeading>{manifest.signatures.map((signature, index) => <article key={index}><FacetHeading>{signature.title}</FacetHeading><p>{signature.text}</p></article>)}</section>}
