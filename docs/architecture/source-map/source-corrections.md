@@ -133,3 +133,22 @@ selects a new capture of the revised definition, with its uncommitted input
 qualification recorded explicitly. Source-map identity checks and any fresh
 local-gate execution are recorded separately from the supplied source-only review;
 neither establishes production or installed-runner state.
+
+## September 28 R04 family-aware reissue
+
+The map now describes `POST /internal/readings/edition-reissue`, the additive
+successor for reissuing a published Daily edition
+([contract](../../../contracts/daily-edition-reissue-v1/README.md)). It takes
+the family from the edition's retained `assembly_mode`, checked against the
+decrypted envelope, and freezes the successor with that family's builder. It
+binds the family/reason matrix, date window, account-processing and
+`ai_synthesis` grants, and one-successor idempotency identity. The legacy-route
+claim keeps its evidence and now says the route is deliberately unchanged. The
+rollout-gate and contract-package claims name the new operation and package. The
+registry selector follows the extended `load_registry` line. The
+[backlog](backlog.md) records R04 as implemented and leaves the legacy route's
+migration or retirement as a separate decision.
+
+Earlier snapshots keep their bytes. The new capture binds the committed
+implementation; test and gate results are recorded separately and do not
+establish deployment or a production operator run.

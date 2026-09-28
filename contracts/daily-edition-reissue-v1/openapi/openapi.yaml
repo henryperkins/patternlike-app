@@ -1,0 +1,136 @@
+openapi: 3.1.0
+info:
+  title: Family-aware Daily edition reissue v1
+  version: 1.0.0
+  description: |
+    An additive operator operation. It reserves exactly one successor to one
+    named published Daily edition, in the generation family the Worker derives
+    from that edition's retained evidence: the stored `assembly_mode` and the
+    decrypted edition it describes. A `deterministic` edition is reissued by
+    the V1 assembler against an active content release. A `constrained_model`
+    edition is reissued by a new V2 constrained-model command recorded as a
+    `manual_reissue`.
+
+    `POST /internal/readings/reissue` is unchanged and keeps its
+    deterministic-only builder. `POST /internal/readings/invalidate` still owns
+    factual withdrawal and fact repair, and `POST /internal/readings/replace`
+    still owns re-freezing a failed command within its generation budget. This
+    operation never re-freezes a failed successor.
+
+    Idempotency identity is the exact target edition. At most one successor may
+    ever reference a predecessor, so an identical request after success answers
+    `200 replayed` with that successor and freezes nothing new, while a request
+    naming the same edition with a different family or reason is
+    `409 reissue_conflict`. Replay compares the successor's generation-1
+    command, so a later bounded replacement does not change its identity. A
+    deterministic command records no reservation reason, so an identical legacy
+    `/reissue` successor answers as a replay. No Idempotency-Key header is read.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+    description: Production (service-token authenticated; never the product API)
+  - url: http://localhost:8787
+    description: Local Workers dev
+tags:
+  - name: internal
+paths:
+  /internal/readings/edition-reissue:
+    post:
+      tags: [internal]
+      operationId: reissueDailyEdition
+      summary: Reserve a family-aware successor to one published Daily edition
+      description: |
+        The named edition must belong to the active `user_id`, be `published`,
+        and match the stated revision, local date, and generation family
+        exactly. The account must hold its current account-processing grant.
+
+        Family and reason form a closed matrix. `deterministic` accepts
+        `chart_recalculated`, `consent_revoked`, `safety_correction`, and
+        `defect_repair`, none of which reaches a model. `constrained_model`
+        accepts only `safety_correction` and `defect_repair`: a consent
+        revocation never authorizes a new model call, and a chart correction
+        withdraws the stale edition through invalidation instead. A
+        constrained-model reissue also requires the Daily rollout to admit the
+        internal entry point, a configured publisher, and a live
+        `ai_synthesis` grant, which the successor pins and execution re-checks
+        before any provider work. While the rollout does not admit the internal
+        entry point, every constrained-model request, replays included,
+        answers `503 rollout_disabled` before any key or calculation is used.
+
+        Date scope is resolved in the reader's confirmed scheduling zone when
+        the request is made. A `deterministic` edition must be for the current
+        local day; a `constrained_model` edition may be for the current local
+        day or the following one, which the scheduler pre-generates. The
+        successor is frozen for exactly the target's local date.
+
+        The reservation batch re-asserts the exact published edition, the
+        current account-processing grant, and for `constrained_model` the exact
+        `ai_synthesis` grant the successor froze. The target stays published
+        until the successor's own publication supersedes it atomically; a
+        failed successor leaves it published. A `202` establishes dispatch, not
+        publication.
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/request
+      responses:
+        '202':
+          description: This request reserved the successor and attempted dispatch.
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/accepted
+        '200':
+          description: The named edition already has the matching successor; nothing new was frozen or reserved.
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/accepted
+        '400':
+          description: The body does not match the request contract (`invalid_body`).
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/errorResponse
+        '401':
+          description: Missing or wrong service token.
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/middlewareErrorResponse
+        '409':
+          description: |
+            The account, target edition, family, reason, date scope, consent,
+            or preferences do not admit this reissue. Nothing was reserved.
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/errorResponse
+        '424':
+          description: |
+            Stored evidence, calculation policy, assembly, or the reservation
+            commit failed. Nothing was reserved.
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/errorResponse
+        '503':
+          description: |
+            A dependency or deployment gate is unavailable (calculation,
+            content release, rollout, or publisher configuration), or the
+            shared /internal configuration or service-token guard refused.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/errorResponse
+                  - $ref: https://patternlike.app/contracts/daily-edition-reissue-v1/daily-edition-reissue.schema.json#/$defs/middlewareErrorResponse
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: SERVICE_AUTH_TOKEN, the /internal credential zone. Never a product session.

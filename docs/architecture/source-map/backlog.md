@@ -4,6 +4,8 @@ Reconciled on September 28, 2026 against `00299d26b0b27dd5e14887f94287a872a629ef
 
 These classifications describe source implementation. They do not certify acceptance-test execution, production, installed runners, or completed human review. No whole proposal is refuted; some premises and sub-tasks are superseded.
 
+**September 28 update.** R04 is implemented in source as the additive [`daily-edition-reissue-v1`](../../../contracts/daily-edition-reissue-v1/README.md) operation, first on `feat/r04-family-aware-reissue`. This record does not establish a merge, deployment, or production operator run. The legacy route is unchanged. The other dispositions are as reconciled.
+
 ## Disposition ledger
 
 | Proposal | Source disposition | Current action |
@@ -11,7 +13,7 @@ These classifications describe source implementation. They do not certify accept
 | R01 — Private-response caching | Implemented | Preserve and verify the outer policy, explicit public exceptions, error paths, and service-worker restrictions. |
 | R02 — Typed Daily uncertainty | Implemented | Preserve and verify the shared disclosure plan, frozen identity, consent, suppression, and validator agreement at the precision retained in storage. |
 | R03 — Artwork state, withdrawal, runner admission | Implemented | Preserve and verify state separation, independent withdrawal, and pre-claim compatibility. Qualify configuration, deployment, and installed-runner evidence separately. |
-| R04 — Generation-family-aware operator repair | Still needed | Add an explicit successor operation or versioned contract that derives the target's generation family. |
+| R04 — Generation-family-aware operator repair | Implemented | Preserve the additive `POST /internal/readings/edition-reissue` contract and its family, reason, date, consent, identity, and publication bindings. Migrating or retiring legacy `/internal/readings/reissue` is a separate decision. |
 | R05 — Feedback collection versus effect | Partial | Preserve existing activation/category messaging; finish exact-edition effect applicability or explicitly retain collection-only behavior. |
 | R06 — Canonical local release evidence | Implemented | Operate the shared producer/parser and sixteen-lane gate; reconcile each receipt to its source and artifacts. |
 | R07 — Ontology supply assurance | Partial | Preserve the compile-only repair; complete coverage/exclusion decisions, evaluation, required review, and intentional scope-admission policy. |
@@ -19,15 +21,17 @@ These classifications describe source implementation. They do not certify accept
 
 ## Remaining implementation order
 
-**R04 → R05 applicability → R07 wider assurance → R08.** R07 is a prerequisite for any ontology activation, recall-policy change, or expansion of reach it governs. Move that assurance ahead of the other items when such an expansion is imminent. This ordering does not authorize expansion or weaken existing admission controls.
+**R05 applicability → R07 wider assurance → R08.** R04 is implemented (below). R07 is a prerequisite for any ontology activation, recall-policy change, or expansion of reach it governs. Move that assurance ahead of the other items when such an expansion is imminent. This ordering does not authorize expansion or weaken existing admission controls.
 
-### R04 — Generation-family-aware operator repair
+### R04 — Generation-family-aware operator repair (implemented)
 
-Current source: [operator routes](../../../apps/api/src/routes/internal-generation.ts), [enqueueDailyReading and enqueueReissue](../../../apps/api/src/services/enqueue.ts). Both ordinary entry points call the legacy `buildGenerationCommand`. Reissue reads predecessor ID, revision, and status without selecting a builder from its generation family. Calculation-defect invalidation and failed-command replacement already have separate V2-capable paths with different eligibility and lifecycle rules.
+Source: [operator routes](../../../apps/api/src/routes/internal-generation.ts), [edition reissue](../../../apps/api/src/services/edition-reissue.ts), and the [contract](../../../contracts/daily-edition-reissue-v1/README.md). `POST /internal/readings/edition-reissue` is an additive successor. It validates a closed `daily-edition-reissue/v1` body with a generated validator and names the exact published edition and its family. It derives that family from the edition's retained `assembly_mode` and decrypted envelope, then freezes the successor with the matching builder: a V2 `manual_reissue` command or a V1 command. `enqueueDailyReading` and the legacy `enqueueReissue` are unchanged.
 
-- [ ] Specify an additive successor operation or versioned contract binding the expected published target, generation family, supported reason, date scope, idempotency identity, and live authorization.
-- [ ] Derive and validate family from retained target evidence. Preserve legacy route semantics until an intentional migration.
-- [ ] Cover stale predecessors, replay/conflict handling, atomic publication, and attempt/spend ceilings. Keep invalidation distinct from replacement; `consent_revoked` alone must never authorize a new model call.
+- [x] Specify an additive successor contract binding the expected published target, generation family, supported reason, date scope, idempotency identity, and live authorization. The request binds `reading_id`, `revision`, `local_date`, and `generation_family`. A constrained-model edition accepts only `safety_correction` or `defect_repair`. A deterministic edition must be for the current local day; a constrained-model edition may be for the current or next local day. The idempotency identity is the edition itself, because `uq_daily_readings_successor` admits one successor per predecessor.
+- [x] Derive and validate family from retained target evidence. A misstated family is `family_mismatch`, and a row whose decrypted envelope disagrees with it is `target_evidence_invalid`. Legacy route semantics are preserved and pinned by a characterization test.
+- [x] Cover stale predecessors, replay/conflict handling, atomic publication, and attempt/spend ceilings. Replays compare the successor's generation-1 command and never re-freeze a failed successor. The reservation batch re-asserts the exact edition, the account-processing grant, and the frozen `ai_synthesis` grant. Invalidation and failed-command replacement stay separate, and `consent_revoked` cannot start a constrained-model generation.
+
+Remaining decision: whether to migrate or retire `POST /internal/readings/reissue`, which still freezes a deterministic command whatever the edition's family. Choosing is an intentional migration, not part of this change. Deployment, installed-runner behavior, and a production operator run remain unverified.
 
 ### R05 remainder — Exact-edition effect applicability
 
@@ -60,6 +64,7 @@ Current source: [relationship routes](../../../apps/api/src/routes/reader-relati
 
 | Item | Regression and operational boundary |
 | --- | --- |
+| R04 | Keep the family/reason matrix in both the contract and the Worker, the exact-edition and grant guards inside the reservation batch, replay identity from the generation-1 command, and the separation from invalidation, replacement, and the unchanged legacy route. Local tests do not establish a production operator run. |
 | R01 | Keep `/health` and `/v1/meta` public, retain distinct authorities, and exercise private policy across success/refusal/exception paths. Retain the larger status matrix, including 410 and 429; inspection of the dedicated test source alone does not execute that matrix. Keep private API bodies out of service-worker storage. |
 | R02 | Keep exact birth time exact when qualified. Stored `birth_instant / technique_specific` does not identify a more specific historical-zone, border, ambiguous-time, or nonexistent-time diagnostic. Richer detail needs retained evidence and a compatible contract change. |
 | R03 | Keep unreadable permission unknown and withdrawal independent of generation admission when ownership, storage, and write checks permit. The image CLI pin remains `0.153.3`. Committed adaptive settings are default `0`, production `1`; verify live deployment, migrations, installed runner, consent races, protocols, attempt budgets, and an artwork canary separately. |

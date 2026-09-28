@@ -28,6 +28,7 @@ import type {
   PatternErasureReplayEvent, PatternRegenerationReplayEvent,
 } from "@patternlike/shared";
 import type { ContentReleaseIngestionRequest } from "../services/content-release.js";
+import type { DailyEditionReissueRequest } from "../services/edition-reissue.js";
 export declare const validateContentReleaseV3: ValidateFunction<ContentReleaseIngestionRequest>;
 export declare const validateContentReleaseV4: ValidateFunction<ContentReleaseIngestionRequest>;
 export declare const validateSourceCorpusRelease: ValidateFunction;
@@ -35,3 +36,4 @@ export declare const validateOntologyRelease: ValidateFunction<PatternOntologyRe
 export declare const validateNatalPredicate: ValidateFunction<PatternOntologyRecord["feature_predicate"]>;
 export declare const validateReplayEvent: ValidateFunction<PatternErasureReplayEvent>;
 export declare const validateRegenerationReplayEvent: ValidateFunction<PatternRegenerationReplayEvent>;
+export declare const validateDailyEditionReissueRequest: ValidateFunction<DailyEditionReissueRequest>;

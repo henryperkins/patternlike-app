@@ -55,6 +55,7 @@ DAILY_UNCERTAINTY_V1 = ROOT / "daily-uncertainty-v1"
 READER_RELATIONSHIPS_V1 = ROOT / "reader-relationships-v1"
 READING_FEEDBACK_V1 = ROOT / "reading-feedback-v1"
 RUNTIME_HEALTH_V1 = ROOT / "runtime-health-v1"
+DAILY_EDITION_REISSUE_V1 = ROOT / "daily-edition-reissue-v1"
 PATTERN_PROVIDER_BOUNDARY_POLICY_PATH = (
     ROOT / "policies" / "pattern-provider-boundary-v1.json"
 )
@@ -77,6 +78,7 @@ PORTRAIT_STATE_V1_BASE = "https://patternlike.app/contracts/portrait-state-v1/"
 DAILY_UNCERTAINTY_V1_BASE = "https://patternlike.app/contracts/daily-uncertainty-v1/"
 READER_RELATIONSHIPS_V1_BASE = "https://patternlike.app/contracts/reader-relationships-v1/"
 READING_FEEDBACK_V1_BASE = "https://patternlike.app/contracts/reading-feedback-v1/"
+DAILY_EDITION_REISSUE_V1_BASE = "https://patternlike.app/contracts/daily-edition-reissue-v1/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
@@ -100,6 +102,11 @@ FIXTURE_SCHEMA = {
         "feedback-receipt": READING_FEEDBACK_V1_BASE + "reading-feedback.schema.json#/$defs/receipt",
         "feedback-options": READING_FEEDBACK_V1_BASE + "reading-feedback.schema.json#/$defs/optionsResponse",
         "feedback-account-export": READING_FEEDBACK_V1_BASE + "account-export.schema.json#/$defs/accountExport",
+    },
+    "daily-edition-reissue-v1": {
+        "daily-edition-reissue-request": DAILY_EDITION_REISSUE_V1_BASE + "daily-edition-reissue.schema.json#/$defs/request",
+        "daily-edition-reissue-accepted": DAILY_EDITION_REISSUE_V1_BASE + "daily-edition-reissue.schema.json#/$defs/accepted",
+        "daily-edition-reissue-error": DAILY_EDITION_REISSUE_V1_BASE + "daily-edition-reissue.schema.json#/$defs/errorResponse",
     },
     "reader-relationships-v1": {
         "reader-source": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/sourceResponse",
@@ -283,6 +290,7 @@ POLICY_ONLY = {
     "runtime-health-v1": set(),
     "reading-feedback-v1": set(),
     "reader-relationships-v1": set(),
+    "daily-edition-reissue-v1": set(),
     "portrait-v1": set(),
     "portrait-v2": set(),
     "portrait-mesh-v2": set(),
@@ -466,7 +474,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, PORTRAIT_STATE_V1, DAILY_UNCERTAINTY_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):
+    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, PORTRAIT_STATE_V1, DAILY_UNCERTAINTY_V1, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1, DAILY_EDITION_REISSUE_V1):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1479,7 +1487,7 @@ def validate_package(
             return _m7_policy_errors(fixture, instance)
         if name == "m8":
             return _m8_policy_errors(fixture, instance)
-        if name in ("m9", "geocoder-v2", "portrait-v1", "portrait-v2", "portrait-mesh-v2", "portrait-state-v1", "reader-relationships-v1", "reading-feedback-v1", "runtime-health-v1"):
+        if name in ("m9", "geocoder-v2", "portrait-v1", "portrait-v2", "portrait-mesh-v2", "portrait-state-v1", "reader-relationships-v1", "reading-feedback-v1", "runtime-health-v1", "daily-edition-reissue-v1"):
             return []
         raise ValueError(f"unregistered contract package policy: {name}")
 
@@ -1555,6 +1563,7 @@ PACKAGE_BASE = {
     "reader-relationships-v1": READER_RELATIONSHIPS_V1_BASE,
     "reading-feedback-v1": READING_FEEDBACK_V1_BASE,
     "runtime-health-v1": "https://patternlike.app/contracts/runtime-health-v1/",
+    "daily-edition-reissue-v1": DAILY_EDITION_REISSUE_V1_BASE,
 }
 
 
@@ -1651,7 +1660,7 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            if package in (M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1):
+            if package in (M8, M9, GEOCODER_V2, PORTRAIT_V1, PORTRAIT_V2, PORTRAIT_MESH_V2, READER_RELATIONSHIPS_V1, READING_FEEDBACK_V1, RUNTIME_HEALTH_V1, DAILY_EDITION_REISSUE_V1):
                 # The validate() shortcut builds SchemaPath with its own handlers
                 # before instantiating `cls`, so a custom class cannot affect
                 # retrieval there. Construct the validator from the raw mapping.
@@ -4174,6 +4183,10 @@ def main() -> int:
     errors += check_openapi(READING_FEEDBACK_V1, registry)
     errors += validate_package(registry, "runtime-health-v1", RUNTIME_HEALTH_V1, set())
     errors += check_openapi(RUNTIME_HEALTH_V1, registry)
+
+    print("\n== contracts/daily-edition-reissue-v1 ==")
+    errors += validate_package(registry, "daily-edition-reissue-v1", DAILY_EDITION_REISSUE_V1, set())
+    errors += check_openapi(DAILY_EDITION_REISSUE_V1, registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")

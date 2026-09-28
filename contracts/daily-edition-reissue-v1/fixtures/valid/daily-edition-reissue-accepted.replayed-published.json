@@ -1,0 +1,18 @@
+{
+  "schema_version": "daily-edition-reissue/v1",
+  "status": "replayed",
+  "target": {
+    "reading_id": "rdg_01JAMPLEREADING00003",
+    "revision": 1,
+    "local_date": "2026-09-28",
+    "generation_family": "deterministic"
+  },
+  "successor": {
+    "reading_id": "rdg_01JAMPLEREADING00005",
+    "revision": 2,
+    "revision_reason": "consent_revoked",
+    "status": "published",
+    "job_id": "job_01JAMPLEJOB000000002"
+  },
+  "dispatched": true
+}

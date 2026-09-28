@@ -84,16 +84,55 @@ interface AiConsentRow {
   created_at: string;
 }
 
+/** The one ordering that decides which ai_synthesis row is current. */
+const LATEST_AI_CONSENT_ORDER = "ORDER BY version DESC, created_at DESC, id DESC";
+
 async function loadLatestAiConsent(env: Env, userId: string): Promise<AiConsentRow | null> {
   return env.DB.prepare(
     `SELECT id, status, policy_version, granted_at, expires_at, version, created_at
      FROM consents
      WHERE user_id = ? AND kind = 'ai_synthesis'
-     ORDER BY version DESC, created_at DESC, id DESC
+     ${LATEST_AI_CONSENT_ORDER}
      LIMIT 1`,
   )
     .bind(userId)
     .first<AiConsentRow>();
+}
+
+/**
+ * A conditional D1 abort for a batch that reserves work under one frozen
+ * ai_synthesis grant.
+ *
+ * It repeats `loadLatestAiConsent` and `activeGrant` in SQL: the newest row
+ * must still be exactly that grant, granted and unexpired under the same
+ * policy version. A revocation or regrant committed after the command froze
+ * therefore aborts every following statement instead of reserving work that
+ * execution would only refuse later.
+ */
+export function assertExactCurrentAiSynthesisGrant(
+  env: Env,
+  userId: string,
+  consentId: string,
+  policyVersion: string,
+  now = new Date(),
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO assertion_probe (id, reason)
+     SELECT 1, 'the frozen ai_synthesis grant is no longer the current grant'
+     WHERE NOT EXISTS (
+       SELECT 1 FROM consents
+       WHERE id = (
+           SELECT id FROM consents
+           WHERE user_id = ? AND kind = 'ai_synthesis'
+           ${LATEST_AI_CONSENT_ORDER}
+           LIMIT 1
+         )
+         AND id = ? AND user_id = ? AND kind = 'ai_synthesis'
+         AND status = 'granted' AND granted_at IS NOT NULL
+         AND policy_version = ?
+         AND (expires_at IS NULL OR expires_at > ?)
+     )`,
+  ).bind(userId, consentId, userId, policyVersion, now.toISOString());
 }
 
 function activeGrant(

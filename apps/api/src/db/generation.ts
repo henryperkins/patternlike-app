@@ -146,8 +146,23 @@ async function encryptedJobInsert(
  * one key would make "the same request" mean two different readings.
  */
 export function idempotencyKeyFor(command: GenerateDailyReadingCommand): string {
-  const family = isCommandV2(command) ? "daily-reading-v5" : "daily-reading";
-  return `${family}:${command.target_local_date}:r${command.revision}:g${command.command_generation}`;
+  return generationIdempotencyKey(
+    isCommandV2(command) ? "constrained_model" : "deterministic",
+    command.target_local_date,
+    command.revision,
+    command.command_generation,
+  );
+}
+
+/** The same key from its parts, for finding one generation's job without its command. */
+export function generationIdempotencyKey(
+  assemblyMode: "deterministic" | "constrained_model",
+  localDate: string,
+  revision: number,
+  commandGeneration: number,
+): string {
+  const family = assemblyMode === "constrained_model" ? "daily-reading-v5" : "daily-reading";
+  return `${family}:${localDate}:r${revision}:g${commandGeneration}`;
 }
 
 /**
@@ -388,12 +403,18 @@ export async function reserveInitial(
  * exactly one higher, so two concurrent reissues cannot both succeed —
  * `uq_daily_readings_successor` refuses the second claim on the same predecessor
  * even if both pass the assertion.
+ *
+ * `guards` are the caller's own conditional aborts, committed at the head of
+ * the same batch. The edition reissue uses them to re-assert its exact target
+ * edition and the grants it was admitted under; a guard that fires surfaces
+ * here as `conflict`, and the caller re-reads state to name the cause.
  */
 export async function reserveReissue(
   env: Env,
   identity: UserIdentity,
   command: GenerateDailyReadingCommand,
   expectedLiveReadingId: string,
+  guards: readonly D1PreparedStatement[] = [],
 ): Promise<ReserveOutcome> {
   const now = new Date().toISOString();
   const jobId = newId("job");
@@ -423,6 +444,7 @@ export async function reserveReissue(
   try {
     await env.DB.batch([
       encryptedJob.fence,
+      ...guards,
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'expected predecessor is no longer the live reading at the expected revision'

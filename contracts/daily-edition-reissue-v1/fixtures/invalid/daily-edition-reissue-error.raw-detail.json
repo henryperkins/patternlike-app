@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "D1_ERROR",
+    "message": "D1_ERROR: CHECK constraint failed: id = 0",
+    "request_id": null,
+    "details": { "sql": "INSERT INTO assertion_probe" }
+  }
+}

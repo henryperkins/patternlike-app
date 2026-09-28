@@ -12439,9 +12439,345 @@ function validate163(data, { instancePath = "", parentData, parentDataProperty, 
   return errors === 0;
 }
 validate163.evaluated = { "props": true, "dynamicProps": false, "dynamicItems": false };
+var validateDailyEditionReissueRequest = validate168;
+var schema263 = { "type": "string", "enum": ["safety_correction", "defect_repair"], "description": "The only reasons that may start a new constrained-model generation. A consent revocation never authorizes a model call by itself, and a chart correction must withdraw the stale edition through invalidation and fact repair rather than leave it published while a successor is generated." };
+var schema271 = { "type": "string", "enum": ["chart_recalculated", "consent_revoked", "safety_correction", "defect_repair"], "description": "Why the successor revision exists. initial is never a reissue reason." };
+var pattern94 = new RegExp("^usr_[A-Za-z0-9_-]{1,124}$", "u");
+var schema270 = { "type": "string", "enum": ["deterministic", "constrained_model"], "description": "The retained assembly_mode of the named edition. deterministic editions are reissued by the V1 assembler against an active content release; constrained_model editions are reissued by a new V2 constrained-model command." };
+var pattern95 = new RegExp("^rdg_[A-Za-z0-9_-]{1,124}$", "u");
+var pattern96 = new RegExp("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "u");
+var formats14 = require_formats().fullFormats.date;
+function validate169(data, { instancePath = "", parentData, parentDataProperty, rootData = data, dynamicAnchors = {} } = {}) {
+  let vErrors = null;
+  let errors = 0;
+  const evaluated0 = validate169.evaluated;
+  if (evaluated0.dynamicProps) {
+    evaluated0.props = void 0;
+  }
+  if (evaluated0.dynamicItems) {
+    evaluated0.items = void 0;
+  }
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (data.reading_id === void 0 && (missing0 = "reading_id") || data.revision === void 0 && (missing0 = "revision") || data.local_date === void 0 && (missing0 = "local_date") || data.generation_family === void 0 && (missing0 = "generation_family")) {
+        validate169.errors = [{ instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: missing0 }, message: "must have required property '" + missing0 + "'" }];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 in data) {
+          if (!(key0 === "reading_id" || key0 === "revision" || key0 === "local_date" || key0 === "generation_family")) {
+            validate169.errors = [{ instancePath, schemaPath: "#/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key0 }, message: "must NOT have additional properties" }];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.reading_id !== void 0) {
+            let data0 = data.reading_id;
+            const _errs2 = errors;
+            const _errs3 = errors;
+            if (errors === _errs3) {
+              if (typeof data0 === "string") {
+                if (!pattern95.test(data0)) {
+                  validate169.errors = [{ instancePath: instancePath + "/reading_id", schemaPath: "#/$defs/readingId/pattern", keyword: "pattern", params: { pattern: "^rdg_[A-Za-z0-9_-]{1,124}$" }, message: 'must match pattern "^rdg_[A-Za-z0-9_-]{1,124}$"' }];
+                  return false;
+                }
+              } else {
+                validate169.errors = [{ instancePath: instancePath + "/reading_id", schemaPath: "#/$defs/readingId/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+                return false;
+              }
+            }
+            var valid0 = _errs2 === errors;
+          } else {
+            var valid0 = true;
+          }
+          if (valid0) {
+            if (data.revision !== void 0) {
+              let data1 = data.revision;
+              const _errs5 = errors;
+              const _errs6 = errors;
+              if (!(typeof data1 == "number" && (!(data1 % 1) && !isNaN(data1)) && isFinite(data1))) {
+                validate169.errors = [{ instancePath: instancePath + "/revision", schemaPath: "#/$defs/revision/type", keyword: "type", params: { type: "integer" }, message: "must be integer" }];
+                return false;
+              }
+              if (errors === _errs6) {
+                if (typeof data1 == "number" && isFinite(data1)) {
+                  if (data1 > 2147483647 || isNaN(data1)) {
+                    validate169.errors = [{ instancePath: instancePath + "/revision", schemaPath: "#/$defs/revision/maximum", keyword: "maximum", params: { comparison: "<=", limit: 2147483647 }, message: "must be <= 2147483647" }];
+                    return false;
+                  } else {
+                    if (data1 < 1 || isNaN(data1)) {
+                      validate169.errors = [{ instancePath: instancePath + "/revision", schemaPath: "#/$defs/revision/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" }];
+                      return false;
+                    }
+                  }
+                }
+              }
+              var valid0 = _errs5 === errors;
+            } else {
+              var valid0 = true;
+            }
+            if (valid0) {
+              if (data.local_date !== void 0) {
+                let data2 = data.local_date;
+                const _errs8 = errors;
+                const _errs9 = errors;
+                if (errors === _errs9) {
+                  if (errors === _errs9) {
+                    if (typeof data2 === "string") {
+                      if (!pattern96.test(data2)) {
+                        validate169.errors = [{ instancePath: instancePath + "/local_date", schemaPath: "#/$defs/localDate/pattern", keyword: "pattern", params: { pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }, message: 'must match pattern "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"' }];
+                        return false;
+                      } else {
+                        if (!formats14.validate(data2)) {
+                          validate169.errors = [{ instancePath: instancePath + "/local_date", schemaPath: "#/$defs/localDate/format", keyword: "format", params: { format: "date" }, message: 'must match format "date"' }];
+                          return false;
+                        }
+                      }
+                    } else {
+                      validate169.errors = [{ instancePath: instancePath + "/local_date", schemaPath: "#/$defs/localDate/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+                      return false;
+                    }
+                  }
+                }
+                var valid0 = _errs8 === errors;
+              } else {
+                var valid0 = true;
+              }
+              if (valid0) {
+                if (data.generation_family !== void 0) {
+                  let data3 = data.generation_family;
+                  const _errs11 = errors;
+                  if (typeof data3 !== "string") {
+                    validate169.errors = [{ instancePath: instancePath + "/generation_family", schemaPath: "#/$defs/generationFamily/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+                    return false;
+                  }
+                  if (!(data3 === "deterministic" || data3 === "constrained_model")) {
+                    validate169.errors = [{ instancePath: instancePath + "/generation_family", schemaPath: "#/$defs/generationFamily/enum", keyword: "enum", params: { allowedValues: schema270.enum }, message: "must be equal to one of the allowed values" }];
+                    return false;
+                  }
+                  var valid0 = _errs11 === errors;
+                } else {
+                  var valid0 = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      validate169.errors = [{ instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" }];
+      return false;
+    }
+  }
+  validate169.errors = vErrors;
+  return errors === 0;
+}
+validate169.evaluated = { "props": true, "dynamicProps": false, "dynamicItems": false };
+function validate168(data, { instancePath = "", parentData, parentDataProperty, rootData = data, dynamicAnchors = {} } = {}) {
+  let vErrors = null;
+  let errors = 0;
+  const evaluated0 = validate168.evaluated;
+  if (evaluated0.dynamicProps) {
+    evaluated0.props = void 0;
+  }
+  if (evaluated0.dynamicItems) {
+    evaluated0.items = void 0;
+  }
+  const _errs2 = errors;
+  let valid1 = true;
+  const _errs3 = errors;
+  if (data && typeof data == "object" && !Array.isArray(data)) {
+    let missing0;
+    if (data.target === void 0 && (missing0 = "target")) {
+      const err0 = {};
+      if (vErrors === null) {
+        vErrors = [err0];
+      } else {
+        vErrors.push(err0);
+      }
+      errors++;
+    } else {
+      if (data.target !== void 0) {
+        let data0 = data.target;
+        const _errs4 = errors;
+        if (errors === _errs4) {
+          if (data0 && typeof data0 == "object" && !Array.isArray(data0)) {
+            let missing1;
+            if (data0.generation_family === void 0 && (missing1 = "generation_family")) {
+              const err1 = {};
+              if (vErrors === null) {
+                vErrors = [err1];
+              } else {
+                vErrors.push(err1);
+              }
+              errors++;
+            } else {
+              if (data0.generation_family !== void 0) {
+                if ("constrained_model" !== data0.generation_family) {
+                  const err2 = {};
+                  if (vErrors === null) {
+                    vErrors = [err2];
+                  } else {
+                    vErrors.push(err2);
+                  }
+                  errors++;
+                }
+              }
+            }
+          } else {
+            const err3 = {};
+            if (vErrors === null) {
+              vErrors = [err3];
+            } else {
+              vErrors.push(err3);
+            }
+            errors++;
+          }
+        }
+      }
+    }
+  }
+  var _valid0 = _errs3 === errors;
+  errors = _errs2;
+  if (vErrors !== null) {
+    if (_errs2) {
+      vErrors.length = _errs2;
+    } else {
+      vErrors = null;
+    }
+  }
+  if (_valid0) {
+    const _errs7 = errors;
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      if (data.revision_reason !== void 0) {
+        let data2 = data.revision_reason;
+        if (typeof data2 !== "string") {
+          validate168.errors = [{ instancePath: instancePath + "/revision_reason", schemaPath: "#/$defs/constrainedModelReason/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+          return false;
+        }
+        if (!(data2 === "safety_correction" || data2 === "defect_repair")) {
+          validate168.errors = [{ instancePath: instancePath + "/revision_reason", schemaPath: "#/$defs/constrainedModelReason/enum", keyword: "enum", params: { allowedValues: schema263.enum }, message: "must be equal to one of the allowed values" }];
+          return false;
+        }
+      }
+    }
+    var _valid0 = _errs7 === errors;
+    valid1 = _valid0;
+    if (valid1) {
+      var props0 = {};
+      props0.revision_reason = true;
+      props0.target = true;
+    }
+  }
+  if (!valid1) {
+    const err4 = { instancePath, schemaPath: "#/allOf/0/if", keyword: "if", params: { failingKeyword: "then" }, message: 'must match "then" schema' };
+    if (vErrors === null) {
+      vErrors = [err4];
+    } else {
+      vErrors.push(err4);
+    }
+    errors++;
+    validate168.errors = vErrors;
+    return false;
+  }
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing2;
+      if (data.schema_version === void 0 && (missing2 = "schema_version") || data.user_id === void 0 && (missing2 = "user_id") || data.target === void 0 && (missing2 = "target") || data.revision_reason === void 0 && (missing2 = "revision_reason")) {
+        validate168.errors = [{ instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: missing2 }, message: "must have required property '" + missing2 + "'" }];
+        return false;
+      } else {
+        const _errs11 = errors;
+        for (const key0 in data) {
+          if (!(key0 === "schema_version" || key0 === "user_id" || key0 === "target" || key0 === "revision_reason")) {
+            validate168.errors = [{ instancePath, schemaPath: "#/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key0 }, message: "must NOT have additional properties" }];
+            return false;
+            break;
+          }
+        }
+        if (_errs11 === errors) {
+          if (data.schema_version !== void 0) {
+            let data3 = data.schema_version;
+            const _errs12 = errors;
+            if (typeof data3 !== "string") {
+              validate168.errors = [{ instancePath: instancePath + "/schema_version", schemaPath: "#/$defs/schemaVersion/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+              return false;
+            }
+            if ("daily-edition-reissue/v1" !== data3) {
+              validate168.errors = [{ instancePath: instancePath + "/schema_version", schemaPath: "#/$defs/schemaVersion/const", keyword: "const", params: { allowedValue: "daily-edition-reissue/v1" }, message: "must be equal to constant" }];
+              return false;
+            }
+            var valid6 = _errs12 === errors;
+          } else {
+            var valid6 = true;
+          }
+          if (valid6) {
+            if (data.user_id !== void 0) {
+              let data4 = data.user_id;
+              const _errs15 = errors;
+              const _errs16 = errors;
+              if (errors === _errs16) {
+                if (typeof data4 === "string") {
+                  if (!pattern94.test(data4)) {
+                    validate168.errors = [{ instancePath: instancePath + "/user_id", schemaPath: "#/$defs/userId/pattern", keyword: "pattern", params: { pattern: "^usr_[A-Za-z0-9_-]{1,124}$" }, message: 'must match pattern "^usr_[A-Za-z0-9_-]{1,124}$"' }];
+                    return false;
+                  }
+                } else {
+                  validate168.errors = [{ instancePath: instancePath + "/user_id", schemaPath: "#/$defs/userId/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+                  return false;
+                }
+              }
+              var valid6 = _errs15 === errors;
+            } else {
+              var valid6 = true;
+            }
+            if (valid6) {
+              if (data.target !== void 0) {
+                const _errs18 = errors;
+                if (!validate169(data.target, { instancePath: instancePath + "/target", parentData: data, parentDataProperty: "target", rootData, dynamicAnchors })) {
+                  vErrors = vErrors === null ? validate169.errors : vErrors.concat(validate169.errors);
+                  errors = vErrors.length;
+                }
+                var valid6 = _errs18 === errors;
+              } else {
+                var valid6 = true;
+              }
+              if (valid6) {
+                if (data.revision_reason !== void 0) {
+                  let data6 = data.revision_reason;
+                  const _errs19 = errors;
+                  if (typeof data6 !== "string") {
+                    validate168.errors = [{ instancePath: instancePath + "/revision_reason", schemaPath: "#/$defs/revisionReason/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
+                    return false;
+                  }
+                  if (!(data6 === "chart_recalculated" || data6 === "consent_revoked" || data6 === "safety_correction" || data6 === "defect_repair")) {
+                    validate168.errors = [{ instancePath: instancePath + "/revision_reason", schemaPath: "#/$defs/revisionReason/enum", keyword: "enum", params: { allowedValues: schema271.enum }, message: "must be equal to one of the allowed values" }];
+                    return false;
+                  }
+                  var valid6 = _errs19 === errors;
+                } else {
+                  var valid6 = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      validate168.errors = [{ instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" }];
+      return false;
+    }
+  }
+  validate168.errors = vErrors;
+  return errors === 0;
+}
+validate168.evaluated = { "props": true, "dynamicProps": false, "dynamicItems": false };
 export {
   validateContentReleaseV3,
   validateContentReleaseV4,
+  validateDailyEditionReissueRequest,
   validateNatalPredicate,
   validateOntologyRelease,
   validateRegenerationReplayEvent,

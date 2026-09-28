@@ -1,0 +1,13 @@
+{
+  "package": "contracts/daily-edition-reissue-v1",
+  "schema_version": "daily-edition-reissue/v1",
+  "document_date": "2026-09-28",
+  "status": "additive_local_implementation",
+  "schemas": [
+    "daily-edition-reissue.schema.json"
+  ],
+  "openapi": [
+    "openapi/openapi.yaml"
+  ],
+  "note": "M0–M9, daily-uncertainty-v1 and every other package are unchanged, including the frozen V1 and V2 generation-command contracts the successor commands already satisfy. POST /internal/readings/reissue keeps its deterministic-only semantics. Runtime tests enforce ownership, exact published-edition binding, family derivation from retained evidence, the family/reason matrix, date scope, account-processing and ai_synthesis consent, replay and conflict identity, atomic publication, and the existing attempt and generation ceilings. No migration is required."
+}

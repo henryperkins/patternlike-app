@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -97,6 +97,22 @@ test("bundled validators work with string code generation forbidden even during 
   for (const [name, validate] of Object.entries(validators)) {
     assert.equal(validate(null), false, `${name} must still reject invalid input`);
     assert.ok(validate.errors?.length, `${name} must retain validation errors`);
+  }
+  // The operator request is validated only by this generated code at runtime,
+  // so it must enforce the whole contract here too: the family/reason matrix,
+  // calendar dates, and the closed shape, not only what TypeScript can see.
+  for (const kind of ["valid", "invalid"] as const) {
+    const directory = `daily-edition-reissue-v1/fixtures/${kind}`;
+    const names = (await readdir(resolve(contractsRoot, directory)))
+      .filter((name) => name.startsWith("daily-edition-reissue-request."));
+    assert.ok(names.length > 0, `no ${kind} edition reissue request fixtures`);
+    for (const name of names) {
+      assert.equal(
+        validators.validateDailyEditionReissueRequest!(await fixture(`${directory}/${name}`)),
+        kind === "valid",
+        name,
+      );
+    }
   }
   const output = await fixture("m5/fixtures/valid/reading-generation-output.json") as Record<string, unknown>;
   assert.equal(validators.validateReadingOutput!({ ...output, unexpected: true }), false);
