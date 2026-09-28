@@ -140,6 +140,22 @@ test("the committed CI script emits a success summary accepted by the release re
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("the committed CI script carries no double-encoded characters", () => {
+  // 33469fc re-encoded every non-ASCII character in ci-local.sh as mojibake:
+  // UTF-8 bytes read back as Windows-1252, so a check mark (U+2713) became
+  // U+00E2 U+0153 U+201C and an em dash became U+00E2 U+20AC U+201D. The
+  // signature is a lead byte (U+00C2-U+00F4) followed by a continuation byte
+  // (0x80-0xBF as Windows-1252, or a C1 control where 1252 leaves it undefined).
+  // Only the success line had a parser to notice; keep the rest honest too.
+  const continuation = "\u0080-\u00bf\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc"
+    + "\u2013\u2014\u2018-\u201a\u201c-\u201e\u2020-\u2022\u2026\u2030\u2039\u203a\u20ac\u2122";
+  const doubleEncoded = new RegExp(`[\u00c2-\u00f4][${continuation}]`);
+  const script = readFileSync(join(REPO_ROOT, "scripts/ci-local.sh"), "utf8");
+  const garbled = script.split("\n").flatMap((line, index) =>
+    doubleEncoded.test(line) ? [`${index + 1}: ${line.trim()}`] : []);
+  assert.deepEqual(garbled, []);
+});
+
 function prepareGate(root, { mutate = false, partial = false, exit = 0 } = {}) {
   const files = {
     "package.json": JSON.stringify({ scripts: { "ci:local": "node fixture-gate.cjs" } }),

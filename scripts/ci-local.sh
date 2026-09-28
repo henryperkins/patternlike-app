@@ -102,18 +102,18 @@ FAILED=0
 run_step() {
   local name="$1"; shift
   bold ""
-  bold "â”€â”€â”€â”€ ${name}"
+  bold "──── ${name}"
   "$@" 2>&1 | sed 's/^/  /'
   local rc=${PIPESTATUS[0]}
   STEP_NAMES+=("$name")
   if [ "$rc" -eq 0 ]; then
-    STEP_RESULTS+=("pass"); green "  âœ“ ${name}"
+    STEP_RESULTS+=("pass"); green "  ✓ ${name}"
   else
-    STEP_RESULTS+=("FAIL"); red "  âœ— ${name} (exit ${rc})"; FAILED=1
+    STEP_RESULTS+=("FAIL"); red "  ✗ ${name} (exit ${rc})"; FAILED=1
   fi
 }
 
-bold "Local CI â€” mirrors .github/workflows/ci.yml"
+bold "Local CI — mirrors .github/workflows/ci.yml"
 echo "  node    $(node -v)   (.nvmrc ${WANT_NODE})"
 echo "  npm     $(npm -v)"
 echo "  python  ${HAVE_PY#Python }${PY_NOTE:+   [${PY_NOTE}]}"
@@ -137,7 +137,7 @@ if [ "$SKIP_EPHE" -eq 0 ]; then
   run_step "monorepo: ephemeris download" \
     npm run ephe:download -w @patternlike/calc-stub
 else
-  yellow "  â€¦ skipped ephemeris download (--skip-ephe)"
+  yellow "  … skipped ephemeris download (--skip-ephe)"
 fi
 
 run_step "monorepo: npm run typecheck" npm run typecheck
@@ -153,14 +153,14 @@ run_step "monorepo: npm run build" npm run build
 # ci.yml's monorepo job never listed these, so they shipped with no CI coverage.
 # Reported separately so the "same as CI" claim above stays exactly true.
 bold ""
-bold "â•â• Beyond ci.yml (workspaces the workflow never listed) â•â•"
+bold "══ Beyond ci.yml (workspaces the workflow never listed) ══"
 run_step "extra: test @patternlike/pattern-engine" npm run test -w @patternlike/pattern-engine
 run_step "extra: test @patternlike/codex-runner"   npm run test -w @patternlike/codex-runner
 run_step "extra: npm run test:content"             npm run test:content
 
 # ---- summary --------------------------------------------------------------
 bold ""
-bold "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SUMMARY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+bold "════════════════════ SUMMARY ════════════════════"
 echo "commit  $(git rev-parse --short HEAD) on $(git rev-parse --abbrev-ref HEAD)"
 echo "node    $(node -v)   npm $(npm -v)   python ${HAVE_PY#Python }"
 [ -n "$PY_NOTE" ] && yellow "note    ${PY_NOTE}"
@@ -172,6 +172,6 @@ echo
 if [ "$FAILED" -eq 0 ]; then
   green "ALL STEPS PASSED — safe to merge on local evidence."
 else
-  red "AT LEAST ONE STEP FAILED â€” do not merge."
+  red "AT LEAST ONE STEP FAILED — do not merge."
 fi
 exit "$FAILED"
