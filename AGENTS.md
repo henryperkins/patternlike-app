@@ -34,7 +34,9 @@ Use focused, imperative subjects with an area prefix, for example `api: validate
 
 `npm run ci:local` is the merge gate. It runs the same steps as `.github/workflows/ci.yml`, in the same order, on the Node pinned by `.nvmrc` (which Workers Builds also reads), and prints a paste-ready summary. **Run it and paste the summary into the PR before merging.** A green GitHub check will never appear, so an unpasted claim that "tests pass" is the only evidence anyone gets — make it a real one.
 
-The script also runs three lanes `ci.yml` never listed — `@patternlike/pattern-engine`, `@patternlike/codex-runner`, and `npm run test:content` — and reports them separately, so the "same as CI" claim stays exactly true.
+The script also runs five lanes `ci.yml` never listed: `@patternlike/pattern-engine`, `@patternlike/codex-runner`, `npm run test:content`, `npm run test:source-map`, and `npm run map:check:current`. It reports them separately, so the "same as CI" claim stays exactly true. The last lane checks the immutable snapshot selected by `docs/architecture/source-map/current.json`; refresh and review the map after changing its consumed source, then update that pointer before the final gate.
+
+All 16 lanes must pass. OpenAPI validation dependencies are mandatory, and `--skip-ephe` is an exploratory incomplete run that exits nonzero. The producer and release recorder share the ASCII summary format and ordered lane definitions in `scripts/pattern-release/ci-summary.mjs`; a success token alone is not passing evidence. Use `scripts/pattern-release/release-evidence.mjs gate <new-evidence.json>` to bind the actual process exit and complete summary to source and build identities.
 
 First-time setup on a host with an externally managed Python (no `ensurepip`, PEP 668 refuses a bare `pip install`):
 

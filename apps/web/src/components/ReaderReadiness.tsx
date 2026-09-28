@@ -25,8 +25,11 @@ export function useReaderObservationFresh(observedAt: number | null): boolean {
   }, [observedAt]);
   return observedAt !== null && Number.isFinite(observedAt) && observedAt <= Date.now() && Date.now() - observedAt <= 60_000;
 }
-export function ReaderConsequences({ action, observedAt = null, evidence = "unavailable" }: { action: ConsequenceAction; observedAt?: number | null; evidence?: "known" | "unavailable" }) {
+export function ReaderConsequences({ action, observedAt = null, evidence = "unavailable", retainEvidence = false }: { action: ConsequenceAction; observedAt?: number | null; evidence?: "known" | "unavailable"; retainEvidence?: boolean }) {
   const fresh = useReaderObservationFresh(observedAt);
-  const consequences = selectReaderConsequences(action, { observedAt, evidence: fresh && evidence === "known" ? "known" : "unavailable" });
+  const consequences = selectReaderConsequences(action, {
+    observedAt,
+    evidence: retainEvidence || (fresh && evidence === "known") ? evidence : "unavailable",
+  });
   return <p className="field-help" data-consequence={action} data-evidence={consequences.evidence}>{consequences.text}</p>;
 }

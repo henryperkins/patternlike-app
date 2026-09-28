@@ -796,6 +796,7 @@ describe("POST /v1/birth-profiles — operational guards", () => {
       birth_date: "1996-05-15",
     });
     expect(denied.response.status).toBe(429);
+    expect(denied.response.headers.get("cache-control")).toBe("private, no-store");
     expect(denied.response.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
     expect(denied.body).toMatchObject({
       error: {

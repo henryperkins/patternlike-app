@@ -17,7 +17,7 @@ import {
   type DailyReadingV5,
   type ReadingEvidenceV5,
   type ReadingGenerationOutput,
-  type ReadingGenerationRequest,
+  type LegacyReadingGenerationRequest as ReadingGenerationRequest,
   type ReadingPublisherProvider,
 } from "./m5-reading-types.js";
 

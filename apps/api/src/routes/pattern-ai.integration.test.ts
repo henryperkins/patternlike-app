@@ -2355,6 +2355,32 @@ describe("account-wide Pattern for an account that was never allowlisted", () =>
     expect(await providerFootprint()).toEqual({ jobs: 0, usage: 0 });
   });
 
+  it("refuses a confirmed locale the active ontology cannot publish, before any provider work", async () => {
+    enablePatternAi();
+    await confirmPreferences(USER_B, "America/Chicago", "en-GB");
+    await seedActiveOntology();
+
+    expect((await jsonAs(USER_B, "/v1/pattern-state")).body.state)
+      .toBe("locale_confirmation_required");
+
+    const refused = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-locale-en-gb" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(refused.status).toBe(409);
+    expect((refused.body.error as { code: string }).code).toBe("locale_unsupported");
+    expect(await providerFootprint()).toEqual({ jobs: 0, usage: 0 });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM pattern_generation_jobs WHERE user_id = ?",
+    ).bind(USER_B).first<{ n: number }>()).toEqual({ n: 0 });
+  });
+
   it("keeps the one-Pattern rules for this account too", async () => {
     enablePatternAi();
     await confirmPreferences(USER_B);

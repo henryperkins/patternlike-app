@@ -12,6 +12,15 @@ export interface PortraitAutomationPreferenceV1 {
   chart_id: string | null;
   enabled: boolean;
   consent_policy_version: typeof PORTRAIT_AUTOMATION_CONSENT_POLICY_VERSION;
+  /** Authoritative when present; an unreadable store never proves a disabled grant. */
+  state?: PortraitAutomationState;
+}
+export interface PortraitAutomationState {
+  supported_protocols: Array<"v1" | "v2">;
+  generation_available: boolean;
+  grant_status: "enabled" | "disabled" | "unknown";
+  grant_policy_version: "1.1.0" | "2.0.0" | null;
+  allowed_actions: Array<"enable" | "disable">;
 }
 export interface PortraitAutomationRequestV1 {
   chart_id: string;

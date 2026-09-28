@@ -87,7 +87,7 @@ describe("Portrait exploration", () => {
     for (const name of ["Dusk", "Show roof", "Open reading desk", "Turn chapter object", "Look closer"]) await user.click(screen.getByRole("button", { name }));
     const bookmark = { position: [-3, 3, 6] as [number, number, number], target: [-2, 1, -1] as [number, number, number], frameDistance: 8 };
     act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
-    await user.click(screen.getByRole("button", { name: "Back to reading" }));
+    await user.click(screen.getByRole("button", { name: "Chapter list" }));
     await waitFor(() => expect(window.history.state?.portrait).toBeUndefined());
     // Remounting the account route still uses the same private session.
     view.unmount();
@@ -453,7 +453,7 @@ describe("Portrait exploration", () => {
     await user.click(within(explorer).getByRole("button", { name: /^Full reading/ }));
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByText(nativePattern.core_chapters[3].counter_expression.text)).toBeInTheDocument();
-    await user.click(within(explorer).getByRole("button", { name: "Back to reading" }));
+    await user.click(within(explorer).getByRole("button", { name: "Chapter list" }));
     expect(screen.getByRole("button", { name: "Open portrait" })).toBeInTheDocument();
   });
 

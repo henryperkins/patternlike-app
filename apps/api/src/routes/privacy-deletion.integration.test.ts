@@ -257,6 +257,7 @@ describe("account deletion", () => {
       headers: { cookie: receiptCookie(accepted.response) },
     });
     expect(status.status).toBe(200);
+    expect(status.headers.get("cache-control")).toBe("private, no-store");
     expect(await status.json()).toMatchObject({
       schema_version: "0.6.0",
       deletion_request_id: accepted.body.resource_id,

@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/daily-uncertainty-v1/uncertainty.schema.json",
+  "title": "Typed Daily uncertainty input and disclosure plan v1",
+  "$defs": {
+    "dailyUncertaintyInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accuracy",
+        "window_plus_minus_minutes",
+        "suppressed_features",
+        "qualified_features"
+      ],
+      "properties": {
+        "accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "window_plus_minus_minutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1440
+        },
+        "suppressed_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "feature_class",
+              "feature_id",
+              "reason"
+            ],
+            "properties": {
+              "feature_class": {
+                "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/suppressedFeatureClass"
+              },
+              "feature_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "unknown_birth_time",
+                  "birthplace_unavailable"
+                ]
+              }
+            }
+          }
+        },
+        "qualified_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "feature_id",
+                  "qualification"
+                ],
+                "properties": {
+                  "feature_id": {
+                    "const": "birth_instant"
+                  },
+                  "qualification": {
+                    "const": "technique_specific"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "feature_id",
+                  "qualification"
+                ],
+                "properties": {
+                  "feature_id": {
+                    "const": "birthplace"
+                  },
+                  "qualification": {
+                    "const": "technique_specific"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "feature_id",
+                  "qualification"
+                ],
+                "properties": {
+                  "feature_id": {
+                    "const": "houses"
+                  },
+                  "qualification": {
+                    "const": "approximate_only"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "feature_id",
+                  "qualification"
+                ],
+                "properties": {
+                  "feature_id": {
+                    "const": "moon"
+                  },
+                  "qualification": {
+                    "const": "low_confidence_moon"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "uncertaintyDisclosure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "birth_time"
+            },
+            "reason": {
+              "const": "approximate_birth_time"
+            },
+            "statement": {
+              "const": "Your birth time is approximate."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "birth_time"
+            },
+            "reason": {
+              "const": "unknown_birth_time"
+            },
+            "statement": {
+              "const": "Your birth time is unknown."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "angle_transits"
+            },
+            "reason": {
+              "const": "unknown_birth_time"
+            },
+            "statement": {
+              "const": "Angle transits are omitted because your birth time is unknown."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "angle_transits"
+            },
+            "reason": {
+              "const": "birthplace_unavailable"
+            },
+            "statement": {
+              "const": "Angle transits are omitted because your birthplace is unavailable."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "angles"
+            },
+            "reason": {
+              "const": "unknown_birth_time"
+            },
+            "statement": {
+              "const": "Angles are omitted because your birth time is unknown."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "angles"
+            },
+            "reason": {
+              "const": "birthplace_unavailable"
+            },
+            "statement": {
+              "const": "Angles are omitted because your birthplace is unavailable."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "houses"
+            },
+            "reason": {
+              "const": "unknown_birth_time"
+            },
+            "statement": {
+              "const": "Houses are omitted because your birth time is unknown."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "houses"
+            },
+            "reason": {
+              "const": "birthplace_unavailable"
+            },
+            "statement": {
+              "const": "Houses are omitted because your birthplace is unavailable."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "moon_time_sensitive"
+            },
+            "reason": {
+              "const": "unknown_birth_time"
+            },
+            "statement": {
+              "const": "Time-sensitive Moon details are omitted because your birth time is unknown."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_class",
+            "reason",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "suppression"
+            },
+            "feature_class": {
+              "const": "moon_time_sensitive"
+            },
+            "reason": {
+              "const": "birthplace_unavailable"
+            },
+            "statement": {
+              "const": "Time-sensitive Moon details are omitted because your birthplace is unavailable."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_id",
+            "qualification",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "qualification"
+            },
+            "feature_id": {
+              "const": "birth_instant"
+            },
+            "qualification": {
+              "const": "technique_specific"
+            },
+            "statement": {
+              "const": "The time-zone mapping of your local birth time needs confirmation."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_id",
+            "qualification",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "qualification"
+            },
+            "feature_id": {
+              "const": "birthplace"
+            },
+            "qualification": {
+              "const": "technique_specific"
+            },
+            "statement": {
+              "const": "Your birthplace needs confirmation."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_id",
+            "qualification",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "qualification"
+            },
+            "feature_id": {
+              "const": "houses"
+            },
+            "qualification": {
+              "const": "approximate_only"
+            },
+            "statement": {
+              "const": "House details are approximate."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "feature_id",
+            "qualification",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "qualification"
+            },
+            "feature_id": {
+              "const": "moon"
+            },
+            "qualification": {
+              "const": "low_confidence_moon"
+            },
+            "statement": {
+              "const": "Time-sensitive Moon details have low confidence."
+            }
+          }
+        }
+      ]
+    },
+    "uncertaintyDisclosurePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version",
+        "disclosures"
+      ],
+      "properties": {
+        "policy_version": {
+          "const": "1.0.0"
+        },
+        "disclosures": {
+          "type": "array",
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/uncertaintyDisclosure"
+          }
+        }
+      }
+    }
+  }
+}

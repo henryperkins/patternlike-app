@@ -1,4 +1,4 @@
-const CACHE_NAME = "patternlike-shell-v2";
+const CACHE_NAME = "patternlike-shell-v3";
 const SHELL = ["/", "/index.html", "/mark.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -37,6 +37,10 @@ self.addEventListener("fetch", (event) => {
         (cached) =>
           cached ||
           fetch(request).then((response) => {
+            // Cache API writes do not enforce the HTTP response's cache policy.
+            // A private response must never enter the public asset cache.
+            const policy = response.headers.get("cache-control") || "";
+            if (/(?:^|,)\s*(?:private|no-store)(?:\s*(?:=|,|$))/i.test(policy)) return response;
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
             return response;

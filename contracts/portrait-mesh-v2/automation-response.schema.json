@@ -12,6 +12,7 @@
     "legacy_enabled"
   ],
   "properties": {
+    "state": { "$ref": "https://patternlike.app/contracts/portrait-state-v1/portrait-state.schema.json#/$defs/automationState" },
     "schema_version": {
       "const": "portrait-automation/v2"
     },

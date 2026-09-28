@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { REPO_ROOT, canonicalJson, sha256Hex } from "./candidates.mjs";
+import { CI_LANES, formatCiSummary } from "./ci-summary.mjs";
 
 const executable = join(REPO_ROOT, "scripts/pattern-release/release-reconciliation.mjs");
 const gateExecutable = join(REPO_ROOT, "scripts/pattern-release/release-evidence.mjs");
@@ -36,8 +37,10 @@ test("a blank template represents every release and authorized lifecycle gap", (
 
 function repository() {
   const root = mkdtempSync(join(tmpdir(), "release-reconciliation-test-"));
-  const lanes = ["contracts: npm run test:contracts", "monorepo: npm ci --dry-run (lockfile agrees with package.json)", "monorepo: ephemeris download", "monorepo: npm run typecheck", ...["shared", "reading-engine", "calc-stub", "ontology-signer", "api", "web"].map((name) => `monorepo: test @patternlike/${name}`), "monorepo: npm run build", "extra: test @patternlike/pattern-engine", "extra: test @patternlike/codex-runner", "extra: npm run test:content"];
-  const summary = ["════ SUMMARY ════", "node    v22.23.2   npm 10.9.4   python 3.12.3", ...lanes.map((lane) => `  pass   ${lane}`), "ALL STEPS PASSED — safe to merge on local evidence."].join("\n");
+  const summary = formatCiSummary({
+    toolchain: { node: "v22.23.2", npm: "10.9.4", python: "3.12.3" },
+    lanes: CI_LANES.map((name) => ({ name, result: "pass" })),
+  });
   const pattern = ["PLANNER", "WRITER", "VERIFIER"].flatMap((role) => [
     `export const OPENAI_PATTERN_${role}_MODEL = "fixture-model";`,
     `export const OPENAI_PATTERN_${role}_REASONING = "xhigh";`,

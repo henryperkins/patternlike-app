@@ -159,7 +159,6 @@ export async function adminAuth(c: AdminContext, next: Next) {
 
   c.set("adminSubject", identity.subject);
   c.set("adminRole", identity.role);
-  c.header("Cache-Control", "no-store");
   c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
   c.header("Cross-Origin-Resource-Policy", "same-origin");
   c.header("Referrer-Policy", "no-referrer");

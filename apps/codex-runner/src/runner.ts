@@ -109,10 +109,15 @@ export function parseRunnerConfiguration(env: NodeJS.ProcessEnv): RunnerConfigur
 
 export interface PortraitRunnerOptions {
   client: Pick<CodexPortraitClient, "claim" | "complete" | "fail">;
+  checkCompatibility: () => Promise<boolean>;
   execute: (claim: CodexPortraitClaim) => Promise<PortraitInvocationOutcome>;
 }
 
 export async function runOnePortraitJob(options: PortraitRunnerOptions): Promise<"empty" | "processed"> {
+  // Claiming spends an attempt. Known local incompatibility must stay outside
+  // that boundary, and must not disable independent text or mesh work.
+  try { if (await options.checkCompatibility() !== true) return "empty"; }
+  catch { return "empty"; }
   const claimed = await options.client.claim();
   if (claimed.status === "empty") return "empty";
   let outcome: PortraitInvocationOutcome;

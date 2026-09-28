@@ -75,7 +75,7 @@ const enabled: Partial<Env> = {
   READING_PUBLISHER: "codex",
   OPENAI_READING_MODEL,
   OPENAI_READING_REASONING: "xhigh",
-  OPENAI_READING_PROMPT_VERSION: "1.0.3",
+  OPENAI_READING_PROMPT_VERSION: "1.1.0",
   OPENAI_READING_TIMEOUT_MS: "900000",
   OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
   READING_CONTEXT_MAX_BYTES: "98304",
@@ -95,11 +95,11 @@ const enabled: Partial<Env> = {
 
 describe("Codex-only Daily publisher configuration", () => {
   it("requires matching categorical activation and prompt pins", () => {
-    const resolved = resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1", OPENAI_READING_PROMPT_VERSION: "1.0.4" });
+    const resolved = resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1", OPENAI_READING_PROMPT_VERSION: "1.1.1" });
     expect(resolved.ok).toBe(true);
-    if (resolved.ok) expect(resolved.config?.pin).toMatchObject({ prompt_version: "1.0.4", selection_policy_version: "1.4.0" });
+    if (resolved.ok) expect(resolved.config?.pin).toMatchObject({ prompt_version: "1.1.1", selection_policy_version: "1.6.0" });
     expect(resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1" }).ok).toBe(false);
-    expect(resolvePublisherConfiguration({ ...enabled, OPENAI_READING_PROMPT_VERSION: "1.0.4" }).ok).toBe(false);
+    expect(resolvePublisherConfiguration({ ...enabled, OPENAI_READING_PROMPT_VERSION: "1.1.1" }).ok).toBe(false);
     expect(resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "true" }).ok).toBe(false);
   });
   it("accepts a complete hybrid Codex deployment with no OpenAI credential", () => {
@@ -111,7 +111,7 @@ describe("Codex-only Daily publisher configuration", () => {
     expect(resolved.config?.pin.provider).toBe("codex");
     expect(resolved.config?.pin.model).toBe(OPENAI_READING_MODEL);
     expect(resolved.config?.pin.reasoning_effort).toBe("xhigh");
-    expect(resolved.config?.pin.prompt_version).toBe("1.0.3");
+    expect(resolved.config?.pin.prompt_version).toBe("1.1.0");
     expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
     expect(resolved.config?.pin.max_output_tokens).toBe(
       OPENAI_READING_MAX_OUTPUT_TOKENS,

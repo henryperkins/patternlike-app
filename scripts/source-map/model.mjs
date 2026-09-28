@@ -1,5 +1,6 @@
 // Closed authored model and pure deterministic Markdown rendering.
 export const DEFINITION = "docs/architecture/source-map/map.json";
+export const CURRENT = "docs/architecture/source-map/current.json";
 export const SNAPSHOTS = "docs/architecture/source-map/snapshots";
 export const TOOLING = Object.freeze([".nvmrc", "package.json", "scripts/pattern-release/candidates.mjs", "scripts/source-map/cli.mjs", "scripts/source-map/model.mjs", "scripts/source-map/snapshot.mjs"]);
 export class MapError extends Error {

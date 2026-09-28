@@ -5,6 +5,8 @@ import {
   DAILY_SKY_POLICY_VERSION,
   LOCAL_DAY_RESOLUTION_POLICY_VERSION,
   M5_SCHEMA_VERSION,
+  DAILY_GENERATION_SCHEMA_VERSION,
+  type DailyUncertaintyInput,
   TRANSIT_ORB_POLICY_ID,
   TRANSIT_ORB_POLICY_VERSION,
   canonicalJson,
@@ -27,7 +29,7 @@ import {
   ConstrainedInputError,
   prepareConstrainedReadingInput,
   VALIDATION_POLICY_VERSION,
-  type AssemblyUncertaintyInput,
+  normalizeDailyUncertainty,
   type ConstrainedContextRef,
   type ConstrainedNatalFactInput,
   type ConstrainedPriorReading,
@@ -52,7 +54,6 @@ import {
   resolvePublisherConfiguration,
   type PublisherConfigPin,
 } from "./reading-publisher.js";
-import { toAssemblyUncertainty } from "./generation-command.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
 import type { V5ReplacementReason } from "./generation-failures.js";
 
@@ -126,7 +127,7 @@ export interface V5ChartPin {
   contract_version: string;
   container_digest: string;
   effective_accuracy: BirthTimeAccuracy;
-  uncertainty: AssemblyUncertaintyInput;
+  uncertainty: DailyUncertaintyInput;
 }
 
 /**
@@ -164,7 +165,7 @@ export interface PriorReadingPin {
 
 export interface GenerateDailyReadingCommandV2 {
   command_version: "v2";
-  schema_version: typeof M5_SCHEMA_VERSION;
+  schema_version: typeof DAILY_GENERATION_SCHEMA_VERSION;
   generation_id: string;
   generation_input_id: string;
   input_manifest_hash: string;
@@ -587,7 +588,15 @@ export async function buildGenerationCommandV2(
   if (!chart) {
     return { ok: false, reason: "chart_not_found", detail: "active chart snapshot is malformed" };
   }
-  const uncertainty = toAssemblyUncertainty(chart.uncertainty);
+  let uncertainty: DailyUncertaintyInput;
+  try {
+    uncertainty = normalizeDailyUncertainty({
+      ...chart.uncertainty,
+      window_plus_minus_minutes: chart.uncertainty.window?.plus_minus_minutes ?? null,
+    });
+  } catch {
+    return { ok: false, reason: "context_ineligible", detail: "unsupported stored uncertainty" };
+  }
   const effectiveAccuracy = uncertainty.accuracy;
 
   // Cycle scan first: its answer names the ephemeris vintage the daily-sky call
@@ -692,7 +701,7 @@ export async function buildGenerationCommandV2(
   let prepared: PreparedConstrainedReadingInput;
   try {
     prepared = prepareConstrainedReadingInput({
-      schema_version: M5_SCHEMA_VERSION,
+      schema_version: DAILY_GENERATION_SCHEMA_VERSION,
       prompt_version: pin.prompt_version,
       output_schema: "daily-reading-v5",
       selection_policy_version: pin.selection_policy_version,
@@ -742,7 +751,7 @@ export async function buildGenerationCommandV2(
 
   const command: GenerateDailyReadingCommandV2 = {
     command_version: "v2",
-    schema_version: M5_SCHEMA_VERSION,
+    schema_version: DAILY_GENERATION_SCHEMA_VERSION,
     generation_id: newId("gen"),
     generation_input_id: await renderGenerationInputId(prepared.identity_canonical),
     input_manifest_hash: await contentHash(prepared.input_manifest_canonical),

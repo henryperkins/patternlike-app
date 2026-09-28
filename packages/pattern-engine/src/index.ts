@@ -31,7 +31,7 @@ export {
   UNCERTAINTY_WORD_MIN,
   UNCERTAINTY_WORD_MAX,
 } from "./policy.js";
-export { compileOntologyRelease, ontologyRecordMatchesFeature } from "./ontology.js";
+export { compileOntologyCandidate, compileOntologyRelease, ontologyRecordMatchesFeature } from "./ontology.js";
 export { selectPatternEvidence, SelectionCapacityError } from "./selection.js";
 export { validatePatternPlan } from "./plan-validate.js";
 export { validatePatternCandidate } from "./candidate-validate.js";

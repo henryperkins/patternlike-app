@@ -32,6 +32,39 @@ import type { LunarPhaseName, ZodiacSignName } from "./daily-sky-types.js";
 export const M5_SCHEMA_VERSION = "0.5.0" as const;
 export type M5SchemaVersion = typeof M5_SCHEMA_VERSION;
 
+/** Daily command/provider-input successor; published M5 output remains 0.5.0. */
+export const DAILY_GENERATION_SCHEMA_VERSION = "0.5.1" as const;
+
+export type DailyUncertaintyQualification =
+  | { feature_id: "moon"; qualification: "low_confidence_moon" }
+  | { feature_id: "houses"; qualification: "approximate_only" }
+  | { feature_id: "birthplace"; qualification: "technique_specific" }
+  | { feature_id: "birth_instant"; qualification: "technique_specific" };
+
+/** The stored report projected without its unreviewed user_facing_summary. */
+export interface DailyUncertaintyInput {
+  accuracy: BirthTimeAccuracy;
+  window_plus_minus_minutes: number | null;
+  suppressed_features: Array<{
+    feature_class: SuppressedFeatureClass;
+    feature_id: string | null;
+    reason: "unknown_birth_time" | "birthplace_unavailable";
+  }>;
+  qualified_features: DailyUncertaintyQualification[];
+}
+
+export type DailyUncertaintyDisclosure = (
+  | { kind: "birth_time"; reason: "approximate_birth_time" | "unknown_birth_time" }
+  | { kind: "suppression"; feature_class: SuppressedFeatureClass; reason: "unknown_birth_time" | "birthplace_unavailable" }
+  | ({ kind: "qualification" } & DailyUncertaintyQualification)
+) & { statement: string };
+
+export interface DailyUncertaintyDisclosurePlan {
+  policy_version: "1.0.0";
+  /** Every statement must appear once in the candidate's uncertainty note. */
+  disclosures: DailyUncertaintyDisclosure[];
+}
+
 /** Pinned structured output schema for constrained-model publication. */
 export const M5_OUTPUT_SCHEMA = "daily-reading-v5" as const;
 export type M5OutputSchema = typeof M5_OUTPUT_SCHEMA;
@@ -223,7 +256,7 @@ export interface ReadingComposition {
  * consent record id, birth instant, coordinate, or timezone name. The accuracy
  * LABEL and its consequences cross; the birth data never does.
  */
-export interface ReadingGenerationRequest {
+export interface LegacyReadingGenerationRequest {
   schema_version: M5SchemaVersion;
   prompt_version: string;
   selection_policy_version: string;
@@ -238,6 +271,12 @@ export interface ReadingGenerationRequest {
   context: RequestContext[];
   prior_readings: PriorReadingExcerpt[];
   composition: ReadingComposition;
+}
+
+/** contracts/daily-uncertainty-v1/reading-generation-request.schema.json. */
+export interface ReadingGenerationRequest extends Omit<LegacyReadingGenerationRequest, "schema_version"> {
+  schema_version: typeof DAILY_GENERATION_SCHEMA_VERSION;
+  uncertainty_disclosure: DailyUncertaintyDisclosurePlan;
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import {
   isPortraitMeshAudit,
   parsePortraitMeshProgram,
   type PortraitAutomationPreference,
+  type PortraitAutomationState,
   type PortraitAutomationRequest,
   type CodexPortraitMeshClaim,
   type CodexPortraitMeshCompletion,
@@ -145,15 +146,54 @@ async function liveGrant(env: Env, userId: string, chartId: string) {
     .bind(userId, chartId)
     .first<Grant>();
 }
+async function automationGrantStoreAvailable(env: Env): Promise<boolean> {
+  try {
+    const columns = (await env.DB.prepare("PRAGMA table_info(portrait_automation_grants)").all<{ name: string }>()).results;
+    return ["id", "user_id", "chart_id", "chart_fingerprint_hash", "enabled", "policy_version", "updated_at"].every(name => columns.some(column => column.name === name));
+  } catch { return false; }
+}
+async function withdrawalAvailable(env: Env): Promise<boolean> {
+  try {
+    const objects = (await env.DB.prepare("SELECT name FROM sqlite_master WHERE (type='table' AND name IN ('portrait_start_outbox','portrait_mesh_jobs','pattern_portrait_jobs','pattern_portraits')) OR (type='trigger' AND name='portrait_automation_withdraw')").all<{ name: string }>()).results;
+    return objects.length === 5;
+  } catch { return false; }
+}
+const chartWriteCheck = `SELECT 1 FROM chart_snapshots c JOIN birth_profiles b ON b.user_id=c.user_id AND b.version=c.profile_version JOIN users u ON u.id=c.user_id WHERE c.id=? AND c.user_id=? AND c.status='active' AND c.fingerprint=? AND b.status='active' AND u.status='active' AND u.crypto_write_fence IS NULL`;
+const chartWriteFence = (env: Env, userId: string, chart: { id: string; fingerprint: string }) => env.DB.prepare(
+  `INSERT INTO assertion_probe(id,reason) SELECT 1,'portrait chart changed' WHERE NOT EXISTS(${chartWriteCheck})`,
+).bind(chart.id, userId, chart.fingerprint);
+
 export async function readPortraitAutomation(
   env: Env,
   userId: string,
   protocol: PortraitProtocol = "v1",
 ): Promise<PortraitAutomationPreference> {
-  const enabled = await available(env);
-  const chart = enabled ? await loadActiveChart(env, userId) : null;
-  const grant = chart ? await liveGrant(env, userId, chart.id) : null;
-  const base = { available: enabled && (protocol === "v1" || adaptivePortraitsEnabled(env)),
+  const state: PortraitAutomationState = { supported_protocols: ["v1", "v2"], generation_available: false,
+    grant_status: "unknown", grant_policy_version: null, allowed_actions: [] };
+  let chart: Awaited<ReturnType<typeof loadActiveChart>> = null;
+  let grant: Grant | null = null;
+  try {
+    chart = await loadActiveChart(env, userId);
+    if (await automationGrantStoreAvailable(env)) {
+      grant = chart ? await liveGrant(env, userId, chart.id) : null;
+      state.grant_status = grant ? "enabled" : "disabled";
+      state.grant_policy_version = grant?.policy_version ?? null;
+      const canWithdraw = await withdrawalAvailable(env);
+      state.generation_available = canWithdraw && await available(env) && (protocol === "v1" || adaptivePortraitsEnabled(env));
+      const writable = chart && await env.DB.prepare(chartWriteCheck).bind(chart.id, userId, chart.fingerprint).first();
+      if (writable && state.generation_available && (protocol === "v2" || grant?.policy_version !== "2.0.0")
+        && await loadLiveAccountProcessingGrant(env, userId, new Date())) state.allowed_actions.push("enable");
+      if (writable && grant && canWithdraw) state.allowed_actions.push("disable");
+    }
+  } catch {
+    // Failure to observe permission is not evidence that permission was withdrawn.
+    grant = null;
+    state.grant_status = "unknown";
+    state.grant_policy_version = null;
+    state.generation_available = false;
+    state.allowed_actions = [];
+  }
+  const base = { available: state.generation_available, state,
     chart_id: chart?.id ?? null, enabled: !!grant && (protocol === "v1" || grant.policy_version === "2.0.0") };
   return protocol === "v2"
     ? { ...base, schema_version: "portrait-automation/v2", legacy_enabled: grant?.policy_version === "1.1.0", consent_policy_version: PORTRAIT_AUTOMATION_V2_CONSENT_POLICY_VERSION }
@@ -165,7 +205,7 @@ export async function setPortraitAutomation(
   input: PortraitAutomationRequest,
   protocol: PortraitProtocol = "v1",
 ) {
-  if (!(await available(env)))
+  if (!(await automationGrantStoreAvailable(env)))
     throw new PortraitError(503, "portrait_unavailable");
   const chart = await loadActiveChart(env, userId);
   const identity = await loadUserIdentity(env, userId);
@@ -173,13 +213,17 @@ export async function setPortraitAutomation(
   if (!chart || chart.id !== input.chart_id || identity?.status !== "active")
     throw new PortraitError(409, "portrait_revision_conflict");
   if (!input.enabled) {
-    await env.DB.prepare(
-      "UPDATE portrait_automation_grants SET enabled=0,updated_at=? WHERE user_id=? AND chart_id=? AND enabled=1",
-    )
-      .bind(now.toISOString(), userId, chart.id)
-      .run();
-    return readPortraitAutomation(env, userId, protocol);
+    if (!await withdrawalAvailable(env)) throw new PortraitError(503, "portrait_unavailable");
+    try {
+      await env.DB.batch([chartWriteFence(env, userId, chart), env.DB.prepare(
+        "UPDATE portrait_automation_grants SET enabled=0,updated_at=? WHERE user_id=? AND chart_id=? AND enabled=1",
+      ).bind(now.toISOString(), userId, chart.id)]);
+    } catch { throw new PortraitError(409, "portrait_revision_conflict"); }
+    const result = await readPortraitAutomation(env, userId, protocol);
+    if (result.state?.grant_status === "unknown") throw new PortraitError(503, "portrait_unavailable");
+    return result;
   }
+  if (!(await available(env)) || !await withdrawalAvailable(env)) throw new PortraitError(503, "portrait_unavailable");
   if (input.consent_policy_version === "2.0.0" && !adaptivePortraitsEnabled(env))
     throw new PortraitError(503, "portrait_unavailable");
   const processing = await loadLiveAccountProcessingGrant(env, userId, now);
@@ -194,9 +238,7 @@ export async function setPortraitAutomation(
         processing.consentId,
         now,
       ),
-      env.DB.prepare(
-        `INSERT INTO assertion_probe(id,reason) SELECT 1,'portrait chart changed' WHERE NOT EXISTS(SELECT 1 FROM chart_snapshots c JOIN birth_profiles b ON b.user_id=c.user_id AND b.version=c.profile_version JOIN users u ON u.id=c.user_id WHERE c.id=? AND c.user_id=? AND c.status='active' AND c.fingerprint=? AND b.status='active' AND u.status='active' AND u.crypto_write_fence IS NULL)`,
-      ).bind(chart.id, userId, chart.fingerprint),
+      chartWriteFence(env, userId, chart),
       env.DB.prepare(
         "INSERT INTO assertion_probe(id,reason) SELECT 1,'legacy client cannot replace adaptive grant' WHERE ?='1.1.0' AND EXISTS(SELECT 1 FROM portrait_automation_grants WHERE user_id=? AND chart_id=? AND enabled=1 AND policy_version='2.0.0')",
       ).bind(input.consent_policy_version, userId, chart.id),

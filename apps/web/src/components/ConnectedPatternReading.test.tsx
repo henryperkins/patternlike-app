@@ -38,7 +38,7 @@ describe("an exact Pattern connection", () => {
     await waitFor(() => expect(heading).toHaveFocus());
     expect(within(explorer).getByText(`Chapter ${count} of ${count}`)).toBeInTheDocument();
     expect(window.history.state.readerJourney).toEqual(originState.readerJourney);
-    await user.click(within(explorer).getByRole("button", { name: "Back to reading" }));
+    await user.click(within(explorer).getByRole("button", { name: "Chapter list" }));
     await waitFor(() => expect(window.history.state).toEqual(originState));
     await waitFor(() => expect(globalThis.document.querySelector(`[data-reading-chapter="chapter-${count}"]`)).toHaveFocus());
     const artworkReads = capturedFor("/v1/pattern-portrait/explorer");

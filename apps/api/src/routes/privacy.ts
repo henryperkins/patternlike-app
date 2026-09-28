@@ -254,7 +254,6 @@ privacyRoutes.get("/v1/exports/:id/download", async (c) => {
       headers: {
         "content-type": "application/json; charset=utf-8",
         "content-disposition": `attachment; filename="patternlike-${row.id}.json"`,
-        "cache-control": "no-store",
       },
     });
   } catch {

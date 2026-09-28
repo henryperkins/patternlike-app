@@ -18,7 +18,7 @@ import { b64 } from "../crypto.js";
 import { decryptPayload, loadUserIdentity, type UserIdentity } from "../db/users.js";
 import { loadPreferences } from "../db/preferences.js";
 import { ensureNatalFeatureSet } from "../db/natal-features.js";
-import { loadActiveOntology, loadOntologyByVersion } from "../db/pattern-ontology.js";
+import { loadActiveOntology, loadOntologyByVersion, patternLocaleServesReader } from "../db/pattern-ontology.js";
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { isConsumedStatus, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import {
@@ -1113,6 +1113,13 @@ export async function executePatternJob(
       return { ok: true, terminal: true };
     }
     const frozenOntology = ontology;
+    if (!patternLocaleServesReader(frozenOntology, command.locale)) {
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "cancel",
+        reason: "cancel_stale",
+      });
+      return { ok: true, terminal: true };
+    }
 
     const features = await ensureNatalFeatureSet(env, identity.userId, command.chart_id, now);
     if (features.featureSetHash !== command.feature_set_hash) {

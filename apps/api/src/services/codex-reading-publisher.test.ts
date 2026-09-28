@@ -65,7 +65,7 @@ function options(overrides: Partial<PublishOptions> = {}): PublishOptions {
 }
 
 const packet: ReadingGenerationRequest = {
-  schema_version: "0.5.0",
+  schema_version: "0.5.1",
   prompt_version: READING_PROMPT_VERSION,
   selection_policy_version: "1.0.0",
   output_schema: "daily-reading-v5",
@@ -73,6 +73,7 @@ const packet: ReadingGenerationRequest = {
   locale: "en-US",
   birth_time_accuracy: "exact",
   suppressed_features: [],
+  uncertainty_disclosure: { policy_version: "1.0.0", disclosures: [] },
   domain_preference: null,
   facts: [
     {

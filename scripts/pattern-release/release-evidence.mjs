@@ -7,6 +7,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { canonicalJson, sha256Hex } from "./candidates.mjs";
+import { CI_LANES, CI_SUMMARY_VERSION, parseCiSummary } from "./ci-summary.mjs";
+export { parseCiSummary } from "./ci-summary.mjs";
 
 const EXCLUDED_PREFIXES = ["docs/reviews/", "docs/superpowers/", "output/"];
 const ARTIFACT_ROOTS = ["apps/api/dist", "apps/web/dist", "apps/codex-runner/dist"];
@@ -17,22 +19,6 @@ const IDENTITY_FILES = [
   "packages/pattern-engine/src/policy.ts",
   "apps/api/src/services/pattern-publication-safety.ts",
   "apps/codex-runner/src/codex-cli.ts",
-];
-const CI_LANES = [
-  "contracts: npm run test:contracts",
-  "monorepo: npm ci --dry-run (lockfile agrees with package.json)",
-  "monorepo: ephemeris download",
-  "monorepo: npm run typecheck",
-  "monorepo: test @patternlike/shared",
-  "monorepo: test @patternlike/reading-engine",
-  "monorepo: test @patternlike/calc-stub",
-  "monorepo: test @patternlike/ontology-signer",
-  "monorepo: test @patternlike/api",
-  "monorepo: test @patternlike/web",
-  "monorepo: npm run build",
-  "extra: test @patternlike/pattern-engine",
-  "extra: test @patternlike/codex-runner",
-  "extra: npm run test:content",
 ];
 const DEPLOYMENT = { status: "unverified", release_git_sha: null, worker_version_id: null, traffic_percent: null, installed_runner_sha256: null };
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -92,20 +78,6 @@ export function compareSourceSnapshots(before, after) {
   return { ok: !changed.length && !missing.length && !added.length, changed, missing, added, problems: [] };
 }
 
-export function parseCiSummary(output) {
-  const clean = output.replace(/\u001b\[[0-9;]*m/g, "");
-  const index = clean.lastIndexOf(" SUMMARY ");
-  const tail = index < 0 ? "" : clean.slice(index);
-  const parsed = [...tail.matchAll(/^\s*(pass|FAIL)\s+(.+?)\s*$/gm)].map((match) => ({ name: match[2], result: match[1] }));
-  const toolchainMatch = tail.match(/^node\s+(v\d+\.\d+\.\d+)\s+npm\s+(\d+\.\d+\.\d+)\s+python\s+(\d+\.\d+\.\d+)\s*$/m);
-  const toolchain = toolchainMatch ? { node: toolchainMatch[1], npm: toolchainMatch[2], python: toolchainMatch[3] } : null;
-  const lanes = parsed.filter((item) => CI_LANES.includes(item.name));
-  const finalSuccess = /^ALL STEPS PASSED — safe to merge on local evidence\.\s*$/m.test(tail);
-  const passed = finalSuccess && toolchain !== null && parsed.length === CI_LANES.length
-    && parsed.every((item, index) => item.name === CI_LANES[index] && item.result === "pass");
-  return { passed, final_success: finalSuccess, toolchain, lanes };
-}
-
 function captureArtifacts(root) {
   const files = {};
   const walk = (path) => {
@@ -157,7 +129,8 @@ function receiptProblems(receipt) {
   if (receipt.gate?.command !== "npm run ci:local" || receipt.gate?.status !== "observed" || receipt.gate?.exit_code !== 0
     || !SHA256.test(receipt.gate?.output_sha256 ?? "")) problems.push("gate_execution_invalid");
   const summary = receipt.gate?.summary;
-  if (!summary?.passed || !summary.final_success || !summary.toolchain || summary.toolchain.node?.split(".")[0] !== "v22"
+  if (!summary?.passed || summary.format_version !== CI_SUMMARY_VERSION || summary.exit_code !== 0
+    || !summary.final_success || !summary.toolchain || summary.toolchain.node?.split(".")[0] !== "v22"
     || !Array.isArray(summary.lanes) || summary.lanes.length !== CI_LANES.length
     || summary.lanes.some((item, index) => item.name !== CI_LANES[index] || item.result !== "pass")) problems.push("gate_summary_incomplete");
   if (receipt.artifacts?.status !== "observed") problems.push("build_artifacts_unverified");
@@ -206,7 +179,7 @@ async function captureGate(root) {
     source_comparison: sourceComparison,
     gate: {
       status: "observed", command: "npm run ci:local", started_at: startedAt,
-      exit_code: exitCode, output_sha256: outputHash.digest("hex"), summary: parseCiSummary(outputTail),
+      exit_code: exitCode, output_sha256: outputHash.digest("hex"), summary: parseCiSummary(outputTail, exitCode),
     },
     repository_identity: captureRepositoryIdentity(root, sourceAfter),
     artifacts: captureArtifacts(root),

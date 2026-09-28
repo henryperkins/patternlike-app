@@ -1,0 +1,30 @@
+{
+  "browser": "151.0.7922.34",
+  "url": "http://127.0.0.1:5198/",
+  "browser_plugin": "not available",
+  "scope": "actual PortraitAutomationControl with mocked local API responses; no live services",
+  "results": [
+    {
+      "fixture": "withdrawal",
+      "viewport": {
+        "width": 1100,
+        "height": 820
+      },
+      "gets": 1,
+      "puts": 1,
+      "console_errors": [],
+      "passed": true
+    },
+    {
+      "fixture": "unknown",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "gets": 2,
+      "puts": 0,
+      "console_errors": [],
+      "passed": true
+    }
+  ]
+}

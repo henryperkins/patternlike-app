@@ -10,6 +10,8 @@ import type { NatalFeature, PatternOntologyRelease } from "@patternlike/shared";
 import {
   buildDeterministicPlan,
   buildDeterministicWriterOutput,
+  compileOntologyCandidate,
+  compileOntologyRelease,
   ontologyRecordMatchesFeature,
   selectPatternEvidence,
   stripPrivateEvidence,
@@ -33,6 +35,29 @@ const common = {
   exclusions: ["a diagnosis", "a guaranteed outcome"],
   allowed_transformations: ["intersection" as const, "contrast" as const],
 };
+
+test("compile-only internal candidates never claim evaluation or release readiness", async () => {
+  const input = JSON.parse(await readFile(
+    new URL("../../../pattern-corpus/fragments.json", import.meta.url), "utf8",
+  ));
+  const corpus = await buildOntologyCorpusRelease(input, "pattern-ontology-source-manual-en-us-0.1.0");
+  const release = await runInternalBuilder(corpus);
+  assert.equal(release.evaluation.compiler_passed, true);
+  assert.equal(release.evaluation.evaluator_passed, false);
+  assert.equal(release.evaluation.regression_passed, false);
+  assert.equal(release.evaluation.verdict, "reject");
+  assert.equal(release.evaluation.evaluation_report_hash, undefined);
+  assert.equal(release.evaluation.regression_report_hash, undefined);
+  assert.equal(release.provenance?.reviewed_at, undefined);
+  assert.equal(release.corpus_release_hash, corpus.corpus_hash);
+  const admission = compileOntologyRelease(release);
+  assert.equal(admission.ok, false);
+  assert.ok(admission.failures.some((failure) => failure.code === "evaluation_reject"));
+  assert.deepEqual(compileOntologyCandidate(release), { ok: true, failures: [] });
+  const malformed = { ...release, records: [{ ...release.records[0]!, source_fragment_ids: [] }] };
+  assert.ok(compileOntologyCandidate(malformed).failures.some((failure) => failure.code === "source_unterminated"));
+  assert.equal(compileOntologyRelease(malformed).ok, false);
+});
 
 async function runInternalBuilder(
   corpus: Awaited<ReturnType<typeof buildOntologyCorpusRelease>>,
@@ -94,7 +119,7 @@ test("internal builder recovers explicit source contrasts in a new candidate ver
   assert.equal(release.records.filter((record) =>
     record.counter_expressions.length === 1 &&
     record.counter_expressions[0] === record.normalized_proposition).length, 0);
-  assert.equal(release.ontology_version, "pattern-ontology-en-us-internal-0.1.2");
+  assert.equal(release.ontology_version, "pattern-ontology-en-us-internal-0.1.3");
   assert.equal(release.evaluation.ontology_version, release.ontology_version);
   assert.equal(release.status, "candidate");
   assert.equal(release.corpus_release_hash, corpus.corpus_hash);

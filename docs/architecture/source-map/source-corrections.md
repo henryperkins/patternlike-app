@@ -54,3 +54,58 @@ superseded outside the retained bytes. The original two-paragraph decision block
 evidence ledger, and raw August 27 observation were compared byte-for-byte
 against the recorded Git baseline. The corrected current opening and admission
 table remain intact. This follow-up changes documentation only.
+
+
+## September 28 architecture contract repair
+
+This dated successor records behavioral repairs requested against the supplied
+`77c6c00` map and reconciled with source at `b5e5fc50673c94641cc6b930812c0398025c1207`.
+The earlier sections remain historical records of their stated dates and scopes.
+Their compilation, source-manifest, and evaluation descriptions must not be read
+as descriptions of this successor. The original supplied map is unchanged.
+
+| Correction | Current source meaning | Boundary retained |
+| --- | --- | --- |
+| R01 | One outer private/no-store policy covers private successes, refusals, and exceptions. The service worker also refuses private asset-cache writes. | Health/meta stay public; route authorities are unchanged. |
+| R02 | A reason-specific typed disclosure plan reaches both the model packet and candidate validation. Request/command schema 0.5.1 and new policy pins bind it. | Published M5 output stays frozen; exact time stays exact; unsupported inputs and invented disclosures fail closed. |
+| R03 | Portrait state separates protocol, generation, grant observation, and permitted actions. Existing permission is readable and revocable independently of rollout when required storage and write checks permit. Image compatibility is checked before claiming work. | Missing storage is unknown; grant versions, cancellation, completed assets, and runtime image checks remain enforced. |
+| R06 | The real gate producer and receipt parser share an ASCII summary and sixteen ordered required lanes, including mandatory OpenAPI and current-map checks. Exit status and source identities bind the receipt. | Local evidence never asserts a deployment. |
+| R07, immediate | The offline builder emits a structurally compiled candidate with evaluator/regression false and verdict reject. Release admission still rejects it. | Compilation supplies no evaluation, completed human review, signing, or activation evidence. |
+
+The broader ontology coverage ledger, actual evaluation/review evidence and
+activation preview remain later work, along with generation-aware operator
+repair, feedback applicability, and additive reader navigation. Calculation
+replay and runner concurrency remain unchanged.
+
+The maintained definition is still [map.json](map.json). The [current pointer](current.json)
+selects a new immutable capture with explicit dirty-source qualifications.
+September 23 and earlier snapshots were removed before this repair by commit
+`0f48334be0bacc9651b73d9ab25e06b1fec4172e`; the README now links their preserved
+Git objects instead of absent checkout paths. The five archived-file hashes
+were rechecked against those Git objects.
+
+The September 6 raw pointer-observation artifact was also removed previously.
+The current map therefore cites only the retained dated review narrative and
+limits its claim accordingly; it does not reconstruct missing hash evidence or
+assert current production state.
+
+## September 28 integration of PRs 68 and 70
+
+The integrated definition reconciles the architecture changes with main at
+`21f75aee56f1f6c945e55930f31e4d5dd44008c7` and the Pattern-page fixes. It keeps
+main's removal of the unsupported pointer-observation claim, preserves the
+shared private-response policy, and updates the reader, deletion, regeneration,
+and permission selectors to the combined implementation. A missing feedback-route
+evidence entry was restored after the closed-model validator rejected its dangling
+claim reference; capture had stopped before creating an output directory.
+
+The integration review also repaired authoritative reading-refusal handling,
+confirmation of concurrently changed artwork permission, and birthplace-specific
+chart suppression labels. Browser inspection repaired repeated locale guidance
+and restored the shared preference-form styling for the embedded language form.
+
+The successor capture `2026-09-28-pattern-contract-integration` records clean
+consumed inputs at `a7ab939c282e457d36497dbceae2a3c3b8dac738`. Historical captures
+and release receipts remain unchanged. The [integration review](../../reviews/2026-09-28-pattern-contract-integration.md)
+records tests and browser scope separately; the map does not establish deployment
+or provider execution.

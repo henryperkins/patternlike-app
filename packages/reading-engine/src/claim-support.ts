@@ -10,7 +10,7 @@
  */
 import type { DailySkyFact, ZodiacSignName } from "@patternlike/shared";
 import type { ConstrainedFact, PreparedConstrainedReadingInput } from "./constrained-types.js";
-import type { BirthTimeAccuracy, SuppressedFeatureClass } from "./types.js";
+import { uncertaintyDisclosureFailure } from "./uncertainty-disclosure.js";
 import {
   BODY_TERMS,
   PERSONALIZATION_RULES,
@@ -342,64 +342,17 @@ function sentenceSupported(text: string, fact: ConstrainedFact, prepared: Prepar
   return timeSupported(text, record, prepared);
 }
 
-function uncertaintyDisclosure(text: string, prepared: PreparedConstrainedReadingInput): boolean {
-  const suppressed = new Set(prepared.request.suppressed_features);
-  const accuracy = prepared.request.birth_time_accuracy;
-  if (accuracy === "approximate" && text === "your birth time is approximate, so time-sensitive details remain uncertain") return true;
-  const feature = "(?:houses|angles|angle transits|time-sensitive moon details)";
-  const scope = `${feature}(?:(?:, (?:and |or )?| and | or )${feature})*`;
-  const patterns = [
-    new RegExp(`^without a confirmed birth time this reading leaves ${scope} out(?: entirely)?$`),
-    new RegExp(`^your birth time is ${accuracy}, so this reading (?:omits|claims nothing about) ${scope}$`),
-    new RegExp(`^this reading omits ${scope} because those facts are unavailable$`),
-  ];
-  if (!patterns.some((pattern) => pattern.test(text))) return false;
-  return (!text.includes("houses") || suppressed.has("houses")) &&
-    (!text.includes("angles") || suppressed.has("angles")) &&
-    (!text.includes("angle transits") || suppressed.has("angle_transits")) &&
-    (!text.includes("moon") || suppressed.has("moon_time_sensitive"));
-}
-
-/**
- * Can a mandatory uncertainty disclosure be expressed at all for this packet?
- *
- * `uncertaintyDisclosure` accepts exactly two shapes. The first is the fixed
- * approximate-time sentence, available only when the time is `approximate`.
- * The second is one of three suppression sentences, and every one of them
- * requires at least one feature phrase — `scope` is built from `feature` with
- * no empty alternative — which is then checked against `suppressed_features`.
- * So when nothing is suppressed and the time is not approximate, no accepted
- * sentence exists; and omitting the note is not an escape, because
- * `uncertainty_note_required` then fails `required_note_missing`.
- *
- * That combination is reachable in production rather than theoretical:
- * calc-stub's `buildUncertainty()` qualifies `birthplace` and `birth_instant`
- * at every accuracy, not only for approximate births, and a surviving
- * qualification forces the note. Callers use this to refuse before paying a
- * provider for a candidate that cannot pass.
- *
- * This must stay in step with `uncertaintyDisclosure`. The cross-check in
- * `candidate-validation.test.ts` drives the real grammar and fails if it drifts.
- */
-export function uncertaintyDisclosureRepresentable(
-  birthTimeAccuracy: BirthTimeAccuracy,
-  suppressedFeatures: readonly SuppressedFeatureClass[],
-): boolean {
-  return birthTimeAccuracy === "approximate" || suppressedFeatures.length > 0;
-}
-
 export function validateFactSupport(
   text: string,
   cited: readonly ConstrainedFact[],
   prepared: PreparedConstrainedReadingInput,
   kind: UnitKind | "headline",
 ): string | null {
+  if (kind === "uncertainty_note") {
+    return uncertaintyDisclosureFailure(text, prepared.request.uncertainty_disclosure);
+  }
   const normalized = text.normalize("NFKC").replace(/\p{Cf}/gu, "").replace(/[’‘]/g, "'").toLowerCase();
   for (const sentence of normalized.split(/[.!?](?:["']+)?(?=\s|$)|\n+/).map((part) => part.trim()).filter(Boolean)) {
-    if (kind === "uncertainty_note") {
-      if (!uncertaintyDisclosure(sentence, prepared)) return "unsupported_uncertainty_disclosure";
-      continue;
-    }
     if (!factual(sentence)) {
       // Merely naming today's date is not an astrological claim. Other dates
       // and all clock times require an identifiable, supported event.

@@ -1,0 +1,137 @@
+{
+  "browser": "151.0.7922.34",
+  "url": "http://127.0.0.1:5199/",
+  "browser_plugin": "not available",
+  "scope": "real React components and API client with controlled local responses; no real account, provider or device",
+  "results": [
+    {
+      "fixture": "withdrawal-desktop",
+      "viewport": {
+        "width": 1100,
+        "height": 820
+      },
+      "gets": 2,
+      "puts": 1,
+      "deletes": 0,
+      "generations": 0,
+      "requests": [
+        "GET /v1/pattern-portrait/automation",
+        "GET /v1/pattern-portrait/automation",
+        "PUT /v1/pattern-portrait/automation"
+      ],
+      "console_errors": [],
+      "console_warnings": [],
+      "passed": true
+    },
+    {
+      "fixture": "unknown-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "gets": 2,
+      "puts": 0,
+      "deletes": 0,
+      "generations": 0,
+      "requests": [
+        "GET /v1/pattern-portrait/automation",
+        "GET /v1/pattern-portrait/automation"
+      ],
+      "console_errors": [],
+      "console_warnings": [],
+      "passed": true
+    },
+    {
+      "fixture": "permission-change-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "gets": 2,
+      "puts": 0,
+      "deletes": 0,
+      "generations": 0,
+      "requests": [
+        "GET /v1/pattern-portrait/automation",
+        "GET /v1/pattern-portrait/automation"
+      ],
+      "console_errors": [],
+      "console_warnings": [],
+      "passed": true
+    },
+    {
+      "fixture": "language-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "gets": 1,
+      "puts": 0,
+      "deletes": 0,
+      "generations": 1,
+      "requests": [
+        "GET /v1/pattern-state",
+        "PUT /v1/preferences/locale",
+        "GET /v1/pattern-state",
+        "GET /v1/pattern-portrait/automation",
+        "GET /v1/pattern-state",
+        "POST /v1/pattern-generations",
+        "GET /v1/pattern-state"
+      ],
+      "console_errors": [],
+      "console_warnings": [],
+      "passed": true
+    },
+    {
+      "fixture": "reading-desktop",
+      "viewport": {
+        "width": 1100,
+        "height": 820
+      },
+      "gets": 0,
+      "puts": 0,
+      "deletes": 1,
+      "generations": 0,
+      "requests": [
+        "GET /v1/pattern-state",
+        "GET /v1/pattern",
+        "GET /v1/pattern-portrait/explorer",
+        "GET /v1/pattern-state",
+        "GET /v1/pattern-state",
+        "DELETE /v1/pattern",
+        "GET /v1/pattern-state"
+      ],
+      "console_errors": [],
+      "console_warnings": [
+        "[.WebGL-0x364400169c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+        "[.WebGL-0x364400169c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+        "[.WebGL-0x364400169c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+        "[.WebGL-0x364400169c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+      ],
+      "passed": true
+    },
+    {
+      "fixture": "reading-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "gets": 0,
+      "puts": 0,
+      "deletes": 1,
+      "generations": 0,
+      "requests": [
+        "GET /v1/pattern-state",
+        "GET /v1/pattern",
+        "GET /v1/pattern-portrait/explorer",
+        "GET /v1/pattern-state",
+        "GET /v1/pattern-state",
+        "DELETE /v1/pattern",
+        "GET /v1/pattern-state"
+      ],
+      "console_errors": [],
+      "console_warnings": [],
+      "passed": true
+    }
+  ]
+}

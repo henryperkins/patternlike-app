@@ -206,10 +206,17 @@ export function compileOntologyRelease(release: PatternOntologyRelease | unknown
   const structural = structuralFailures(release);
   if (structural.length > 0) return { ok: false, failures: structural };
   const typed = release as PatternOntologyRelease;
-  return compileValidatedRelease(typed);
+  return compileValidatedRelease(typed, true);
 }
 
-function compileValidatedRelease(release: PatternOntologyRelease): OntologyCompileResult {
+/** Compile an offline candidate's rules; this supplies no release admission. */
+export function compileOntologyCandidate(release: PatternOntologyRelease | unknown): OntologyCompileResult {
+  const structural = structuralFailures(release);
+  if (structural.length > 0) return { ok: false, failures: structural };
+  return compileValidatedRelease(release as PatternOntologyRelease, false);
+}
+
+function compileValidatedRelease(release: PatternOntologyRelease, requireEvaluation: boolean): OntologyCompileResult {
   const failures: ValidationFailure[] = [];
   if (release.schema_version !== "0.7.0") {
     failures.push({ code: "schema_version", message: "ontology release schema_version must be 0.7.0" });
@@ -217,10 +224,10 @@ function compileValidatedRelease(release: PatternOntologyRelease): OntologyCompi
   if (release.records.length === 0) {
     failures.push({ code: "empty_records", message: "ontology release has no records" });
   }
-  if (release.evaluation.unevaluated_fixture_count !== 0) {
+  if (requireEvaluation && release.evaluation.unevaluated_fixture_count !== 0) {
     failures.push({ code: "unevaluated_fixtures", message: "ontology release has unevaluated regression fixtures" });
   }
-  if (release.evaluation.verdict !== "pass") {
+  if (requireEvaluation && release.evaluation.verdict !== "pass") {
     failures.push({ code: "evaluation_reject", message: "ontology evaluation verdict is not pass" });
   }
   const ids = new Set<string>();

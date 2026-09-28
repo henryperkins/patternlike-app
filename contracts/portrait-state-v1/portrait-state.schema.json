@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-state-v1/portrait-state.schema.json",
+  "title": "Portrait capability and permission projections",
+  "$defs": {
+    "generationCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supported_protocols",
+        "generation_available",
+        "allowed_actions"
+      ],
+      "properties": {
+        "supported_protocols": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "v1",
+              "v2"
+            ]
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "generation_available": {
+          "type": "boolean"
+        },
+        "allowed_actions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "create",
+              "retry"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "generation_available": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "allowed_actions": {
+                "items": {
+                  "const": "retry"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "automationState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supported_protocols",
+        "generation_available",
+        "grant_status",
+        "grant_policy_version",
+        "allowed_actions"
+      ],
+      "properties": {
+        "supported_protocols": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "v1",
+              "v2"
+            ]
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "generation_available": {
+          "type": "boolean"
+        },
+        "grant_status": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "unknown"
+          ]
+        },
+        "grant_policy_version": {
+          "enum": [
+            "1.1.0",
+            "2.0.0",
+            null
+          ]
+        },
+        "allowed_actions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "enable",
+              "disable"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "grant_status": {
+                "const": "enabled"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "grant_policy_version": {
+                "enum": [
+                  "1.1.0",
+                  "2.0.0"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "grant_policy_version": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grant_status": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "generation_available": {
+                "const": false
+              },
+              "allowed_actions": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowed_actions": {
+                "contains": {
+                  "const": "enable"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "generation_available": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowed_actions": {
+                "contains": {
+                  "const": "disable"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "grant_status": {
+                "const": "enabled"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

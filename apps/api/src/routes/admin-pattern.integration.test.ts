@@ -267,7 +267,7 @@ describe("Cloudflare Access Pattern administration", () => {
     const before = await env.DB.prepare("SELECT * FROM pattern_generation_jobs WHERE generation_id = ?").bind(GENERATION_ID).first();
     const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/candidate-revalidation?purpose=incident_response`);
     expect(response.status).toBe(409);
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ error: { code: "generation_not_revalidatable" } });
     expect(await env.DB.prepare("SELECT * FROM pattern_generation_jobs WHERE generation_id = ?").bind(GENERATION_ID).first()).toEqual(before);
     expect(await env.DB.prepare("SELECT admin_subject, generation_id, purpose_class, artifact_classes_json, result FROM pattern_admin_access_events").first()).toEqual({
@@ -331,7 +331,7 @@ describe("Cloudflare Access Pattern administration", () => {
     try {
       const response = await adminRequest(`/admin/pattern-generations/${REVALIDATION_GENERATION_ID}/candidate-revalidation?purpose=incident_response`);
       expect(response.status).toBe(200);
-      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
       const body = await response.json();
       expect(body).toMatchObject({
         schema_version: "pattern-candidate-revalidation/v1",
@@ -369,7 +369,7 @@ describe("Cloudflare Access Pattern administration", () => {
   it("audits aggregate access without inventing a target and rejects wrong/repeated purpose", async () => {
     const response = await adminRequest("/admin/runtime-health?purpose=incident_response");
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     const body = await response.json() as {schema_version:string};
     expect(body.schema_version).toBe("runtime-health/v1");
     expect(JSON.stringify(body)).not.toContain(GENERATION_ID);
@@ -388,7 +388,7 @@ describe("Cloudflare Access Pattern administration", () => {
     for (const headers of [new Headers({"x-user-id":USER_A}),new Headers({authorization:"Bearer runner-token"})]) {
       const response = await app.request("/admin/runtime-health?purpose=incident_response",{headers},env);
       expect(response.status).toBe(401);
-      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
     }
     await env.DB.prepare("ALTER TABLE runtime_health_access_events RENAME TO runtime_health_access_events_unavailable").run();
     try { expect((await adminRequest("/admin/runtime-health?purpose=incident_response")).status).toBe(503); }
@@ -400,7 +400,7 @@ describe("Cloudflare Access Pattern administration", () => {
     await env.DB.prepare("UPDATE jobs SET status = 'failed' WHERE id = ?").bind(JOB_ID).run();
     const response = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`);
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     const body = await response.json() as Record<string, unknown>;
     expect(body).toMatchObject({ schema_version: "pattern-diagnostics/v1", generation_id: GENERATION_ID, stage: "failed", failure_class: "publication_safety_failed", provider: null, revision_reason: null });
     expect(JSON.stringify(body)).not.toMatch(/user_id|object_key|prompt|artifact|ciphertext/);
@@ -419,7 +419,7 @@ describe("Cloudflare Access Pattern administration", () => {
     for (const authorization of [undefined, "Bearer reader-token", "Bearer runner-token"]) {
       const denied = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`, { audience: "none", authorization });
       expect(denied.status).toBe(401);
-      expect(denied.headers.get("cache-control")).toBe("no-store");
+      expect(denied.headers.get("cache-control")).toBe("private, no-store");
     }
     expect((await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`, { audience: "wrong" })).status).toBe(401);
   });
@@ -451,7 +451,7 @@ describe("Cloudflare Access Pattern administration", () => {
     try {
       const unavailable = await adminRequest(`/admin/pattern-generations/${GENERATION_ID}/diagnostics?purpose=incident_response`);
       expect(unavailable.status).toBe(500);
-      expect(unavailable.headers.get("cache-control")).toBe("no-store");
+      expect(unavailable.headers.get("cache-control")).toBe("private, no-store");
       expect(await unavailable.text()).not.toContain("pattern-diagnostics/v1");
     } finally { await env.DB.prepare("DROP TRIGGER reject_diagnostic_audit").run(); }
   });
