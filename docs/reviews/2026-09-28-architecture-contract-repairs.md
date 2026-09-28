@@ -56,11 +56,11 @@ engine 177; shared 107; Daily API integration 247; portrait API 80; portrait web
 not a single total. API portrait tests emitted a Cloudflare shutdown
 `EnvironmentTeardownError` with zero assertion failures and process exit 0.
 
-## Full local gate
+## Initial full local gate
 
 The complete third run exited 0 at `2026-09-28T06:38:48.428Z`. Its
 [passing receipt](artifacts/2026-09-28-architecture-contract-repairs/local-gate-03.json)
-verified against the final checkout with `passed: true`, no problems, and
+verified against the original implementation checkout with `passed: true`, no problems, and
 deployment status `unverified`. This is one complete passing run, not a combined
 result from earlier attempts. The [actual paste-ready summary](artifacts/2026-09-28-architecture-contract-repairs/local-gate-summary.txt)
 was extracted from its retained log, `/tmp/patternlike-ci-local-final-03.log`.
@@ -161,8 +161,10 @@ The user subsequently authorized committing, pushing, and opening a PR. Before
 publication, the original passing receipt and source-map snapshot were verified
 again with zero problems. Main had advanced to
 `0f83713a31dbb62070342f0adb3111117c7b3e53`, containing the separate navigation
-changes noted above. The PR branch will incorporate that committed base and
-record a new source-map snapshot and full gate result before publication.
+changes noted above. The PR branch was rebased onto that committed base, and a new source-map
+snapshot was captured at `aa6d7922263a31e60ddba5ef3d2ac8e9250594ec`. PR #70 was
+opened with the combined-tree gate explicitly pending; the completed result
+follows.
 
 PR screenshot evidence uses the actual `PortraitAutomationControl` and styles
 in a temporary local Vite harness with mocked API responses. The Browser plugin
@@ -177,3 +179,25 @@ end-to-end or deployed-service evidence.
 - [Withdrawal with generation disabled](artifacts/2026-09-28-architecture-contract-repairs/portrait-withdrawal-desktop.png)
 - [Unknown grant on mobile](artifacts/2026-09-28-architecture-contract-repairs/portrait-unknown-mobile.png)
 - [Browser fixture results](artifacts/2026-09-28-architecture-contract-repairs/results.json)
+
+### Combined-tree gate for PR #70
+
+The uninterrupted gate on `3c86d9520f7e6fa3468ccba084a0c593a777f361` exited 0
+at `2026-09-28T07:35:42.307Z` with all 16 required lanes passing. The
+[PR gate receipt](artifacts/2026-09-28-architecture-contract-repairs/local-gate-pr.json)
+verified with `passed: true`, no problems, and deployment status `unverified`.
+The [actual summary](artifacts/2026-09-28-architecture-contract-repairs/local-gate-pr-summary.txt)
+was extracted from `/tmp/patternlike-ci-local-pr.log`; the retained child output
+matches SHA-256 `88f36f82f710fb4144a2f43f982aeb81cdcff7ea87b8992cc23ae8564b12cfaa`.
+
+Source remained unchanged throughout the run: 1,633 files,
+identity `108e1a9b85bc5128ab2d26c2552999ca91f81299e5526036d627847402e7b05f`.
+The API suite passed 2,803 primary assertions plus compatibility/script checks.
+The current source-map identity is
+`42fa2a485b5339bab0c8bd5c996e28bda785fbee643d03890e1ba320cda52a6f`; all
+consumed inputs were clean at capture. The evidence commit changes only
+`docs/reviews/`, which is explicitly outside the gate's source identity scope.
+
+[PR #70](https://github.com/henryperkins/patternlike-app/pull/70) targets main.
+The branch and worktree are retained for review. No merge or deployment was
+performed as part of this publication follow-up.
