@@ -88,3 +88,24 @@ The September 6 raw pointer-observation artifact was also removed previously.
 The current map therefore cites only the retained dated review narrative and
 limits its claim accordingly; it does not reconstruct missing hash evidence or
 assert current production state.
+
+## September 28 integration of PRs 68 and 70
+
+The integrated definition reconciles the architecture changes with main at
+`21f75aee56f1f6c945e55930f31e4d5dd44008c7` and the Pattern-page fixes. It keeps
+main's removal of the unsupported pointer-observation claim, preserves the
+shared private-response policy, and updates the reader, deletion, regeneration,
+and permission selectors to the combined implementation. A missing feedback-route
+evidence entry was restored after the closed-model validator rejected its dangling
+claim reference; capture had stopped before creating an output directory.
+
+The integration review also repaired authoritative reading-refusal handling,
+confirmation of concurrently changed artwork permission, and birthplace-specific
+chart suppression labels. Browser inspection repaired repeated locale guidance
+and restored the shared preference-form styling for the embedded language form.
+
+The successor capture `2026-09-28-pattern-contract-integration` records clean
+consumed inputs at `a7ab939c282e457d36497dbceae2a3c3b8dac738`. Historical captures
+and release receipts remain unchanged. The [integration review](../../reviews/2026-09-28-pattern-contract-integration.md)
+records tests and browser scope separately; the map does not establish deployment
+or provider execution.
