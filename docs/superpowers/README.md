@@ -8,7 +8,7 @@ commit, and `git show <commit>^:<path>` prints the last version.
 
 ## Open-work indexes
 
-- [`../architecture/source-map/backlog.md`](../architecture/source-map/backlog.md) — current R01–R08 architecture-correction dispositions and remaining order, reconciled at `00299d2` on September 28; source implementation is separate from test and production evidence.
+- [`../architecture/source-map/backlog.md`](../architecture/source-map/backlog.md) — current R01–R08 architecture-correction dispositions and remaining order, reconciled at `00299d2` on September 28 and updated when R04 was implemented; source implementation is separate from test and production evidence.
 - [`plans/2026-09-07-mind-map-alignment-slices.md`](plans/2026-09-07-mind-map-alignment-slices.md) — the current delivery ledger.
 - [`plans/2026-08-15-m7-remaining-slices-ledger.md`](plans/2026-08-15-m7-remaining-slices-ledger.md) — remaining M7 work, cited by the Pattern rollout runbook.
 - [`plans/2026-08-01-backend-completion-roadmap.md`](plans/2026-08-01-backend-completion-roadmap.md) and its web counterpart [`plans/2026-08-01-frontend-completion-roadmap.md`](plans/2026-08-01-frontend-completion-roadmap.md) — the backend roadmap still owns open items (Stream 7 place search, the geocode-grade half of the uncertainty report, Stream 8's deferred async workflow, Stream 9's key-rotation caller and rate limiting).
