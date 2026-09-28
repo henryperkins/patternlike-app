@@ -151,7 +151,8 @@ fly deploy --config fly.toml
 
 Before deploying, diff `app`, `primary_region`, and the `[[http_service.checks]]`
 block against the committed file: Fly Launch has rewritten this configuration
-once before, pointing the calculation Dockerfile at the web app's name.
+twice (`5e6acec`, `0ffb851`), each time pointing the calculation Dockerfile at
+the web app's name and moving the region away from `iad`.
 
 Verify: the deployed image digest matches what was built; `/health` answers; and
 an authenticated synthetic `POST /v1/daily-sky` — invented coordinates, no real

@@ -521,20 +521,20 @@ by D1.
 
 | App | Serves | Config | Deploy |
 | --- | --- | --- | --- |
-| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml`, after correcting the target below | `fly deploy` from the repository root |
+| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` from the repository root |
 
 > **Do not** run `fly deploy` from inside an app directory and do not pass
 > `--build-context`. The calc Dockerfile expects root-level workspace files.
 > `fly.web.toml` is the retired PWA deployment; using it would resurrect the
 > superseded `patternlike-app` service.
 
-The committed `fly.toml` currently names `patternlike-app` in `ams` while
-building the calculation image. Before an authorized calc deployment, restore
-`app = 'patternlike-calc'` and `primary_region = 'iad'`, and retain the
-`[[http_service.checks]]` `/health` block. `fly deploy -a patternlike-calc`
-overrides the app name only; it does not correct the region in the file.
-This mismatch came from Fly Launch commit `0ffb851` (PR #58); inspect generated
-Fly configuration before using it.
+The committed `fly.toml` names `app = 'patternlike-calc'` in
+`primary_region = 'iad'`, the host the production Worker's `CALC_SERVICE_URL`
+calls, and keeps the `[[http_service.checks]]` `/health` block. Fly Launch has
+rewritten those two lines twice, to `patternlike-app` in `ord` (`5e6acec`) and
+to `patternlike-app` in `ams` (`0ffb851` in PR #58, since reverted); inspect any
+generated Fly configuration before using it. `fly deploy -a <app>` overrides the app name only; it does not
+correct the region in the file.
 
 ### Calc service auth
 
