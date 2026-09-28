@@ -111,17 +111,28 @@ async function userKeysHaveRootKekId(env: Env): Promise<boolean> {
   return results.some((column) => column.name === "root_kek_id");
 }
 
+/**
+ * Every encryptPayload and decryptPayload call lands here, so this is one
+ * statement rather than a PRAGMA probe followed by a projected SELECT. `*`
+ * carries root_kek_id once migration 0021 has added it and simply omits it on
+ * the pre-0021 schema the deploy-before-migrate suite still exercises, where
+ * the stored key can only be the legacy root.
+ */
 async function readLiveKey(env: Env, userId: string): Promise<LiveKeyRow | null> {
-  const rootKekProjection = await userKeysHaveRootKekId(env)
-    ? "root_kek_id"
-    : "'legacy' AS root_kek_id";
-  return env.DB.prepare(
-    `SELECT key_version, kek_version, wrapped_dek, ${rootKekProjection} FROM user_keys
+  const row = await env.DB.prepare(
+    `SELECT * FROM user_keys
      WHERE user_id = ? AND destroyed_at IS NULL
      ORDER BY key_version DESC LIMIT 1`,
   )
     .bind(userId)
-    .first<LiveKeyRow>();
+    .first<Omit<LiveKeyRow, "root_kek_id"> & { root_kek_id?: string | null }>();
+  if (!row) return null;
+  return {
+    key_version: row.key_version,
+    kek_version: row.kek_version,
+    wrapped_dek: row.wrapped_dek,
+    root_kek_id: row.root_kek_id ?? "legacy",
+  };
 }
 
 /**

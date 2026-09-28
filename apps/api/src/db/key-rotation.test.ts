@@ -431,3 +431,31 @@ describe("DEK rotation over context_signals.value_enc", () => {
     expect(plain.text).toBe("Third week of the migration.");
   });
 });
+
+describe("live key reads", () => {
+  it("read the live key with one statement and no schema probe", async () => {
+    // Every payload encrypt and decrypt loads the live key. A PRAGMA probe
+    // before each load doubled the D1 round trips on those paths.
+    const statements: string[] = [];
+    const DB = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property === "prepare") {
+          return (sql: string) => {
+            statements.push(sql);
+            return target.prepare(sql);
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const recording = { ...env, DB } as Env;
+
+    const sealed = await encryptPayload(recording, IDENTITY_A, { birth_date: "1990-05-15" }, CTX);
+    const out = await decryptPayload<{ birth_date: string }>(recording, IDENTITY_A, sealed, CTX);
+
+    expect(out.birth_date).toBe("1990-05-15");
+    expect(statements).toHaveLength(2);
+    expect(statements.some((sql) => /pragma/i.test(sql))).toBe(false);
+  });
+});

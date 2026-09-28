@@ -303,3 +303,25 @@ test("Pattern replay ledger has dedicated development and production buckets", (
     },
   );
 });
+
+test("fly.toml deploys the calc image to the Fly app the production Worker calls", async () => {
+  // Fly Launch has rewritten fly.toml's app and region twice (5e6acec, 0ffb851),
+  // pointing a bare `fly deploy` of the calc image at the retired PWA app while
+  // the Worker kept calling patternlike-calc. Tie the three files together.
+  const production = unstable_readConfig({ config: configPath, env: "production" });
+  const calcUrl = new URL(String(production.vars.CALC_SERVICE_URL));
+  assert.match(calcUrl.hostname, /^[a-z0-9-]+\.fly\.dev$/);
+  const calcApp = calcUrl.hostname.replace(/\.fly\.dev$/, "");
+
+  const flyLine = (source: string, key: string) =>
+    new RegExp(`^${key}\\s*=\\s*['"]([^'"]+)['"]\\s*$`, "m").exec(source)?.[1];
+  const calcFly = await readFile(path.resolve(here, "../../../fly.toml"), "utf8");
+  const webFly = await readFile(path.resolve(here, "../../../fly.web.toml"), "utf8");
+
+  assert.equal(flyLine(calcFly, "app"), calcApp);
+  assert.equal(flyLine(calcFly, "primary_region"), "iad");
+  assert.equal(flyLine(calcFly, "  dockerfile"), "apps/calc-stub/Dockerfile");
+  const webApp = flyLine(webFly, "app");
+  assert.ok(webApp, "fly.web.toml must name its app on a plain app = '...' line");
+  assert.notEqual(webApp, calcApp);
+});

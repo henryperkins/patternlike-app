@@ -1,4 +1,4 @@
-# Daily lane: fresh Codex output for the six synthetic corpus profiles, scored
+# Daily lane: fresh Codex output for the eight synthetic corpus profiles, scored
 # by the production validator. Every provider call spends a real xhigh turn.
 #
 # Run through scripts/promptfoo.mjs (npm run eval:daily), which adds

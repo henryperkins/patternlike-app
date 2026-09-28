@@ -1,8 +1,9 @@
 import { ApiError } from "./api-client.js";
 
 /**
- * A stub route answers 501 with `not_implemented` until its milestone lands.
- * That is a statement about the roadmap, not a failure, so callers render it
+ * A placeholder route answers 501 with `not_implemented` until its milestone
+ * lands. The current API mounts none, but the client still treats that answer
+ * as a statement about the roadmap, not a failure: callers render it
  * differently from an error — and never offer a retry for it.
  */
 export function isNotImplemented(error: unknown): error is ApiError {

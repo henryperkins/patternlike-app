@@ -236,6 +236,7 @@ function projectEvidence(evidence: ReadingEvidence) {
 }
 
 readingRoutes.put("/v1/readings/today", async (c) => {
+  privateNoStore(c);
   const requestId = c.get("requestId");
   const identity: UserIdentity = {
     userId: c.get("userId"),
@@ -432,6 +433,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
 });
 
 readingRoutes.get("/v1/readings/today", async (c) => {
+  privateNoStore(c);
   const requestId = c.get("requestId");
   const errorBody = (code: string, message: string) => ({
     error: { code, message, request_id: requestId },
@@ -552,6 +554,7 @@ readingRoutes.get("/v1/readings/:id", async (c) => {
 });
 
 readingRoutes.get("/v1/readings/:id/evidence", async (c) => {
+  privateNoStore(c);
   const requestId = c.get("requestId");
   const identity: UserIdentity = {
     userId: c.get("userId"),
@@ -582,6 +585,7 @@ readingRoutes.get("/v1/readings/:id/evidence", async (c) => {
 });
 
 readingRoutes.get("/v1/readings/:id/feedback", async (c) => {
+  privateNoStore(c);
   const requestId = c.get("requestId");
   const identity: UserIdentity = {
     userId: c.get("userId"),
@@ -604,6 +608,7 @@ readingRoutes.get("/v1/readings/:id/feedback", async (c) => {
 });
 
 readingRoutes.post("/v1/readings/:id/feedback", async (c) => {
+  privateNoStore(c);
   const requestId = c.get("requestId");
   const errorBody = (code: string, message: string) => ({
     error: { code, message, request_id: requestId },

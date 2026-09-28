@@ -465,11 +465,12 @@
             },
             {
               "id": "leaf-swiss-ephemeris-compute-service-5",
-              "text": "Committed fly.toml builds apps/calc-stub/Dockerfile as Fly app patternlike-app in region ams, and fly.web.toml gives that same app name to apps/web/Dockerfile, while the production CALC_SERVICE_URL in apps/api/wrangler.toml is https://patternlike-calc.fly.dev. The Worker sends CALC_SERVICE_AUTH_TOKEN as a bearer token when it is set. These are committed settings, not deployed state.",
+              "text": "Committed fly.toml builds apps/calc-stub/Dockerfile as Fly app patternlike-calc in region iad, the host the production CALC_SERVICE_URL in apps/api/wrangler.toml names (https://patternlike-calc.fly.dev), and a wrangler-config test fails if they diverge; fly.web.toml names patternlike-app for apps/web/Dockerfile. The Worker sends CALC_SERVICE_AUTH_TOKEN as a bearer token when it is set. These are committed settings, not deployed state.",
               "evidence_ids": [
-                "evidence-b2-fly-calc-app",
-                "evidence-b2-fly-web-app",
+                "evidence-fly-calc-target",
                 "evidence-b2-wrangler-production-calc",
+                "evidence-fly-target-guard-test",
+                "evidence-b2-fly-web-app",
                 "evidence-b2-calc-client-bearer"
               ]
             }
@@ -956,13 +957,6 @@
                 "evidence-b4-ontology-pointer-update",
                 "evidence-b4-ontology-internal-origin",
                 "evidence-b4-sign-quality-limit"
-              ]
-            },
-            {
-              "id": "leaf-offline-ontology-supply-5",
-              "text": "The September 6 active-pointer join recorded internal release 0.1.0 with bundle hash sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84, corpus hash sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c, and a null joined machine evidence run; it does not prove a current signature, current activation, or a complete evidence census.",
-              "evidence_ids": [
-                "evidence-b4-recorded-ontology-pointer-join"
               ]
             }
           ]
@@ -1939,16 +1933,16 @@
             },
             {
               "id": "leaf-protected-personal-payloads-2",
-              "text": "Owner scoping is a query predicate, as in the owned export lookup, and reading routes project wire fields by name instead of spreading decrypted artifacts. The history, single-reading, and save handlers set private, no-store themselves, so refusals before them carry none; Today, evidence, and resonance feedback reads set no Cache-Control.",
+              "text": "Owner scoping is a query predicate, as in the owned export lookup, and reading routes project wire fields by name instead of spreading decrypted artifacts. The Today, history, single-reading, evidence, resonance feedback, and save handlers set private, no-store themselves, so a refusal issued before a handler runs carries none.",
               "evidence_ids": [
                 "evidence-b7-owned-export-query",
                 "evidence-b7-reading-projection-contract",
+                "evidence-today-private-no-store",
                 "evidence-b7-history-private-no-store",
                 "evidence-b7-reading-private-no-store",
-                "evidence-b7-save-private-no-store",
-                "evidence-b7-today-route",
-                "evidence-b3-reading-evidence-route",
-                "evidence-b7-resonance-feedback-route"
+                "evidence-reading-evidence-private-no-store",
+                "evidence-resonance-feedback-private-no-store",
+                "evidence-b7-save-private-no-store"
               ]
             },
             {
@@ -2166,12 +2160,11 @@
             },
             {
               "id": "leaf-signed-editorial-release-delivery-3",
-              "text": "GET /v1/pattern hands every account to the generated Pattern reader, while M4 editorial releases still ingest as preserved data. A release-builder test asserts that no runtime source under apps/api/src, apps/web/src, apps/calc-stub/src, or packages references the draft candidate files, and the stub router mounts after every product router.",
+              "text": "GET /v1/pattern hands every account to the generated Pattern reader, while M4 editorial releases still ingest as preserved data. A release-builder test asserts that no runtime source under apps/api/src, apps/web/src, apps/calc-stub/src, or packages references the draft candidate files.",
               "evidence_ids": [
                 "evidence-b8-pattern-route-generated",
                 "evidence-b8-content-release-generated-validators",
-                "evidence-b8-candidate-boundary-test",
-                "evidence-legacy-stub-order"
+                "evidence-b8-candidate-boundary-test"
               ]
             }
           ]
@@ -2345,12 +2338,11 @@
             },
             {
               "id": "leaf-maintainer-tooling-outside-the-gate-2",
-              "text": "eval:daily takes its claims from the fresh Daily evaluation plan, one test per plan case, so it covers the eight committed corpus profiles, although its README still describes six. The README treats a run as exploration evidence, not release evidence or merge approval.",
+              "text": "eval:daily takes its claims from the fresh Daily evaluation plan, one test per plan case, so it covers the eight committed corpus profiles. The README treats a run as exploration evidence, not release evidence or merge approval.",
               "evidence_ids": [
                 "evidence-b8-promptfoo-plan-source",
                 "evidence-b8-promptfoo-test-per-case",
                 "evidence-b8-fresh-daily-eight-profiles",
-                "evidence-b8-promptfoo-readme-six",
                 "evidence-b8-promptfoo-exploration-evidence"
               ]
             },
@@ -4192,11 +4184,20 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b2-fly-calc-app",
+      "id": "evidence-fly-calc-target",
       "kind": "source",
       "path": "fly.toml",
       "selector": {
-        "text": "app = 'patternlike-app'\nprimary_region = 'ams'\n\n[build]\n  dockerfile = 'apps/calc-stub/Dockerfile'"
+        "text": "app = 'patternlike-calc'\nprimary_region = 'iad'\n\n[build]\n  dockerfile = 'apps/calc-stub/Dockerfile'"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-fly-target-guard-test",
+      "kind": "source",
+      "path": "apps/api/scripts/wrangler-config.test.ts",
+      "selector": {
+        "text": "test(\"fly.toml deploys the calc image to the Fly app the production Worker calls\", async () => {"
       },
       "observed_at": null
     },
@@ -6053,15 +6054,6 @@
         "text": " * signer. Neither signature certifies interpretation quality; this path binds"
       },
       "observed_at": null
-    },
-    {
-      "id": "evidence-b4-recorded-ontology-pointer-join",
-      "kind": "recorded_observation",
-      "path": "docs/reviews/artifacts/2026-09-06-source-register-followup/production-observation.json",
-      "selector": {
-        "text": "            \"active_version\": \"pattern-ontology-en-us-internal-0.1.0\",\n            \"status\": \"active\",\n            \"bundle_hash\": \"sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84\",\n            \"corpus_release_hash\": \"sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c\",\n            \"machine_evidence_run\": null"
-      },
-      "observed_at": "2026-09-06T18:49:35.205Z"
     },
     {
       "id": "evidence-b4-pipeline-registered-corpus",
@@ -9313,20 +9305,29 @@
       "observed_at": null
     },
     {
-      "id": "evidence-b7-today-route",
+      "id": "evidence-today-private-no-store",
       "kind": "source",
       "path": "apps/api/src/routes/readings.ts",
       "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/today\", async (c) => {"
+        "text": "readingRoutes.get(\"/v1/readings/today\", async (c) => {\n  privateNoStore(c);"
       },
       "observed_at": null
     },
     {
-      "id": "evidence-b7-resonance-feedback-route",
+      "id": "evidence-reading-evidence-private-no-store",
       "kind": "source",
       "path": "apps/api/src/routes/readings.ts",
       "selector": {
-        "text": "readingRoutes.get(\"/v1/readings/:id/feedback\", async (c) => {"
+        "text": "readingRoutes.get(\"/v1/readings/:id/evidence\", async (c) => {\n  privateNoStore(c);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-resonance-feedback-private-no-store",
+      "kind": "source",
+      "path": "apps/api/src/routes/readings.ts",
+      "selector": {
+        "text": "readingRoutes.get(\"/v1/readings/:id/feedback\", async (c) => {\n  privateNoStore(c);"
       },
       "observed_at": null
     },
@@ -10132,15 +10133,6 @@
       "observed_at": null
     },
     {
-      "id": "evidence-legacy-stub-order",
-      "kind": "source",
-      "path": "apps/api/src/index.ts",
-      "selector": {
-        "text": "api.route(\"/\", stubRoutes);"
-      },
-      "observed_at": null
-    },
-    {
       "id": "evidence-packages-reading-engine-index-ts",
       "kind": "source",
       "path": "packages/reading-engine/src/index.ts",
@@ -10722,15 +10714,6 @@
       "path": "evals/promptfoo/tests/daily-profiles.mjs",
       "selector": {
         "text": "return [...plan.cases.values()].map((entry) => ({"
-      },
-      "observed_at": null
-    },
-    {
-      "id": "evidence-b8-promptfoo-readme-six",
-      "kind": "source",
-      "path": "evals/promptfoo/README.md",
-      "selector": {
-        "text": "| The six synthetic profiles and their prepared inputs |"
       },
       "observed_at": null
     },
