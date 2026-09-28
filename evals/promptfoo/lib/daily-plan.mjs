@@ -4,7 +4,7 @@
  *
  * The plan is not built here. It comes from the repository's own fresh
  * evaluation harness, so promptfoo sends exactly the claims that harness
- * sends: the same six synthetic profiles, the same compiled pin, the same
+ * sends: the same eight synthetic profiles, the same compiled pin, the same
  * `buildResponsesRequest` body converted through the same Codex contract.
  * A second definition of the claim would be a second definition of what the
  * product sends, and the copy that drifted would be the one nobody ran.

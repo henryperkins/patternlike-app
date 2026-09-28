@@ -57,7 +57,7 @@ are summarized in the root `README.md` Pattern portraits section.
 | API flags | Committed production sets `PATTERN_PORTRAIT_ENABLED=1` and `PATTERN_PORTRAIT_MESH_ENABLED=1`; default `[vars]` omits both. Artwork creation requires the exact flag `"1"` plus `ARTIFACTS`; meshes also require image enablement. |
 | Migrations | `0026_pattern_portraits.sql` and `0027_portrait_mesh_automation.sql`, recorded applied 2026-09-06 in `db/d1/MIGRATIONS.json`. |
 | Consent | Artwork creation requires live `account_processing` and `pattern_generation` grants, policy version `1.0.0`, and `CREATE MY PORTRAIT` confirmation. Automation is a separate per-chart grant at policy `1.1.0`. Observatory entry does not grant generation consent. |
-| Runner | `CODEX_RUNNER_PORTRAITS=1` then `CODEX_RUNNER_MESHES=1`. Poll order is text → image → mesh. See [`apps/codex-runner/README.md`](../../apps/codex-runner/README.md). |
+| Runner | `CODEX_RUNNER_PORTRAITS=1` then `CODEX_RUNNER_MESHES=1`. Claims rotate through weighted slots (`weighted-work-classes/v1`: four text, one image, one mesh per cycle). See [`apps/codex-runner/README.md`](../../apps/codex-runner/README.md). |
 | Pause | Unsetting the API flags stops creation and claims; scheduled cleanup still runs if the tables exist. `PATTERN_GENERATION_ENABLED` does not pause portraits. |
 | Local trap | `npm run dev:portrait -w @patternlike/web` is a fictional preview on port 5174, not the authenticated `#pattern` product. |
 

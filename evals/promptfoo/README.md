@@ -13,7 +13,7 @@ Every lane reuses the repository's own definitions rather than restating them:
 
 | Concern | Where it comes from |
 | --- | --- |
-| The six synthetic profiles and their prepared inputs | `apps/api/test/fixtures/reading-evaluation-corpus.json` via `prepareProfile()` |
+| The eight synthetic profiles and their prepared inputs | `apps/api/test/fixtures/reading-evaluation-corpus.json` via `prepareProfile()` |
 | The exact provider claim (instructions, packet, schema, model, effort, timeout) | `prepareFreshReadingEvaluation()` in `scripts/pattern-release/fresh-reading-evaluation.mjs` |
 | The transport | `runCodexInvocation()` in `apps/codex-runner/src/codex-cli.ts`, the production isolated Codex path |
 | The output schema check | `validateReadingOutput` from `apps/api/src/generated/reading-validators.js`, the Worker's precompiled validator |
@@ -47,15 +47,15 @@ release evidence and not as merge approval.
 
 | Lane | Provider | Calls | Purpose |
 | --- | --- | --- | --- |
-| `validators` | `echo` | none | The 31 authored corpus candidates, checked against their corpus labels. Runs offline in seconds; smoke-tests the promptfoo wiring and shows validator false rejections per case. |
-| `daily` | `providers/codex-isolated.mjs` | 6 per run, times `--repeat` (at most 3) | Fresh output for the six profiles through the production transport, scored by the hard gate. Each call is one `xhigh` turn and takes minutes. |
+| `validators` | `echo` | none | The 35 authored corpus candidates, checked against their corpus labels. Runs offline in seconds; smoke-tests the promptfoo wiring and shows validator false rejections per case. |
+| `daily` | `providers/codex-isolated.mjs` | 8 per run, times `--repeat` (at most 3) | Fresh output for the eight profiles through the production transport, scored by the hard gate. Each call is one `xhigh` turn and takes minutes. |
 
 ## Commands
 
 ```bash
 npm run check             # offline self-check: prompt functions, generators, assertions; no provider, no promptfoo
 npm run eval:validators   # promptfoo, echo provider, no model calls
-npm run eval:daily        # six Codex turns; add -- --repeat 2 (the wrapper refuses more than 3) or -- --filter-pattern unknown_time
+npm run eval:daily        # eight Codex turns; add -- --repeat 2 (the wrapper refuses more than 3) or -- --filter-pattern unknown_time
 npm run view              # local viewer over this directory's results database
 ```
 

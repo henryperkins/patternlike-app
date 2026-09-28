@@ -1,6 +1,6 @@
 # Codex runner
 
-The existing text queue remains the default. Set `CODEX_RUNNER_PORTRAITS=1` to poll the separate portrait queue whenever the text queue is empty. The runner still executes one claim at a time. Portrait generation must also be enabled separately on the API after its migration and compatible release.
+Text work is always polled. Set `CODEX_RUNNER_PORTRAITS=1` to add the separate portrait lane. The runner still executes one claim at a time, rotating claim opportunities through weighted slots (`weighted-work-classes/v1`: four text, one portrait, one mesh per cycle); an empty or disabled lane yields its slot, and a failed poll cools only that lane, so artwork is not starved by sustained text work. Portrait generation must also be enabled separately on the API after its migration and compatible release.
 
 Install the latest stable Codex CLI for text and mesh JSON work. These turns require an existing ChatGPT login and verify the effective configuration and event contract before sending source content; they do not require an exact CLI version. Portrait image invocations still require CLI **0.153.3** under their separate frozen provenance contract. The claim selects the orchestration model and `xhigh` reasoning; current backend claims use `gpt-5.6-sol`.
 
@@ -49,7 +49,7 @@ Do not omit optional dependencies: Sharp needs its platform packages. Do not rep
 
 ## Automated 3D portraits
 
-Set `CODEX_RUNNER_MESHES=1` together with `CODEX_RUNNER_PORTRAITS=1` after the compatible API has migration 0027. Dispatch priority remains text, image, then mesh, with one invocation at a time. An empty mesh claim also drains the durable portrait-start outbox and repairs missing mesh jobs. The scheduled API maintenance performs the same recovery, so work is not tied to an open browser.
+Set `CODEX_RUNNER_MESHES=1` together with `CODEX_RUNNER_PORTRAITS=1` after the compatible API has migration 0027. Dispatch follows the same weighted rotation (four text, one image, one mesh slot per cycle), with one invocation at a time. An empty mesh claim also drains the durable portrait-start outbox and repairs missing mesh jobs. The scheduled API maintenance performs the same recovery, so work is not tied to an open browser.
 
 Automatic generation is authorized by a separate, explicit chart-scoped portrait preference. Pattern publication records pending start work atomically, and opting in after publication records equivalent work for the existing Pattern. No account is opted in by migration or feature enablement. The existing written-Pattern consent is unchanged. New image and model work additionally requires the applicable live Pattern and account-processing grants.
 
