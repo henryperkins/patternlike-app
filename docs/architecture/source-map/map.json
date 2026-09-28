@@ -141,7 +141,7 @@
             },
             {
               "id": "leaf-passage-connections-4",
-              "text": "Four GET routes on the product API serve connections: relationship-source, relationships, and relationship-target under /v1/readings/:id, and /v1/timing/cycles/:id. These paths inherit the shared private, no-store policy before configuration and authority checks. Timing destinations reach the web through relationship-target; nothing in apps/web calls /v1/timing/cycles/:id. A Daily destination opens only if saved.",
+              "text": "The relationship-source, relationships, and relationship-target HTTP routes are rooted at /v1/readings/:id and construct a Daily source. The separate /v1/timing/cycles/:id endpoint serves stored Timing detail, not a chapter/cycle relationship-root contract. These paths inherit the shared private, no-store policy before configuration and authority checks. Timing destinations reach the web through relationship-target; nothing in apps/web calls the standalone Timing endpoint. A Daily destination opens only if saved.",
               "evidence_ids": [
                 "evidence-b1-relationship-source-route",
                 "evidence-b1-relationships-route",
@@ -149,18 +149,22 @@
                 "evidence-b1-timing-cycle-route",
                 "evidence-b7-private-response-policy",
                 "evidence-b1-timing-target-via-relationship",
-                "evidence-b1-relationship-saved-target"
+                "evidence-b1-relationship-saved-target",
+                "evidence-b1-relationship-daily-root"
               ]
             },
             {
               "id": "leaf-passage-connections-5",
-              "text": "Each link needs stored support: a shared calculated feature, a shared natal participant, or a dated occurrence, and a feature that needs the birth time counts only when it is exact. The resolver does no prose matching, recalculation, or network access and stops at three hops, four links per item, and twelve overall.",
+              "text": "Each link needs stored support: a shared calculated feature, a shared natal participant, or a dated occurrence, and a feature that needs the birth time counts only when it is exact. The pure resolver accepts the broader ReaderTarget union, does no prose matching, recalculation, or network access, and bounds each resolution to three hops, four links per item, and twelve overall. Its visited set prevents repeat expansion; those resolver capabilities do not provide broader HTTP roots or journey-wide Daily continuation.",
               "evidence_ids": [
                 "evidence-b1-relationship-kinds",
                 "evidence-b1-relationship-exact-time",
                 "evidence-b1-relationship-resolver-contract",
                 "evidence-b1-relationship-hops",
-                "evidence-b1-relationship-caps"
+                "evidence-b1-relationship-caps",
+                "evidence-b1-relationship-general-resolver",
+                "evidence-b1-relationship-visited-set",
+                "evidence-b1-relationship-visited-expansion"
               ]
             },
             {
@@ -743,7 +747,7 @@
             },
             {
               "id": "leaf-categorical-reader-feedback-2",
-              "text": "Each event seals its request, including any note, with the receipt, the grant binding, and derived fact targets into one encrypted payload in reading_feedback_events (migration 0031). A write without an active USR-12 grant creates or renews it in the same batch, which also asserts that the grant state and target reading are unchanged. Effects last 7 days, none for unclear, and every event carries a 24-month retention.",
+              "text": "Each event seals its request, including any note, with the receipt, the grant binding, and derived fact targets into one encrypted payload in reading_feedback_events (migration 0031). A write without an active USR-12 grant creates or renews it in the same batch, which also asserts that the grant state and target reading are unchanged. Non-unclear events receive a seven-day effect eligibility timestamp; unclear receives none. That timestamp is not evidence of later use. Every event carries a 24-month retention.",
               "evidence_ids": [
                 "evidence-b3-feedback-note-in-request",
                 "evidence-b3-feedback-event-payload",
@@ -766,6 +770,24 @@
                 "evidence-b3-feedback-runner-recheck",
                 "evidence-b3-feedback-publication-guard",
                 "evidence-b3-feedback-guards-in-batch"
+              ]
+            },
+            {
+              "id": "leaf-categorical-reader-feedback-4",
+              "text": "ReadingResponseCard validates and uses generation_effects_active in its existing category explanation: generation-off responses are collected without being offered to later readings, unclear is never offered, repetition use is bounded, and theme ranking requires supported theme associations and live permission. The explanation explicitly separates eligibility from actual use in a later reading.",
+              "evidence_ids": [
+                "evidence-b3-feedback-ui-validates-activation",
+                "evidence-b3-feedback-ui-effect-explanation",
+                "evidence-b3-feedback-ui-uses-activation"
+              ]
+            },
+            {
+              "id": "leaf-categorical-reader-feedback-5",
+              "text": "Feedback options report global publisher activation, not this exact edition/event's theme applicability or observed later use. supportedTargets derives retained fact IDs but always returns empty theme IDs; the compiler refuses not_relevant_today without theme IDs. Global activation therefore does not make those stored events eligible for theme ranking.",
+              "evidence_ids": [
+                "evidence-b3-feedback-options-body",
+                "evidence-b3-feedback-targets-no-themes",
+                "evidence-b3-feedback-compiler-needs-themes"
               ]
             }
           ]
@@ -927,13 +949,14 @@
             },
             {
               "id": "leaf-offline-ontology-supply-2",
-              "text": "Against the committed 60-fragment corpus, default version pattern-ontology-en-us-internal-0.1.3 maps 35 fragments to 36 records. Concentration (6.2) matches only stellium; the sign sections, section 8, 6.3 to 6.5, and 7.3 to 7.4 get no record; section 7.1 adds an exact-time methodology record; explicit source counter-expressions are kept verbatim.",
+              "text": "Against the committed 60-fragment corpus, default version pattern-ontology-en-us-internal-0.1.3 maps 35 fragments to 36 records. Concentration (6.2) matches only stellium; the sign sections, section 8, 6.3 to 6.5, and 7.3 to 7.4 get no record; section 7.1 adds an exact-time methodology record; explicit source counter-expressions are kept verbatim. The builder uses fixed section mappings and an aggregate skipped-fragment count, not a reviewed per-fragment/per-feature coverage and exclusion ledger.",
               "evidence_ids": [
                 "evidence-b4-builder-version",
                 "evidence-b4-builder-yield",
                 "evidence-b4-builder-stellium",
                 "evidence-b4-builder-exact-time",
-                "evidence-b4-builder-counter-marker"
+                "evidence-b4-builder-counter-marker",
+                "evidence-b4-builder-aggregate-skips"
               ]
             },
             {
@@ -943,19 +966,38 @@
                 "evidence-b4-builder-compile-gate",
                 "evidence-b4-builder-evaluation-fields",
                 "evidence-b4-builder-yield",
-                "evidence-b4-corpus-human-review"
+                "evidence-b4-corpus-human-review",
+                "evidence-b4-release-compiler-requires-evaluation",
+                "evidence-b4-release-verdict-gate",
+                "evidence-b4-store-release-compiler"
               ]
             },
             {
               "id": "leaf-offline-ontology-supply-4",
-              "text": "The internal sign route accepts only compiled synthetic_internal releases and returns the release, with a recomputed bundle hash, and the isolated signer's signature without storing it; POST /internal/pattern-ontology-releases stores and activates it. An active synthetic_internal release is admitted by origin, and neither signing path certifies interpretation quality.",
+              "text": "Internal signing and storeOntologyRelease both invoke the release compiler, which requires a passing evaluation verdict; the builder's reject-verdict candidate cannot become admissible through signing. For an admissible synthetic_internal release the sign route returns its recomputed bundle hash and isolated signature without storing it; POST /internal/pattern-ontology-releases stores and activates it. An active synthetic_internal release is admitted by origin, and signatures do not certify interpretation quality.",
               "evidence_ids": [
                 "evidence-b4-sign-origin",
                 "evidence-b4-sign-route-return",
                 "evidence-b4-internal-store",
                 "evidence-b4-ontology-pointer-update",
                 "evidence-b4-ontology-internal-origin",
-                "evidence-b4-sign-quality-limit"
+                "evidence-b4-sign-quality-limit",
+                "evidence-b4-sign-release-compiler",
+                "evidence-b4-release-compiler-requires-evaluation",
+                "evidence-b4-release-verdict-gate",
+                "evidence-b4-store-release-compiler"
+              ]
+            },
+            {
+              "id": "leaf-offline-ontology-supply-5",
+              "text": "Release evidence handling remains origin-specific: storeOntologyRelease requires bound pipeline evidence for machine_pipeline releases and refuses that evidence argument for other origins. Machine public scope is derived when loading a release from committed evidence, eligible corpus identity, matching hashes, and receipts. These existing admission controls are distinct from the builder's structural candidate compilation.",
+              "evidence_ids": [
+                "evidence-b4-store-origin-evidence-policy",
+                "evidence-b4-ontology-machine-scope",
+                "evidence-b4-ontology-licensed-excerpt",
+                "evidence-b4-public-scope-bound-evidence",
+                "evidence-b4-public-scope-receipt",
+                "evidence-b4-public-scope-at-load"
               ]
             }
           ]
@@ -1019,7 +1061,7 @@
             },
             {
               "id": "leaf-source-provenance-and-rights-2",
-              "text": "By its own account the committed record is incomplete: 60 model-generated fragments; provider, model, model version, account context, and generation time all unverified; zero certified fragments; an empty reviewer registry; and five outstanding public-activation items.",
+              "text": "By its own account the committed record is incomplete: 60 model-generated fragments; provider, model, model version, account context, and generation time all unverified; zero certified fragments; an empty reviewer registry; and five outstanding public-activation items. These are committed record contents, not proof that no review occurred elsewhere or that this corpus is the active production ontology.",
               "evidence_ids": [
                 "evidence-pattern-corpus-readme-md",
                 "evidence-b4-provenance-generation",
@@ -1484,13 +1526,16 @@
           "leaves": [
             {
               "id": "leaf-operator-generation-and-repair-1",
-              "text": "POST /internal/readings/reissue requires user_id, the expected live reading id, which must still be published, and a revision reason from chart_recalculated, consent_revoked, safety_correction, or defect_repair. It freezes a deterministic V1 successor command, which cannot be built without an active editorial content release.",
+              "text": "POST /internal/readings/generate and ordinary /internal/readings/reissue both call the legacy buildGenerationCommand. Reissue requires user_id, an expected still-published reading, and chart_recalculated, consent_revoked, safety_correction, or defect_repair as its reason. It loads predecessor ID, revision, and status without deriving the generation family, then freezes a deterministic V1 successor that requires an active editorial content release. Separate V2 repair paths do not make ordinary published-target reissue family-aware.",
               "evidence_ids": [
                 "evidence-b6-reissue-reasons",
                 "evidence-b6-reissue-validation",
                 "evidence-b6-reissue-live-predecessor",
                 "evidence-b6-reissue-v1-builder",
-                "evidence-b6-v1-release-required"
+                "evidence-b6-v1-release-required",
+                "evidence-b6-ordinary-generate-dispatch",
+                "evidence-b6-ordinary-generate-v1-builder",
+                "evidence-b6-reissue-predecessor-fields"
               ]
             },
             {
@@ -1506,13 +1551,14 @@
             },
             {
               "id": "leaf-operator-generation-and-repair-3",
-              "text": "The revision reason states why a revision exists, not who started it; V2 commands record initiation separately as a reservation reason, such as scheduled, automatic_replacement, manual_reissue, or fact_repair. A replacement for a failed command keeps the revision's reason, and POST /internal/readings/replace takes its actor, operator or scheduler, from the caller.",
+              "text": "The revision reason states why a revision exists, not who started it; V2 commands record initiation separately as a reservation reason, such as scheduled, automatic_replacement, manual_reissue, or fact_repair. Failed-command replacement chooses V1 or V2 from the failed reservation's assembly_mode and keeps its revision reason. POST /internal/readings/replace takes its actor, operator or scheduler, from the caller; this failed-command lifecycle is separate from published-target reissue.",
               "evidence_ids": [
                 "evidence-b6-reason-vocabularies",
                 "evidence-b6-v1-replacement-keeps-reason",
                 "evidence-apps-api-services-enqueue-ts",
                 "evidence-b6-reservation-reason-mapping",
-                "evidence-b6-replace-actor"
+                "evidence-b6-replace-actor",
+                "evidence-b6-failed-replacement-family"
               ]
             }
           ]
@@ -10876,6 +10922,195 @@
       "path": "apps/codex-runner/src/portrait-invocation.ts",
       "selector": {
         "text": "if (!claim) { configurationVerified = true; stop(); return; }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-ordinary-generate-dispatch",
+      "kind": "source",
+      "path": "apps/api/src/routes/internal-generation.ts",
+      "selector": {
+        "text": "const result = await enqueueDailyReading(c.env, userId);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-ordinary-generate-v1-builder",
+      "kind": "source",
+      "path": "apps/api/src/services/enqueue.ts",
+      "selector": {
+        "text": "const build = await buildGenerationCommand(env, userId, {\n    readingId,\n    revision: 1,\n    revisionReason: \"initial\","
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-reissue-predecessor-fields",
+      "kind": "source",
+      "path": "apps/api/src/services/enqueue.ts",
+      "selector": {
+        "text": "`SELECT id, revision, status FROM daily_readings WHERE id = ? AND user_id = ?`"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b6-failed-replacement-family",
+      "kind": "source",
+      "path": "apps/api/src/services/enqueue.ts",
+      "selector": {
+        "text": "const commandVersion = reservation.assembly_mode === \"constrained_model\" ? \"v2\" : \"v1\";"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b3-feedback-ui-validates-activation",
+      "kind": "source",
+      "path": "apps/web/src/components/ReadingResponseCard.tsx",
+      "selector": {
+        "text": "&& typeof value.generation_effects_active === \"boolean\""
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b3-feedback-ui-effect-explanation",
+      "kind": "source",
+      "path": "apps/web/src/components/ReadingResponseCard.tsx",
+      "selector": {
+        "text": "function EffectExplanation({ category, active }: { category: ReadingFeedbackCategory | \"\"; active: boolean }) {\n  if (category === \"unclear\") return <p>Unclear responses are recorded for content quality and are not offered to generation.</p>;\n  if (!active) return <p>Generation use is currently off, so responses are stored without being offered to later readings.</p>;\n  if (!category) return null;\n  return <p>{category === \"repetitive\"\n    ? \"Repetition control may use this response for up to seven days while feedback permission remains active.\"\n    : \"Theme ranking may use this response for up to seven days, only when this reading has supported theme associations and feedback permission remains active.\"}\n    {\" \"}Eligibility does not establish that a later reading used it.</p>;\n}"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b3-feedback-ui-uses-activation",
+      "kind": "source",
+      "path": "apps/web/src/components/ReadingResponseCard.tsx",
+      "selector": {
+        "text": "<EffectExplanation category={category} active={document.generation_effects_active} />"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b3-feedback-compiler-needs-themes",
+      "kind": "source",
+      "path": "apps/api/src/services/reading-feedback-compiler.ts",
+      "selector": {
+        "text": "if (receipt.category === \"not_relevant_today\" && themes.length === 0) return null;"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-builder-aggregate-skips",
+      "kind": "source",
+      "path": "apps/api/scripts/build-internal-ontology.ts",
+      "selector": {
+        "text": "let skipped = 0;\nfor (const [index, fragment] of corpus.fragments.entries()) {\n  const section = sectionOf(fragment.location);\n  const predicate = predicateFor(section);\n  if (!predicate) {\n    skipped += 1;\n    continue;\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-release-compiler-requires-evaluation",
+      "kind": "source",
+      "path": "packages/pattern-engine/src/ontology.ts",
+      "selector": {
+        "text": "export function compileOntologyRelease(release: PatternOntologyRelease | unknown): OntologyCompileResult {\n  const structural = structuralFailures(release);\n  if (structural.length > 0) return { ok: false, failures: structural };\n  const typed = release as PatternOntologyRelease;\n  return compileValidatedRelease(typed, true);\n}"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-release-verdict-gate",
+      "kind": "source",
+      "path": "packages/pattern-engine/src/ontology.ts",
+      "selector": {
+        "text": "if (requireEvaluation && release.evaluation.verdict !== \"pass\") {\n    failures.push({ code: \"evaluation_reject\", message: \"ontology evaluation verdict is not pass\" });\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-sign-release-compiler",
+      "kind": "source",
+      "path": "apps/api/src/services/ontology-signing-client.ts",
+      "selector": {
+        "text": "if (release.provenance?.origin !== \"synthetic_internal\") {\n    fail(\"ontology_origin_not_synthetic_internal\");\n  }\n  const compiled = compileOntologyRelease(release);\n  if (!compiled.ok || release.evaluation.compiler_passed !== true) {\n    fail(\"ontology_compiler_failed\");\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-store-release-compiler",
+      "kind": "source",
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "selector": {
+        "text": "const unsigned = stripOntologySignature(release);\n  const compiled = compileOntologyRelease(unsigned);\n  if (!compiled.ok) {\n    throw new Error(`ontology release refused: ${compiled.failures.map((f) => f.code).join(\",\")}`);\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-store-origin-evidence-policy",
+      "kind": "source",
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "selector": {
+        "text": "if (isMachinePipeline && !evidence) {\n    throw new Error(\"ontology_pipeline_evidence_missing\");\n  }\n  if (!isMachinePipeline && evidence) {\n    throw new Error(\"ontology_pipeline_evidence_unexpected\");\n  }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b1-relationship-daily-root",
+      "kind": "source",
+      "path": "apps/api/src/routes/reader-relationships.ts",
+      "selector": {
+        "text": "function source(c: ReaderContext, values: Record<string, string>): ReaderDailyTarget | null {\n  const parsed = revision(values.revision!);\n  const readingId = c.req.param(\"id\");\n  if (!readingId || parsed === null || !validId(readingId) || !validId(values.paragraph_id!)\n    || !/^sha256:[a-f0-9]{64}$/.test(values.content_hash!)) return null;\n  return { kind: \"daily\", reading_id: readingId, revision: parsed, content_hash: values.content_hash!, paragraph_id: values.paragraph_id! };\n}"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b1-relationship-general-resolver",
+      "kind": "source",
+      "path": "apps/api/src/services/reader-relationship-resolver.ts",
+      "selector": {
+        "text": "export async function resolveReaderRelationships(source: ReaderTarget, authorizedUnits: readonly AuthorizedReaderUnit[]): Promise<ReaderRelationships> {"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b1-relationship-visited-set",
+      "kind": "source",
+      "path": "apps/api/src/services/reader-relationship-resolver.ts",
+      "selector": {
+        "text": "const visited = new Set<string>([readerTargetKey(source)]);"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b1-relationship-visited-expansion",
+      "kind": "source",
+      "path": "apps/api/src/services/reader-relationship-resolver.ts",
+      "selector": {
+        "text": "if (!visited.has(key)) { visited.add(key); next.push(edge.to); }"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-public-scope-bound-evidence",
+      "kind": "source",
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "selector": {
+        "text": "const ONTOLOGY_ACTIVATION_SCOPE_SQL = `CASE\n              WHEN e.activation_scope = 'public'\n               AND e.run_status = 'succeeded'\n               AND e.evidence_status = 'committed'\n               AND e.evaluation_artifact_status = 'committed'\n               AND e.compiler_passed = 1\n               AND e.evaluator_passed = 1\n               AND e.unevaluated_fixture_count = 0\n               AND e.corpus_license_class = 'licensed_excerpt'\n               AND e.corpus_public_capable = 1\n               AND e.corpus_release_hash = r.corpus_release_hash\n               AND json_extract(\n                 r.evaluation_json,\n                 '$.evaluation_report_hash'\n               ) = e.evaluation_report_hash\n               AND json_extract(\n                 r.evaluation_json,\n                 '$.regression_passed'\n               ) = 1\n               AND json_extract(\n                 r.evaluation_json,\n                 '$.regression_report_hash'\n               ) = e.regression_report_hash\n"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-public-scope-receipt",
+      "kind": "source",
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "selector": {
+        "text": "                 FROM pattern_ontology_evaluation_runs receipt\n                 WHERE receipt.ontology_version = r.version\n                   AND receipt.verdict = 'pass'\n                   AND json_valid(receipt.summary_json)\n                   AND json_extract(\n                     receipt.summary_json,\n                     '$.run_id'\n                   ) = e.run_id\n                   AND json_extract(\n                     receipt.summary_json,\n                     '$.ontology_version'\n                   ) = e.ontology_version\n                   AND json_extract(\n                     receipt.summary_json,\n                     '$.activation_scope'\n                   ) = e.activation_scope\n                   AND json_extract(\n                     receipt.summary_json,\n                     '$.bundle_hash'\n                   ) = e.bundle_hash"
+      },
+      "observed_at": null
+    },
+    {
+      "id": "evidence-b4-public-scope-at-load",
+      "kind": "source",
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "selector": {
+        "text": "export async function loadActiveOntology(env: Env): Promise<ActiveOntology | null> {\n  const pointer = await env.DB.prepare(\n    `SELECT p.active_version AS version, r.bundle_hash, r.corpus_release_hash,\n            r.locale, r.object_key, r.status,\n            ${ONTOLOGY_ACTIVATION_SCOPE_SQL}\n     FROM pattern_ontology_pointer p\n     LEFT JOIN pattern_ontology_releases r ON r.version = p.active_version\n     LEFT JOIN pattern_ontology_pipeline_evidence e\n       ON e.ontology_version = r.version AND e.bundle_hash = r.bundle_hash\n     WHERE p.id = 1`,\n"
       },
       "observed_at": null
     }

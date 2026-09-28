@@ -109,3 +109,27 @@ consumed inputs at `a7ab939c282e457d36497dbceae2a3c3b8dac738`. Historical captur
 and release receipts remain unchanged. The [integration review](../../reviews/2026-09-28-pattern-contract-integration.md)
 records tests and browser scope separately; the map does not establish deployment
 or provider execution.
+
+## September 28 reconciliation after PR 73
+
+The [supplied reconciled corrections](../../reviews/2026-09-28-architecture-map-reconciled-corrections.md)
+are preserved verbatim against `00299d26b0b27dd5e14887f94287a872a629efb4`.
+The [maintained backlog](backlog.md) now records R01, R02, R03, and R06 as
+implemented; R05 and R07 as partial; and R04 and R08 as still needed. No whole
+proposal is refuted. The remaining order is R04 → R05 applicability → R07 wider
+assurance → R08, with R07 a prerequisite for any expansion it governs.
+
+The maintained map adds owning-source evidence for the existing feedback
+explanation, ordinary operator builders, release-admission boundary, and
+Daily-only relationship roots. The feedback UI blob is identical at the original
+`77c6c00` basis and `00299d2`; its activation/category explanation is preserved,
+not credited as a new repair. Theme applicability remains open. PR #73's committed
+adaptive settings are default `0`, production `1`; the CLI pin remains `0.153.3`.
+Compilation is already truthful, while coverage, review, and origin-specific
+admission assurance remain open.
+
+Earlier snapshots and records retain their bytes and dates. The current pointer
+selects a new capture of the revised definition, with its uncommitted input
+qualification recorded explicitly. Source-map identity checks and any fresh
+local-gate execution are recorded separately from the supplied source-only review;
+neither establishes production or installed-runner state.
