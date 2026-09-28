@@ -441,11 +441,12 @@ requires the image flag. `PATTERN_GENERATION_ENABLED=0` does **not** pause
 portrait generation. These flags gate the artwork APIs; the observatory's
 local folios and complete reading remain available independently.
 
-`PATTERN_ADAPTIVE_PORTRAITS_ENABLED` is explicitly `0` in both committed
-environments. Only exact `1` admits new v2 reservations; absent, `0`, and
+`PATTERN_ADAPTIVE_PORTRAITS_ENABLED` is `1` in committed
+`[env.production.vars]` since 2026-09-28 and `0` in the default `[vars]`.
+Only exact `1` admits new v2 reservations; absent, `0`, and
 malformed values refuse adaptive admission. This switch does not stop completion,
 private reads, downloads or cleanup of already reserved v2 work. Follow the
-[adaptive artwork rollout](docs/deploy/adaptive-portrait-artwork.md) before enabling it.
+[adaptive artwork rollout](docs/deploy/adaptive-portrait-artwork.md) before changing it.
 
 **Consent.** `POST /v1/pattern-portrait-generations` requires live
 `account_processing` and `pattern_generation` grants, an 8–128 character

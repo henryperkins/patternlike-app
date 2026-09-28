@@ -97,6 +97,7 @@ compiler and artifact identity; saved v1 artifacts retain their original format.
 
 Follow the [adaptive rollout](../../docs/deploy/adaptive-portrait-artwork.md).
 Migration 0033 and compatible Worker/runner/client support must precede adaptive
-producer enablement. `PATTERN_ADAPTIVE_PORTRAITS_ENABLED` remains `0` in the
-committed Worker configuration. Policy 2.0.0 requires an explicit reader action;
+producer enablement. `PATTERN_ADAPTIVE_PORTRAITS_ENABLED` is `1` in the
+committed production Worker configuration since 2026-09-28 and `0` in the
+default block. Policy 2.0.0 requires an explicit reader action;
 neither installation nor protocol capability grants generation permission.
