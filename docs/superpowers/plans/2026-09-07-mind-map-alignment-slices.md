@@ -1,5 +1,7 @@
 # Patternlike mind-map alignment: delivery slices
 
+**September 28 architecture follow-up:** The [R01–R08 backlog](../../architecture/source-map/backlog.md) records four implemented proposals, two partial proposals, and two still needed at `00299d26b0b27dd5e14887f94287a872a629efb4`. Its remaining order is R04 → R05 applicability → R07 wider assurance → R08, with R07 required before any expansion it governs. This successor covers those proposals; the dated slice history below remains intact. Current [AGENTS.md](../../../AGENTS.md) requires all sixteen local gate lanes, including source-map tests and the current-map check, before merging; earlier optional-map guidance below is historical.
+
 > **For agentic workers:** Use `superpowers:executing-plans` for an authorized slice after its entry decisions and task plan are concrete. This is the delivery ledger; each slice gets its own implementation and verification boundary, and may span more than one PR.
 
 **Goal:** Deliver a connected, understandable reading experience with stronger interpretation evidence and dependable operations, through focused product changes and one conditional investigation. Slice 2’s proposed verification expansion is withdrawn; numbering is retained for existing references.
