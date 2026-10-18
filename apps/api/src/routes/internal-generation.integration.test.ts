@@ -1,5 +1,7 @@
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { GenerationMessage } from "../env.js";
+import { app } from "../index.js";
 import {
   IDENTITY_A,
   USER_A,
@@ -24,17 +26,38 @@ interface Envelope {
   error?: { code: string; message: string; request_id: string | null };
 }
 
+/**
+ * Every send lands here instead of Miniflare's queue. Its consumer runs
+ * concurrently with the test body, so a delivered message could claim a job
+ * between an assertion's read and the request that assertion is checking.
+ */
+const sent: GenerationMessage[] = [];
+
 async function post(path: string, body: unknown): Promise<{ status: number; body: Envelope }> {
-  const res = await SELF.fetch(`http://api.test/internal${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  // The Worker's `fetch` is `app.fetch`; `app.request` runs the same handler
+  // but takes the env, which is what lets the queue binding be swapped.
+  const res = await app.request(
+    `/internal${path}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    {
+      ...env,
+      READING_QUEUE: {
+        send: async (message: GenerationMessage) => {
+          sent.push(message);
+        },
+      } as unknown as typeof env.READING_QUEUE,
+    },
+  );
   return { status: res.status, body: (await res.json()) as Envelope };
 }
 
 describe("POST /internal/readings/*", () => {
   beforeEach(async () => {
+    sent.length = 0;
     await resetDb();
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A);
@@ -188,6 +211,9 @@ describe("POST /internal/readings/*", () => {
     expect(status).toBe(200);
     expect(body.undispatched).toBe(1);
     expect(body.redispatched).toBe(1);
+    // The reservation's send, then the sweep's re-send of the same message.
+    const message = { job_id: reserved.body.job_id, reading_id: reserved.body.reading_id };
+    expect(sent).toEqual([message, message]);
 
     const [job] = await rows<{ dispatched_at: string | null }>(
       "SELECT dispatched_at FROM jobs WHERE id = ?",
