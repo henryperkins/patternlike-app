@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { CelestialBody, LongitudePosition } from "@patternlike/shared";
 import type { ChartResponse } from "../lib/api-client.js";
 import { createPortraitSky } from "../lib/portrait-sky.js";
@@ -52,6 +52,7 @@ interface ChartViewProps {
 }
 
 export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
+  const [activeBody, setActiveBody] = useState<CelestialBody | null>(null);
   const sky = useMemo(() => createPortraitSky(chart, chart.id), [chart]);
   const positionByBody = new Map(chart.positions.map((position) => [position.body, position]));
   const suppressed = new Map(chart.uncertainty.suppressed_features.map((feature) => [feature.feature_class, feature.reason]));
@@ -65,6 +66,18 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
     return true;
   });
   const wheelPositions = chart.positions.filter((position) => !(position.body === "moon" && moonHidden));
+  const wheelBodySet = new Set(wheelPositions.map((position) => position.body));
+  const connectedBodies = new Set<CelestialBody>();
+  if (activeBody) {
+    connectedBodies.add(activeBody);
+    for (const aspect of chart.aspects.slice(0, 32)) {
+      if (!wheelBodySet.has(aspect.body_a) || !wheelBodySet.has(aspect.body_b)) continue;
+      if (aspect.body_a === activeBody || aspect.body_b === activeBody) {
+        connectedBodies.add(aspect.body_a);
+        connectedBodies.add(aspect.body_b);
+      }
+    }
+  }
 
   return (
     <div className="chart-page page-enter">
@@ -123,6 +136,8 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
             positions={wheelPositions}
             aspects={chart.aspects}
             houseCusps={chart.houses?.cusps_deg ?? null}
+            activeBody={activeBody}
+            onSelectBody={setActiveBody}
           />
           <div className="wheel-legend" aria-hidden="true">
             <span><i className="legend-line legend-line--soft" /> Flowing aspect</span>
@@ -196,16 +211,29 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
           <span className="panel-code">{visiblePositions.length} BODIES</span>
         </div>
         <div className="position-list">
-          {visiblePositions.map((position) => (
-            <article className="position-row" key={position.body}>
-              <span className="position-row__body">{BODY_NAMES[position.body]}</span>
-              <strong>{positionLabel(position)}</strong>
-              <span>{position.house ? `House ${position.house}` : "House omitted"}</span>
-              <span className={position.retrograde ? "retrograde" : "direct"}>
-                {position.retrograde ? "Retrograde" : "Direct"}
-              </span>
-            </article>
-          ))}
+          {visiblePositions.map((position) => {
+            const isActive = activeBody === position.body;
+            const isConnected =
+              activeBody !== null && !isActive && connectedBodies.has(position.body);
+            return (
+              <article
+                className="position-row"
+                key={position.body}
+                data-body={position.body}
+                data-active={isActive ? "true" : undefined}
+                data-connected={isConnected ? "true" : undefined}
+                onPointerEnter={() => setActiveBody(position.body)}
+                onPointerLeave={() => setActiveBody(null)}
+              >
+                <span className="position-row__body">{BODY_NAMES[position.body]}</span>
+                <strong>{positionLabel(position)}</strong>
+                <span>{position.house ? `House ${position.house}` : "House omitted"}</span>
+                <span className={position.retrograde ? "retrograde" : "direct"}>
+                  {position.retrograde ? "Retrograde" : "Direct"}
+                </span>
+              </article>
+            );
+          })}
         </div>
       </section>
 

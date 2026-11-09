@@ -32,10 +32,12 @@ export interface ObservatorySplatsExperienceState {
 export interface ObservatorySplats {
   readonly spark: SparkRenderer | null;
   readonly sky: SplatMesh | null;
+  readonly skyBodies: ReadonlyMap<PortraitSkyBody, SplatMesh>;
   readonly chapters: ReadonlyMap<string, SplatMesh>;
   setQuality: (quality: "standard" | "low") => void;
   setExperience: (state: ObservatorySplatsExperienceState) => void;
   setChapterVolumes: (selectedIds: readonly string[], skyView: boolean) => void;
+  setBlend: (skyBlend: number, chapterBlends: ReadonlyMap<string, number>) => void;
   attachChapterVolume: (id: string, mesh: SplatMesh, root: Object3D) => void;
   syncTransforms: (forms: ReadonlyArray<{ id: string; root: Object3D }>) => void;
   dispose: () => void;
@@ -54,10 +56,12 @@ const MARKER_COLORS: Record<PortraitSkyBody, string> = {
 };
 
 const UP_AXIS = new Vector3(0, 1, 0);
+const KEY_LIGHT_DIR = new Vector3(-3, 7, 5).normalize();
 
 export const SKY_ECLIPTIC_COUNT = 14336;
 export const SKY_CANOPY_COUNT = 8192;
 export const SKY_MARKER_COUNT_PER_BODY = 512;
+export const SKY_FOCUS_CORONA_COUNT = 256;
 export const CHAPTER_VOLUME_COUNT = 12000;
 
 function mulberry32(seed: number): () => number {
@@ -164,15 +168,67 @@ export function createSkyVolumeSplats(placements: readonly PortraitSkyPlacement[
 }
 
 /**
+ * Focused volumetric corona centered on a single calibrated natal placement.
+ * Its origin sits at the exact zodiacPoint of the supplied placement so
+ * selecting a body intensifies its volumetric aura without inventing position.
+ */
+export function createSkyBodyFocusSplats(placement: PortraitSkyPlacement): SplatMesh {
+  const anchor = zodiacPoint(placement.longitude, MARKER_RADII[placement.body], 0.95);
+  const packedSplats = new PackedSplats({ maxSplats: SKY_FOCUS_CORONA_COUNT });
+  const seed = placement.body === "sun" ? 0x51a01 : placement.body === "moon" ? 0x51a02 : 0x51a03;
+  const rng = mulberry32(seed);
+  const center = new Vector3();
+  const scales = new Vector3();
+  const quaternion = new Quaternion();
+  const coreColor = new Color(MARKER_COLORS[placement.body]).offsetHSL(0, 0.04, 0.08);
+  const haloColor = new Color(MARKER_COLORS[placement.body]).offsetHSL(0, -0.02, 0.02);
+  const color = new Color();
+
+  for (let i = 0; i < SKY_FOCUS_CORONA_COUNT; i++) {
+    const inner = i < SKY_FOCUS_CORONA_COUNT * 0.55;
+    const spread = inner ? 0.036 : 0.072;
+    center.set(
+      gaussian(rng) * spread,
+      gaussian(rng) * (spread * 0.58),
+      gaussian(rng) * spread,
+    );
+    const radius = inner ? 0.022 + rng() * 0.01 : 0.034 + rng() * 0.018;
+    scales.set(radius, radius * 0.68, radius);
+    quaternion.setFromAxisAngle(UP_AXIS, rng() * Math.PI * 2);
+    color.copy(inner ? coreColor : haloColor).offsetHSL(0, 0, (rng() - 0.5) * 0.04);
+    const radial = Math.min(1, center.length() / (spread * 2.2));
+    const opacity = (inner ? 0.82 : 0.42) * (1 - radial * 0.55);
+    packedSplats.pushSplat(center, scales, quaternion, opacity, color);
+  }
+
+  const mesh = new SplatMesh({ packedSplats, raycastable: false });
+  mesh.numSplats = packedSplats.numSplats;
+  mesh.name = `Sky body focus ${placement.body}`;
+  mesh.position.set(...anchor);
+  mesh.raycast = () => {};
+  return mesh;
+}
+
+/**
  * Dense surface volume baked from a verified chapter mesh. Tens of thousands
- * of splats oriented to the surface normal give the selected object thickness
- * and a back that a 48-vertex copy cannot. Sampling is area-weighted and
- * deterministic for a given geometry.
+ * of splats oriented to the surface normal give the selected object thickness,
+ * directional normal shading, and an inset subsurface core layer. Sampling is
+ * area-weighted and deterministic for a given geometry.
  */
 export function createChapterVolumeSplats(root: Object3D, targetCount: number = CHAPTER_VOLUME_COUNT): SplatMesh {
   root.updateMatrixWorld(true);
   const inverseRoot = root.matrixWorld.clone().invert();
-  interface Tri { a: Vector3; b: Vector3; c: Vector3; normal: Vector3; color: Color; area: number; }
+  interface Tri {
+    a: Vector3;
+    b: Vector3;
+    c: Vector3;
+    normal: Vector3;
+    ca: Color;
+    cb: Color;
+    cc: Color;
+    shade: number;
+    area: number;
+  }
   const tris: Tri[] = [];
   const toLocal = (mesh: Mesh, v: Vector3) => v.clone().applyMatrix4(mesh.matrixWorld).applyMatrix4(inverseRoot);
   root.traverse((object) => {
@@ -180,10 +236,15 @@ export function createChapterVolumeSplats(root: Object3D, targetCount: number = 
     const geometry = object.geometry;
     const position = geometry.getAttribute("position");
     if (!position || position.count === 0) return;
+    const colorAttr = geometry.getAttribute("color");
     const material = Array.isArray(object.material) ? object.material[0] : object.material;
     const baseColor = material instanceof MeshStandardMaterial ? material.color.clone() : new Color("#d0b377");
     const index = geometry.getIndex();
     const read = (i: number) => toLocal(object, new Vector3().fromBufferAttribute(position, i));
+    const readColor = (i: number) => {
+      if (!colorAttr || i >= colorAttr.count) return baseColor.clone();
+      return new Color(colorAttr.getX(i), colorAttr.getY(i), colorAttr.getZ(i)).multiply(baseColor);
+    };
     const addTri = (ia: number, ib: number, ic: number) => {
       const a = read(ia); const b = read(ib); const c = read(ic);
       if (![a, b, c].every((p) => [p.x, p.y, p.z].every(Number.isFinite))) return;
@@ -191,7 +252,21 @@ export function createChapterVolumeSplats(root: Object3D, targetCount: number = 
       const cross = ab.cross(ac);
       const area = cross.length() / 2;
       if (!(area > 1e-10)) return;
-      tris.push({ a, b, c, normal: cross.normalize(), color: baseColor, area });
+      const normal = cross.normalize();
+      const ndotl = Math.max(0, normal.dot(KEY_LIGHT_DIR));
+      const hemi = 0.5 + 0.5 * normal.y;
+      const shade = (ndotl * 0.65 + hemi * 0.35 - 0.48) * 0.16;
+      tris.push({
+        a,
+        b,
+        c,
+        normal,
+        ca: readColor(ia),
+        cb: readColor(ib),
+        cc: readColor(ic),
+        shade,
+        area,
+      });
     };
     if (index) {
       for (let i = 0; i + 2 < index.count; i += 3) addTri(index.getX(i), index.getX(i + 1), index.getX(i + 2));
@@ -234,18 +309,30 @@ export function createChapterVolumeSplats(root: Object3D, targetCount: number = 
     const r1 = rng(); const r2 = rng();
     const sqrtR1 = Math.sqrt(r1);
     const w0 = 1 - sqrtR1; const w1 = sqrtR1 * (1 - r2); const w2 = sqrtR1 * r2;
+    const isSubsurface = i % 5 === 0;
+    const inset = isSubsurface ? baseScale * (0.35 + rng() * 0.35) : 0;
     center.set(
-      tri.a.x * w0 + tri.b.x * w1 + tri.c.x * w2,
-      tri.a.y * w0 + tri.b.y * w1 + tri.c.y * w2,
-      tri.a.z * w0 + tri.b.z * w1 + tri.c.z * w2,
+      tri.a.x * w0 + tri.b.x * w1 + tri.c.x * w2 - tri.normal.x * inset,
+      tri.a.y * w0 + tri.b.y * w1 + tri.c.y * w2 - tri.normal.y * inset,
+      tri.a.z * w0 + tri.b.z * w1 + tri.c.z * w2 - tri.normal.z * inset,
     );
     quaternion.setFromUnitVectors(UP_AXIS, tri.normal);
     spin.setFromAxisAngle(tri.normal, rng() * Math.PI * 2);
     quaternion.premultiply(spin);
-    const tangent = baseScale * (0.9 + rng() * 0.4);
-    scales.set(tangent, baseScale * 0.32, tangent);
-    color.copy(tri.color).offsetHSL(0, 0, (rng() - 0.5) * 0.05);
-    packedSplats.pushSplat(center, scales, quaternion, 0.9, color);
+    const tangent = baseScale * (0.9 + rng() * 0.4) * (isSubsurface ? 1.18 : 1);
+    scales.set(tangent, baseScale * (isSubsurface ? 0.42 : 0.28), tangent);
+    color.setRGB(
+      tri.ca.r * w0 + tri.cb.r * w1 + tri.cc.r * w2,
+      tri.ca.g * w0 + tri.cb.g * w1 + tri.cc.g * w2,
+      tri.ca.b * w0 + tri.cb.b * w1 + tri.cc.b * w2,
+    );
+    if (isSubsurface) {
+      color.offsetHSL(-0.01, 0.04, tri.shade * 0.5 - 0.04 + (rng() - 0.5) * 0.03);
+      packedSplats.pushSplat(center, scales, quaternion, 0.58, color);
+    } else {
+      color.offsetHSL(0, 0, tri.shade + (rng() - 0.5) * 0.04);
+      packedSplats.pushSplat(center, scales, quaternion, 0.92, color);
+    }
   }
 
   const mesh = new SplatMesh({ packedSplats, raycastable: false });
@@ -274,9 +361,16 @@ export function createObservatorySplats({
   onDirty,
 }: ObservatorySplatsOptions): ObservatorySplats {
   const chapters = new Map<string, SplatMesh>();
+  const skyBodies = new Map<PortraitSkyBody, SplatMesh>();
   let spark: SparkRenderer | null = null;
   let sky: SplatMesh | null = null;
   let disposed = false;
+  let currentExperience: ObservatorySplatsExperienceState = {
+    lighting: "day",
+    skyView: false,
+    comparison: false,
+    selectedSkyBody: null,
+  };
 
   if (quality !== "low") {
     ensureSparkContext(renderer);
@@ -297,16 +391,30 @@ export function createObservatorySplats({
       sky = createSkyVolumeSplats(placements);
       sky.visible = false;
       scene.add(sky);
+      const byBody = new Map<PortraitSkyBody, PortraitSkyPlacement>();
+      for (const placement of placements) {
+        zodiacPoint(placement.longitude, 1, 0);
+        byBody.set(placement.body, placement);
+      }
+      for (const [body, placement] of byBody) {
+        const focusMesh = createSkyBodyFocusSplats(placement);
+        focusMesh.visible = false;
+        skyBodies.set(body, focusMesh);
+        scene.add(focusMesh);
+      }
     }
   }
 
   const dayTint = new Color("#f2ead7");
   const duskTint = new Color("#ffe0b5");
   const skyFocusTint = new Color("#fff3d6");
+  const chapterDayTint = new Color("#ffffff");
+  const chapterDuskTint = new Color("#ffe4be");
 
   const api: ObservatorySplats = {
     get spark() { return spark; },
     get sky() { return sky; },
+    get skyBodies() { return skyBodies; },
     get chapters() { return chapters; },
     setQuality(next) {
       if (next === "low") {
@@ -319,15 +427,48 @@ export function createObservatorySplats({
       }
     },
     setExperience({ lighting, skyView, comparison, selectedSkyBody }) {
-      if (!sky) return;
-      sky.visible = skyView && !comparison;
+      currentExperience = { lighting, skyView, comparison, selectedSkyBody: selectedSkyBody ?? null };
       const dusk = lighting === "dusk";
+      const chapterTint = dusk ? chapterDuskTint : chapterDayTint;
+      for (const mesh of chapters.values()) {
+        mesh.recolor.copy(chapterTint);
+      }
+      if (!sky) return;
+      const showSky = skyView && !comparison;
+      sky.visible = showSky;
       sky.opacity = 0.96;
-      sky.recolor.copy(skyView || selectedSkyBody ? skyFocusTint : dusk ? duskTint : dayTint);
+      sky.recolor.copy(dusk ? duskTint : skyView || selectedSkyBody ? skyFocusTint : dayTint);
+      for (const [body, focusMesh] of skyBodies) {
+        const active = showSky && selectedSkyBody === body;
+        focusMesh.visible = active;
+        focusMesh.opacity = active ? 0.95 : 0;
+        focusMesh.scale.setScalar(active ? 1.18 : 1);
+        focusMesh.recolor.copy(dusk ? duskTint : skyFocusTint);
+      }
     },
     setChapterVolumes(selectedIds, skyView) {
       for (const [id, mesh] of chapters) {
-        mesh.visible = !skyView && selectedIds.includes(id);
+        const active = !skyView && selectedIds.includes(id);
+        mesh.visible = active;
+        mesh.opacity = active ? 1 : 0;
+      }
+    },
+    setBlend(skyBlend, chapterBlends) {
+      if (sky) {
+        const clampedSky = Math.max(0, Math.min(1, skyBlend));
+        sky.visible = clampedSky > 0.001 && !currentExperience.comparison;
+        sky.opacity = 0.96 * clampedSky;
+        for (const [body, focusMesh] of skyBodies) {
+          const active = sky.visible && currentExperience.selectedSkyBody === body;
+          focusMesh.visible = active;
+          focusMesh.opacity = active ? 0.95 * clampedSky : 0;
+          focusMesh.scale.setScalar(active ? 1 + 0.18 * clampedSky : 1);
+        }
+      }
+      for (const [id, mesh] of chapters) {
+        const blend = Math.max(0, Math.min(1, chapterBlends.get(id) ?? 0));
+        mesh.visible = blend > 0.001;
+        mesh.opacity = blend;
       }
     },
     attachChapterVolume(id, mesh, root) {
@@ -338,6 +479,7 @@ export function createObservatorySplats({
       }
       mesh.position.copy(root.position);
       mesh.rotation.copy(root.rotation);
+      mesh.recolor.copy(currentExperience.lighting === "dusk" ? chapterDuskTint : chapterDayTint);
       chapters.set(id, mesh);
       if (!scene.children.includes(mesh)) scene.add(mesh);
     },
@@ -357,6 +499,11 @@ export function createObservatorySplats({
         sky.dispose();
         sky = null;
       }
+      for (const focusMesh of skyBodies.values()) {
+        scene.remove(focusMesh);
+        focusMesh.dispose();
+      }
+      skyBodies.clear();
       for (const mesh of chapters.values()) {
         scene.remove(mesh);
         mesh.dispose();

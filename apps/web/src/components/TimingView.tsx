@@ -82,10 +82,14 @@ function Track({
   cycle,
   asOf,
   nextIndex,
+  activePassIndex,
+  onSelectPass,
 }: {
   cycle: TimingCycle;
   asOf: string;
   nextIndex: number;
+  activePassIndex: number | null;
+  onSelectPass: (passIndex: number | null) => void;
 }) {
   const active = cycle.status === "active";
   return (
@@ -99,8 +103,12 @@ function Track({
           className={`timing-track__pass${
             index === nextIndex ? " timing-track__pass--next" : ""
           }`}
+          data-pass-index={pass.pass_index}
+          data-active={activePassIndex === pass.pass_index ? "true" : undefined}
           key={pass.pass_index}
           style={at(pass.exact_at, cycle)}
+          onPointerEnter={() => onSelectPass(pass.pass_index)}
+          onPointerLeave={() => onSelectPass(null)}
         >
           {pass.pass_index}
         </span>
@@ -112,6 +120,7 @@ function Track({
 
 function CycleArticle({ cycle, asOf }: { cycle: TimingCycle; asOf: string }) {
   const headingId = useId();
+  const [activePassIndex, setActivePassIndex] = useState<number | null>(null);
   const nextIndex = nextPassIndex(cycle.passes, asOf);
   const nextPass = nextIndex === -1 ? null : cycle.passes[nextIndex] ?? null;
   const lastPass = cycle.passes[cycle.passes.length - 1] ?? null;
@@ -168,7 +177,13 @@ function CycleArticle({ cycle, asOf }: { cycle: TimingCycle; asOf: string }) {
         ) : null}
       </p>
 
-      <Track cycle={cycle} asOf={asOf} nextIndex={nextIndex} />
+      <Track
+        cycle={cycle}
+        asOf={asOf}
+        nextIndex={nextIndex}
+        activePassIndex={activePassIndex}
+        onSelectPass={setActivePassIndex}
+      />
       <p className="timing-cycle__span">
         <time dateTime={cycle.start_at}>{formatTimingDate(cycle.start_at, asOf)}</time>
         <span className="timing-cycle__length">
@@ -186,7 +201,14 @@ function CycleArticle({ cycle, asOf }: { cycle: TimingCycle; asOf: string }) {
                 ? "past"
                 : "later";
           return (
-            <li className={`timing-pass timing-pass--${relation}`} key={pass.pass_index}>
+            <li
+              className={`timing-pass timing-pass--${relation}`}
+              data-pass-index={pass.pass_index}
+              data-active={activePassIndex === pass.pass_index ? "true" : undefined}
+              key={pass.pass_index}
+              onPointerEnter={() => setActivePassIndex(pass.pass_index)}
+              onPointerLeave={() => setActivePassIndex(null)}
+            >
               <span className="timing-pass__index">Pass {pass.pass_index}</span>
               <time className="timing-pass__date" dateTime={pass.exact_at}>
                 {formatTimingDate(pass.exact_at, asOf)}

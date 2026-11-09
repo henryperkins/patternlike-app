@@ -18,6 +18,80 @@ import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
 type LoadedForm = { id: string; root: Group; resources: Object3D[]; artwork: boolean; };
 type Motion = { start: number; duration: number; from: CameraBookmark; to: CameraBookmark; positions: Vector3[]; goals: Vector3[]; };
+type AtmosphereState = {
+  clearColor: Color;
+  fogNear: number;
+  fogFar: number;
+  exposure: number;
+  envIntensity: number;
+  keyColor: Color;
+  keyIntensity: number;
+  keyPos: Vector3;
+  hemiColor: Color;
+  hemiIntensity: number;
+  rimIntensity: number;
+};
+
+function targetAtmosphere(dusk: boolean, skyView: boolean): AtmosphereState {
+  if (skyView) {
+    return {
+      clearColor: new Color(dusk ? "#091b21" : "#132629"),
+      fogNear: 4.8,
+      fogFar: 13.5,
+      exposure: dusk ? 1.02 : 1.08,
+      envIntensity: dusk ? 0.12 : 0.24,
+      keyColor: new Color(dusk ? "#ffd29d" : "#fff0d8"),
+      keyIntensity: dusk ? 1.15 : 2.2,
+      keyPos: new Vector3(-4, 8, 5),
+      hemiColor: new Color(dusk ? "#9bb8ce" : "#c8ded9"),
+      hemiIntensity: dusk ? 0.42 : 0.85,
+      rimIntensity: dusk ? 0.3 : 0.65,
+    };
+  }
+  return {
+    clearColor: new Color(dusk ? "#233d40" : "#536a60"),
+    fogNear: dusk ? 20 : 30,
+    fogFar: 75,
+    exposure: dusk ? 1.05 : 1.1,
+    envIntensity: dusk ? 0.1 : 0.35,
+    keyColor: new Color(dusk ? "#ffc991" : "#ffead0"),
+    keyIntensity: dusk ? 0.6 : 3.2,
+    keyPos: new Vector3(-6, dusk ? 5 : 10, 8),
+    hemiColor: new Color(dusk ? "#adc7da" : "#d9e8e3"),
+    hemiIntensity: dusk ? 0.5 : 1.35,
+    rimIntensity: dusk ? 0.35 : 1.1,
+  };
+}
+
+function cloneAtmosphere(state: AtmosphereState): AtmosphereState {
+  return {
+    clearColor: state.clearColor.clone(),
+    fogNear: state.fogNear,
+    fogFar: state.fogFar,
+    exposure: state.exposure,
+    envIntensity: state.envIntensity,
+    keyColor: state.keyColor.clone(),
+    keyIntensity: state.keyIntensity,
+    keyPos: state.keyPos.clone(),
+    hemiColor: state.hemiColor.clone(),
+    hemiIntensity: state.hemiIntensity,
+    rimIntensity: state.rimIntensity,
+  };
+}
+
+function sameAtmosphere(a: AtmosphereState, b: AtmosphereState): boolean {
+  return a.clearColor.equals(b.clearColor)
+    && a.fogNear === b.fogNear
+    && a.fogFar === b.fogFar
+    && a.exposure === b.exposure
+    && a.envIntensity === b.envIntensity
+    && a.keyColor.equals(b.keyColor)
+    && a.keyIntensity === b.keyIntensity
+    && a.keyPos.equals(b.keyPos)
+    && a.hemiColor.equals(b.hemiColor)
+    && a.hemiIntensity === b.hemiIntensity
+    && a.rimIntensity === b.rimIntensity;
+}
 
 function sceneDescription(props: PortraitSceneProps): string {
   if (!props.skyView && props.selectedIds.length === 2) {
@@ -126,6 +200,11 @@ class PortraitRuntime {
   private lastSparkTarget = new Vector3(Number.POSITIVE_INFINITY, 0, 0);
   private dimmed = new Set<string>();
   private materialState = new Map<MeshStandardMaterial, { opacity: number; transparent: boolean; depthWrite: boolean }>();
+  private chapterBlends = new Map<string, number>();
+  private skyBlend = 0;
+  private currentAtmosphere: AtmosphereState | null = null;
+  private atmosphereMotion: { start: number; duration: number; from: AtmosphereState; to: AtmosphereState } | null = null;
+  private ringPulse: { index: number; start: number; duration: number } | null = null;
   private lastFrame = 0;
 
   constructor(private host: HTMLDivElement, private labels: HTMLDivElement, private forms: LoadedForm[], props: PortraitSceneProps, private fail: () => void, private reportStatus: (status: SceneStatus) => void) {
@@ -399,28 +478,78 @@ class PortraitRuntime {
     }
   }
 
+  private applyMeshBlend(form: LoadedForm, blend: number): void {
+    const clamped = Math.max(0, Math.min(1, blend));
+    if (clamped <= 0) {
+      if (this.dimmed.has(form.id)) this.restoreDimmed(form.id);
+      return;
+    }
+    form.root.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!(material instanceof MeshStandardMaterial)) continue;
+        if (!this.materialState.has(material)) {
+          this.materialState.set(material, { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite });
+        }
+        const saved = this.materialState.get(material)!;
+        material.transparent = true;
+        material.opacity = saved.opacity * (1 - clamped);
+        material.depthWrite = clamped < 0.5 ? saved.depthWrite : false;
+        material.needsUpdate = true;
+      }
+    });
+    this.dimmed.add(form.id);
+  }
+
   private updateMeshDimming(): void {
-    if (!this.splats) { this.restoreDimmed(); return; }
+    if (!this.splats) {
+      this.restoreDimmed();
+      this.chapterBlends.clear();
+      this.skyBlend = 0;
+      return;
+    }
+    const immediate = this.props.reducedMotion || !this.ready;
+    const targetSky = !this.comparison() && this.props.skyView && Boolean(this.splats.sky) ? 1 : 0;
+    if (immediate) this.skyBlend = targetSky;
     for (const form of this.forms) {
       const shouldDim = !this.props.skyView && form.artwork && this.props.selectedIds.includes(form.id) && this.splats.chapters.has(form.id);
-      const isDimmed = this.dimmed.has(form.id);
-      if (shouldDim === isDimmed) continue;
-      if (!shouldDim) { this.restoreDimmed(form.id); continue; }
-      form.root.traverse((object) => {
-        if (!(object instanceof Mesh)) return;
-        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-          if (!(material instanceof MeshStandardMaterial)) continue;
-          if (!this.materialState.has(material)) {
-            this.materialState.set(material, { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite });
-          }
-          material.transparent = true;
-          material.opacity = 0;
-          material.depthWrite = false;
-          material.needsUpdate = true;
-        }
-      });
-      this.dimmed.add(form.id);
+      const target = shouldDim ? 1 : 0;
+      if (immediate) {
+        this.chapterBlends.set(form.id, target);
+        this.applyMeshBlend(form, target);
+      } else if (!this.chapterBlends.has(form.id)) {
+        this.chapterBlends.set(form.id, 0);
+      }
     }
+    this.splats.setBlend(this.skyBlend, this.chapterBlends);
+  }
+
+  private stepSplatBlends(seconds: number): boolean {
+    if (!this.splats) return false;
+    const step = seconds >= 1 ? 1 : Math.min(1, seconds / 0.32);
+    let moving = false;
+    const targetSky = !this.comparison() && this.props.skyView && Boolean(this.splats.sky) ? 1 : 0;
+    if (this.skyBlend !== targetSky) {
+      const diff = targetSky - this.skyBlend;
+      this.skyBlend = Math.abs(diff) <= step ? targetSky : this.skyBlend + Math.sign(diff) * step;
+      moving ||= this.skyBlend !== targetSky;
+      this.splatVisibilityDirty = true;
+    }
+    for (const form of this.forms) {
+      const shouldDim = !this.props.skyView && form.artwork && this.props.selectedIds.includes(form.id) && this.splats.chapters.has(form.id);
+      const target = shouldDim ? 1 : 0;
+      const current = this.chapterBlends.get(form.id) ?? 0;
+      if (current !== target) {
+        const diff = target - current;
+        const next = Math.abs(diff) <= step ? target : current + Math.sign(diff) * step;
+        this.chapterBlends.set(form.id, next);
+        this.applyMeshBlend(form, next);
+        moving ||= next !== target;
+        this.splatVisibilityDirty = true;
+      }
+    }
+    this.splats.setBlend(this.skyBlend, this.chapterBlends);
+    return moving;
   }
 
   private syncSplatState(): void {
@@ -472,29 +601,51 @@ class PortraitRuntime {
     this.renderer.setSize(this.width, this.height, false);
   }
 
+  private applyAtmosphere(state: AtmosphereState) {
+    this.renderer.setClearColor(state.clearColor);
+    if (this.scene.fog instanceof Fog) {
+      this.scene.fog.color.copy(state.clearColor);
+      this.scene.fog.near = state.fogNear;
+      this.scene.fog.far = state.fogFar;
+    } else {
+      this.scene.fog = new Fog(state.clearColor.clone(), state.fogNear, state.fogFar);
+    }
+    this.renderer.toneMappingExposure = state.exposure;
+    this.scene.environmentIntensity = state.envIntensity;
+    this.keyLight.color.copy(state.keyColor);
+    this.keyLight.intensity = state.keyIntensity;
+    this.keyLight.position.copy(state.keyPos);
+    this.hemisphere.color.copy(state.hemiColor);
+    this.hemisphere.intensity = state.hemiIntensity;
+    this.rimLight.intensity = state.rimIntensity;
+  }
+
   private applyExperience() {
     const experience = this.props.experience;
     if (!this.world || !experience) return;
-    this.world.setState({ ...experience, open: this.forms.map(form => Boolean(experience.openDesks[form.id])), unfolded: this.props.unfolded,
+    const skyView = Boolean(this.props.skyView) && !this.comparison();
+    this.world.setState({ ...experience, skyView, open: this.forms.map(form => Boolean(experience.openDesks[form.id])), unfolded: this.props.unfolded,
       comparison: this.comparison() ? { indices: this.selectedIndices(), positions: this.forms.map((_, index) => this.layout(index, this.props.unfolded)) } : undefined });
     this.world.instrument.setSelection(this.props.selectedSkyBody ?? null, this.props.sky ? null : this.props.sunSign);
     this.world.instrument.setFocused(Boolean(this.props.skyView));
     this.applySplatExperience();
     const dusk = experience.lighting === "dusk";
-    const sky = dusk ? "#233d40" : "#536a60";
-    this.renderer.setClearColor(sky);
-    this.scene.fog = new Fog(sky, dusk ? 20 : 30, 75);
-    this.renderer.toneMappingExposure = dusk ? 1.05 : 1.1;
-    this.scene.environmentIntensity = dusk ? 0.1 : 0.35;
-    this.keyLight.color.set(dusk ? "#ffc991" : "#ffead0");
-    this.keyLight.intensity = dusk ? 0.6 : 3.2;
-    this.keyLight.position.set(-6, dusk ? 5 : 10, 8);
-    this.hemisphere.intensity = dusk ? 0.5 : 1.35;
-    this.hemisphere.color.set(dusk ? "#adc7da" : "#d9e8e3");
-    this.rimLight.intensity = dusk ? 0.35 : 1.1;
+    const goal = targetAtmosphere(dusk, skyView);
     const ground = this.ground.material as MeshStandardMaterial;
-    ground.color.set("#3b4839");
-    if (this.props.reducedMotion) this.world.tick(1);
+    ground.color.set(skyView ? "#18231e" : "#3b4839");
+    if (this.props.reducedMotion || !this.ready || !this.currentAtmosphere) {
+      this.currentAtmosphere = cloneAtmosphere(goal);
+      this.atmosphereMotion = null;
+      this.applyAtmosphere(this.currentAtmosphere);
+      if (this.props.reducedMotion) this.world.tick(1);
+    } else if (!sameAtmosphere(this.currentAtmosphere, goal)) {
+      this.atmosphereMotion = {
+        start: performance.now(),
+        duration: 360,
+        from: cloneAtmosphere(this.currentAtmosphere),
+        to: goal,
+      };
+    }
   }
 
   update(props: PortraitSceneProps) {
@@ -502,6 +653,15 @@ class PortraitRuntime {
     const turned = before.viewKey === props.viewKey && !props.skyView && props.selectedIds.length === 1
       && props.selectedIds.some(id => (before.experience?.turns[id] ?? 0) !== (props.experience?.turns[id] ?? 0));
     const previousBounds = turned ? this.selectedIndices().map(index => this.bounds()[index]) : null;
+    if (!props.reducedMotion && this.ready && !props.skyView) {
+      const pulsedId = props.selectedIds.find(id => (before.activePassages[id] ?? 0) !== (props.activePassages[id] ?? 0) && before.facet === props.facet);
+      if (pulsedId) {
+        const index = this.forms.findIndex(form => form.id === pulsedId);
+        if (index >= 0) this.ringPulse = { index, start: performance.now(), duration: 360 };
+      }
+    } else if (props.reducedMotion) {
+      this.ringPulse = null;
+    }
     if (before.viewKey !== props.viewKey) this.save();
     this.props = props;
     this.renderer.domElement.setAttribute("aria-label", sceneDescription(props));
@@ -834,6 +994,27 @@ class PortraitRuntime {
       const seconds = this.props.reducedMotion ? 1 : Math.min(0.05, Math.max(0.001, (now - this.lastFrame) / 1000));
       this.lastFrame = now;
       let worldMoving = this.world?.tick(seconds) ?? false;
+      worldMoving = this.stepSplatBlends(seconds) || worldMoving;
+      if (this.atmosphereMotion && this.currentAtmosphere) {
+        const amount = this.props.reducedMotion ? 1 : Math.min(1, Math.max(0, (now - this.atmosphereMotion.start) / this.atmosphereMotion.duration));
+        const eased = amount * amount * (3 - 2 * amount);
+        const { from, to } = this.atmosphereMotion;
+        const lerp = (a: number, b: number) => a + (b - a) * eased;
+        this.currentAtmosphere.clearColor.copy(from.clearColor).lerp(to.clearColor, eased);
+        this.currentAtmosphere.fogNear = lerp(from.fogNear, to.fogNear);
+        this.currentAtmosphere.fogFar = lerp(from.fogFar, to.fogFar);
+        this.currentAtmosphere.exposure = lerp(from.exposure, to.exposure);
+        this.currentAtmosphere.envIntensity = lerp(from.envIntensity, to.envIntensity);
+        this.currentAtmosphere.keyColor.copy(from.keyColor).lerp(to.keyColor, eased);
+        this.currentAtmosphere.keyIntensity = lerp(from.keyIntensity, to.keyIntensity);
+        this.currentAtmosphere.keyPos.lerpVectors(from.keyPos, to.keyPos, eased);
+        this.currentAtmosphere.hemiColor.copy(from.hemiColor).lerp(to.hemiColor, eased);
+        this.currentAtmosphere.hemiIntensity = lerp(from.hemiIntensity, to.hemiIntensity);
+        this.currentAtmosphere.rimIntensity = lerp(from.rimIntensity, to.rimIntensity);
+        this.applyAtmosphere(this.currentAtmosphere);
+        if (amount === 1) this.atmosphereMotion = null;
+        else worldMoving = true;
+      }
       this.forms.forEach(form => {
         const goal = (this.props.experience?.turns[form.id] ?? 0) * Math.PI / 4;
         form.root.rotation.y = seconds >= 1 || Math.abs(form.root.rotation.y - goal) < 0.001 ? goal
@@ -848,6 +1029,15 @@ class PortraitRuntime {
         this.forms.forEach((form, index) => form.root.position.lerpVectors(this.motion!.positions[index]!, this.motion!.goals[index]!, eased));
         this.controls.update();
         if (amount === 1) { this.motion = null; this.save(); }
+      }
+      if (this.ringPulse) {
+        const amount = this.props.reducedMotion ? 1 : Math.min(1, Math.max(0, (now - this.ringPulse.start) / this.ringPulse.duration));
+        const ringMat = this.rings[this.ringPulse.index]?.material;
+        if (ringMat instanceof MeshStandardMaterial) {
+          ringMat.emissiveIntensity = amount >= 1 ? 0.25 : 0.25 + Math.sin(amount * Math.PI) * 0.65;
+        }
+        if (amount >= 1) this.ringPulse = null;
+        else worldMoving = true;
       }
       this.rings.forEach((ring, index) => {
         const position = this.forms[index]!.root.position;
@@ -973,7 +1163,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
   }, [assetKey]);
 
   const facet = facets.find(item => item.id === props.facet)!;
-  return <div className="explorer-scene-renderer" style={{ position: "relative", width: "100%", height: "100%" }}>
+  return <div className="explorer-scene-renderer" data-status={status} style={{ position: "relative", width: "100%", height: "100%" }}>
     <div className="explorer-canvas-host" ref={host} style={{ position: "absolute", inset: 0 }} />
     <div className="explorer-labels" ref={labels} style={{ position: "absolute", inset: 0, pointerEvents: "none", visibility: status === "ready" ? "visible" : "hidden" }}>
       {props.experience && ZODIAC_SIGNS.map((sign, index) => <span key={sign} className="sky-sign-label" data-sign-index={index} aria-hidden="true" style={{ visibility: "hidden" }}>{signLabel(sign)}</span>)}

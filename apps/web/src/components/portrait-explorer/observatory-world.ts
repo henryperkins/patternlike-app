@@ -71,6 +71,7 @@ export function observatoryFrame(boxes: readonly Box3[], selected: readonly numb
 
 interface WorldState {
   roofOpen: boolean; lighting: "day" | "dusk"; open: boolean[]; unfolded: boolean;
+  skyView?: boolean;
   comparison?: { indices: readonly number[]; positions: readonly Point3[] };
 }
 export interface ObservatoryWorld {
@@ -79,6 +80,7 @@ export interface ObservatoryWorld {
   roof: Group;
   stations: Group[];
   desks: Group[];
+  lights: PointLight[];
   setState: (state: WorldState) => void;
   tick: (seconds: number) => boolean;
 }
@@ -279,16 +281,29 @@ export function createObservatory(count: number, placements: readonly PortraitSk
     root.add(station);
     stations.push(station); desks.push(lid); lights.push(light);
   }
-  let state: WorldState = { roofOpen: true, lighting: "day", open: [], unfolded: false };
+  let state: WorldState = { roofOpen: true, lighting: "day", open: [], unfolded: false, skyView: false };
   roof.visible = false;
-  const approach = (current: number, goal: number, fraction: number) => Math.abs(goal - current) < 0.001 ? goal : current + (goal - current) * fraction;
+  const approach = (current: number, goal: number, fraction: number, epsilon = 0.001) => Math.abs(goal - current) < epsilon ? goal : current + (goal - current) * fraction;
+  const targetGlassIntensity = () => state.skyView ? (state.lighting === "dusk" ? 1.4 : 0.35) : (state.lighting === "dusk" ? 3 : 0.6);
+  const targetLightIntensity = (index: number) => {
+    if (state.skyView) return state.lighting === "dusk" ? 4.5 : 0.15;
+    const open = Boolean(state.open[index]);
+    if (state.lighting === "dusk") return open ? 24 : 18;
+    return open ? 2.4 : 0.4;
+  };
   const tick = (seconds: number) => {
     const fraction = seconds >= 1 ? 1 : 1 - Math.exp(-Math.max(0, seconds) * 9);
     let moving = false;
+    const glassGoal = targetGlassIntensity();
+    glass.emissiveIntensity = approach(glass.emissiveIntensity, glassGoal, fraction, 0.01);
+    moving ||= glass.emissiveIntensity !== glassGoal;
     desks.forEach((desk, index) => {
       const goal = state.open[index] ? -1.25 : 0;
       desk.rotation.x = approach(desk.rotation.x, goal, fraction);
       moving ||= desk.rotation.x !== goal;
+      const lightGoal = targetLightIntensity(index);
+      lights[index]!.intensity = approach(lights[index]!.intensity, lightGoal, fraction, 0.02);
+      moving ||= lights[index]!.intensity !== lightGoal;
       const destination = state.comparison?.positions[index] ?? stationPosition(index, state.unfolded, count);
       for (const [axis, value] of (["x", "y", "z"] as const).map((axis, i) => [axis, destination[i]] as const)) {
         stations[index].position[axis] = approach(stations[index].position[axis], value, fraction);
@@ -297,13 +312,11 @@ export function createObservatory(count: number, placements: readonly PortraitSk
     });
     return moving;
   };
-  return { root, roof, instrument, stations, desks, tick, setState(next) {
+  return { root, roof, instrument, stations, desks, lights, tick, setState(next) {
     state = next;
     architecture.visible = !state.comparison;
     instrument.root.visible = !state.comparison;
     roof.visible = !state.comparison && !state.roofOpen;
     stations.forEach((station, index) => { station.visible = !state.comparison || state.comparison.indices.includes(index); });
-    glass.emissiveIntensity = state.lighting === "dusk" ? 3 : 0.6;
-    lights.forEach(light => { light.intensity = state.lighting === "dusk" ? 18 : 0.4; });
   } };
 }

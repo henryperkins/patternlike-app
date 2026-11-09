@@ -1132,6 +1132,16 @@ a.button {
 .wheel-aspect {
   stroke-width: 0.85;
   opacity: 0.52;
+  transition: opacity 150ms ease, stroke-width 150ms ease;
+}
+
+.wheel-aspect[data-active="true"] {
+  stroke-width: 1.45;
+  opacity: 0.95;
+}
+
+.wheel-aspect[data-dimmed="true"] {
+  opacity: 0.14;
 }
 
 .wheel-aspect--conjunction,
@@ -1146,6 +1156,15 @@ a.button {
   stroke-dasharray: 3 3;
 }
 
+.wheel-body {
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.wheel-body[data-dimmed="true"] {
+  opacity: 0.36;
+}
+
 .wheel-body > line:first-child,
 .wheel-body__leader {
   stroke: var(--forest);
@@ -1156,6 +1175,12 @@ a.button {
   opacity: 0.45;
 }
 
+.wheel-body[data-active="true"] .wheel-body__leader {
+  stroke: var(--coral);
+  stroke-width: 1.1;
+  opacity: 0.9;
+}
+
 .wheel-body > circle:not(.wheel-body__label-bg) {
   fill: var(--coral);
   stroke: #fff;
@@ -1164,6 +1189,16 @@ a.button {
 
 .wheel-body__label-bg {
   fill: var(--forest);
+  transition: fill 150ms ease, stroke 150ms ease;
+}
+
+.wheel-body[data-active="true"] .wheel-body__label-bg {
+  fill: var(--coral);
+}
+
+.wheel-body[data-connected="true"] .wheel-body__label-bg {
+  stroke: var(--coral);
+  stroke-width: 1.5;
 }
 
 .wheel-body text {
@@ -1346,6 +1381,19 @@ a.button {
   min-height: 48px;
   border-bottom: 1px solid var(--line);
   font-size: var(--label-md);
+  transition: background-color 150ms ease, padding-left 150ms ease, box-shadow 150ms ease;
+}
+
+.position-row[data-active="true"] {
+  background: var(--forest-light);
+  box-shadow: inset 3px 0 0 var(--coral);
+  padding-left: 10px;
+}
+
+.position-row[data-connected="true"] {
+  background: rgba(220, 231, 223, 0.45);
+  box-shadow: inset 2px 0 0 var(--forest);
+  padding-left: 8px;
 }
 
 .position-row__body {
@@ -3734,14 +3782,20 @@ a.button {
   content: "";
 }
 
-.timing-track__pass--next {
+.timing-track__pass--next,
+.timing-track__pass[data-active="true"] {
   color: var(--coral-ink);
   font-weight: 700;
 }
 
-.timing-track__pass--next::after {
+.timing-track__pass--next::after,
+.timing-track__pass[data-active="true"]::after {
   width: 2px;
   background: var(--coral);
+}
+
+.timing-track__pass[data-active="true"]::after {
+  height: 15px;
 }
 
 .timing-track__now {
@@ -3797,6 +3851,13 @@ a.button {
   gap: 2px 12px;
   padding: 9px 0;
   border-bottom: 1px solid var(--line);
+  transition: background-color 150ms ease, padding-inline 150ms ease, box-shadow 150ms ease;
+}
+
+.timing-pass[data-active="true"] {
+  background: var(--forest-light);
+  box-shadow: inset 3px 0 0 var(--coral);
+  padding-inline: 10px;
 }
 
 .timing-pass__index,

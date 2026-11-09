@@ -76,6 +76,21 @@ describe("observatory Gaussian splats (@sparkjsdev/spark)", () => {
       expect(size.x).toBeGreaterThan(0.5);
       expect(size.y).toBeGreaterThan(0.2);
       expect(size.z).toBeGreaterThan(0.5);
+      let topLum = 0;
+      let topCount = 0;
+      let bottomLum = 0;
+      let bottomCount = 0;
+      let subsurfaceCount = 0;
+      splats.forEachSplat((_index, center, _scales, _quat, opacity, color) => {
+        if (opacity < 0.7) subsurfaceCount++;
+        const lum = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+        if (center.y > 0.22 && opacity >= 0.7) { topLum += lum; topCount++; }
+        if (center.y < -0.22 && opacity >= 0.7) { bottomLum += lum; bottomCount++; }
+      });
+      expect(subsurfaceCount).toBe(400);
+      expect(topCount).toBeGreaterThan(50);
+      expect(bottomCount).toBeGreaterThan(50);
+      expect(topLum / topCount).toBeGreaterThan(bottomLum / bottomCount);
       const raycaster = new Raycaster(new Vector3(0, 5, 0), new Vector3(0, -1, 0));
       expect(raycaster.intersectObject(splats, true)).toEqual([]);
     } finally {
@@ -133,13 +148,23 @@ describe("observatory Gaussian splats (@sparkjsdev/spark)", () => {
       expect(splats.sky!.visible).toBe(true);
       expect(splats.sky!.opacity).toBeCloseTo(0.96);
       expect(splats.sky!.recolor.equals(new Color("#fff3d6"))).toBe(true);
+      expect(splats.skyBodies.get("sun")?.visible).toBe(true);
+      expect(splats.skyBodies.get("sun")?.scale.x).toBeCloseTo(1.18);
+
+      splats.setExperience({ lighting: "dusk", skyView: true, comparison: false, selectedSkyBody: "sun" });
+      expect(splats.sky!.visible).toBe(true);
+      expect(splats.sky!.recolor.equals(new Color("#ffe0b5"))).toBe(true);
 
       splats.setExperience({ lighting: "dusk", skyView: false, comparison: false, selectedSkyBody: null });
       expect(splats.sky!.visible).toBe(false);
+      expect(splats.skyBodies.get("sun")?.visible).toBe(false);
 
       const volume = createChapterVolumeSplats(firstRoot, 500);
       splats.attachChapterVolume("chapter-1", volume, firstRoot);
       expect(scene.children).toContain(volume);
+      expect(volume.recolor.equals(new Color("#ffe4be"))).toBe(true);
+      splats.setExperience({ lighting: "day", skyView: false, comparison: false, selectedSkyBody: null });
+      expect(volume.recolor.equals(new Color("#ffffff"))).toBe(true);
       splats.setChapterVolumes(["chapter-1"], false);
       expect(volume.visible).toBe(true);
       splats.setChapterVolumes(["chapter-1"], true);
