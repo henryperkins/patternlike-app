@@ -2,6 +2,7 @@ import { Box3, Mesh, Texture, Vector3, type Object3D, type Material, type Raycas
 import type { CameraBookmark, Point3, PortraitMeshAsset } from "./types.js";
 
 export const MAX_GLB_BYTES = 12 * 1024 * 1024;
+export const MAX_SPZ_BYTES = 16 * 1024 * 1024;
 export const HOME_DIRECTION = new Vector3(0.15, 0.76, 1).normalize();
 
 /** Raycaster does not itself exclude invisible ancestors, including a cutaway roof. */
@@ -69,6 +70,21 @@ export function validateGlb(bytes: ArrayBuffer, chapterId?: string, source?: Por
       }
     }
   }
+}
+
+async function sha256Hex(bytes: ArrayBuffer | Uint8Array): Promise<string> {
+  const buffer = bytes instanceof Uint8Array ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer : bytes;
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** Verify an optional .spz companion: exact hash, bounded size. Failure keeps the mesh/folio. */
+export async function verifySplatAsset(bytes: ArrayBuffer | Uint8Array, expected: string): Promise<void> {
+  if (!/^[a-f0-9]{64}$/.test(expected)) throw new Error("Invalid splat hash");
+  const length = bytes instanceof Uint8Array ? bytes.byteLength : bytes.byteLength;
+  if (length === 0 || length > MAX_SPZ_BYTES) throw new Error("Invalid splat size");
+  const actual = await sha256Hex(bytes);
+  if (actual !== expected) throw new Error("Splat hash mismatch");
 }
 
 export async function verifyGlbAsset(bytes: ArrayBuffer, expected: string, chapterId?: string, source?: PortraitMeshAsset): Promise<void> {

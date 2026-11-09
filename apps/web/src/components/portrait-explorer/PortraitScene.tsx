@@ -9,13 +9,14 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, placeLabel, TapTracker, type LabelRect, verifyGlbAsset } from "./scene-utils.js";
+import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, MAX_SPZ_BYTES, placeLabel, TapTracker, type LabelRect, verifyGlbAsset, verifySplatAsset } from "./scene-utils.js";
 import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
 import { comparisonPosition, createObservatory, createReadingFolio, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
+import type { ObservatorySplats } from "./observatory-splats.js";
 import { BodyIcon, signLabel, skyBodyLabels } from "./SkyReader.js";
 import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
-type LoadedForm = { id: string; root: Group; resources: Object3D[]; };
+type LoadedForm = { id: string; root: Group; resources: Object3D[]; artwork: boolean; };
 type Motion = { start: number; duration: number; from: CameraBookmark; to: CameraBookmark; positions: Vector3[]; goals: Vector3[]; };
 
 function sceneDescription(props: PortraitSceneProps): string {
@@ -79,7 +80,7 @@ async function loadForm(asset: PortraitSceneProps["assets"][number], signal: Abo
         object.userData.chapterId = asset.chapterId;
       }
     });
-    return { id: asset.chapterId, root, resources };
+    return { id: asset.chapterId, root, resources, artwork: true };
   } catch (error) { disposeModel(resources); throw error; }
 }
 
@@ -117,6 +118,14 @@ class PortraitRuntime {
   private hemisphere!: HemisphereLight;
   private rimLight!: DirectionalLight;
   private world: ObservatoryWorld | null = null;
+  private splats: ObservatorySplats | null = null;
+  private splatModule: typeof import("./observatory-splats.js") | null = null;
+  private splatLoad: Promise<void> | null = null;
+  private splatVisibilityDirty = true;
+  private lastSparkPos = new Vector3(Number.POSITIVE_INFINITY, 0, 0);
+  private lastSparkTarget = new Vector3(Number.POSITIVE_INFINITY, 0, 0);
+  private dimmed = new Set<string>();
+  private materialState = new Map<MeshStandardMaterial, { opacity: number; transparent: boolean; depthWrite: boolean }>();
   private lastFrame = 0;
 
   constructor(private host: HTMLDivElement, private labels: HTMLDivElement, private forms: LoadedForm[], props: PortraitSceneProps, private fail: () => void, private reportStatus: (status: SceneStatus) => void) {
@@ -216,9 +225,11 @@ class PortraitRuntime {
       form.root.position.fromArray(this.layout(index, props.unfolded));
       form.root.position.y = this.elevations[index]!;
     });
+    this.splats?.syncTransforms(this.forms);
     const pose = isCameraBookmark(props.bookmark) ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame();
     this.applyPose(pose);
     this.updateEmphasis();
+    this.syncSplatState();
     this.invalidate();
     } catch (error) {
       this.dispose();
@@ -269,6 +280,173 @@ class PortraitRuntime {
     this.controls.update();
   };
 
+  private needsSpark = (): boolean => {
+    if (this.props.quality === "low") return false;
+    if (this.props.skyView && this.world) return true;
+    return this.forms.some((form) => form.artwork && this.props.selectedIds.includes(form.id) && !this.props.skyView);
+  };
+
+  private handleSparkDirty = () => {
+    if (this.disposed) return;
+    const target = this.controls?.target;
+    if (this.splatVisibilityDirty || !target
+      || this.camera.position.distanceToSquared(this.lastSparkPos) > 1e-8
+      || target.distanceToSquared(this.lastSparkTarget) > 1e-8) {
+      this.invalidate();
+    }
+  };
+
+  private async createChapterVolume(form: LoadedForm): Promise<void> {
+    const module = this.splatModule;
+    if (!module || !this.splats) return;
+    const asset = this.props.assets.find((item) => item.chapterId === form.id);
+    try {
+      let mesh;
+      if (asset?.splat) {
+        const response = await fetch(asset.splat.url, { credentials: "same-origin" });
+        if (!response.ok) throw new Error("Splat delivery failed");
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength > MAX_SPZ_BYTES) throw new Error("Splat size exceeded");
+        await verifySplatAsset(bytes, asset.splat.sha256);
+        if (this.disposed || !this.splats) return;
+        mesh = await module.createChapterSplatFromBytes(bytes);
+      } else {
+        mesh = module.createChapterVolumeSplats(form.root);
+        const count = (mesh as unknown as { numSplats?: number }).numSplats ?? mesh.splats?.getNumSplats() ?? 0;
+        if (count <= 1) { mesh.dispose(); return; }
+      }
+      if (this.disposed || !this.splats) { mesh.dispose(); return; }
+      mesh.name = `Chapter volume ${form.id}`;
+      this.splats.attachChapterVolume(form.id, mesh, form.root);
+    } catch {
+      // Hash, delivery, or bake failure keeps the verified mesh/folio.
+    }
+  }
+
+  private async ensureChapterVolumes(): Promise<void> {
+    if (!this.splats || !this.splatModule) return;
+    for (const form of this.forms) {
+      if (!form.artwork || this.props.skyView || !this.props.selectedIds.includes(form.id)) continue;
+      if (this.splats.chapters.has(form.id)) continue;
+      await this.createChapterVolume(form);
+    }
+  }
+
+  private ensureSplatsIfNeeded(): void {
+    if (this.splats || this.splatLoad || !this.needsSpark()) return;
+    this.splatLoad = (async () => {
+      try {
+        const module = await import("./observatory-splats.js");
+        this.splatModule = module;
+        if (this.disposed || !this.needsSpark() || this.props.quality === "low") return;
+        this.splats = module.createObservatorySplats({
+          renderer: this.renderer,
+          scene: this.scene,
+          placements: this.props.sky?.placements ?? [],
+          hasCourtyard: Boolean(this.world),
+          quality: this.props.quality,
+          onDirty: this.handleSparkDirty,
+        });
+        await this.ensureChapterVolumes();
+        if (this.disposed) return;
+        this.applySplatExperience();
+        this.splatVisibilityDirty = true;
+        this.invalidate();
+      } catch {
+        // Spark is optional: meshes, desks, and prose remain the reading.
+      } finally {
+        this.splatLoad = null;
+      }
+    })();
+  }
+
+  private applySplatExperience(): void {
+    if (!this.splats) return;
+    this.splatVisibilityDirty = true;
+    const experience = this.props.experience;
+    this.splats.setExperience({
+      lighting: experience?.lighting ?? "day",
+      skyView: Boolean(this.props.skyView),
+      comparison: this.comparison(),
+      selectedSkyBody: this.props.selectedSkyBody ?? null,
+    });
+    this.splats.setChapterVolumes(this.props.selectedIds, Boolean(this.props.skyView));
+    this.splats.syncTransforms(this.forms);
+    this.updateMeshDimming();
+  }
+
+  private restoreDimmed(formId?: string): void {
+    const ids = formId ? [formId] : [...this.dimmed];
+    for (const id of ids) {
+      const form = this.forms.find((item) => item.id === id);
+      if (form) {
+        form.root.traverse((object) => {
+          if (!(object instanceof Mesh)) return;
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+            if (!(material instanceof MeshStandardMaterial)) continue;
+            const saved = this.materialState.get(material);
+            if (saved) {
+              material.opacity = saved.opacity;
+              material.transparent = saved.transparent;
+              material.depthWrite = saved.depthWrite;
+              material.needsUpdate = true;
+              this.materialState.delete(material);
+            }
+          }
+        });
+      }
+      this.dimmed.delete(id);
+    }
+  }
+
+  private updateMeshDimming(): void {
+    if (!this.splats) { this.restoreDimmed(); return; }
+    for (const form of this.forms) {
+      const shouldDim = !this.props.skyView && form.artwork && this.props.selectedIds.includes(form.id) && this.splats.chapters.has(form.id);
+      const isDimmed = this.dimmed.has(form.id);
+      if (shouldDim === isDimmed) continue;
+      if (!shouldDim) { this.restoreDimmed(form.id); continue; }
+      form.root.traverse((object) => {
+        if (!(object instanceof Mesh)) return;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if (!(material instanceof MeshStandardMaterial)) continue;
+          if (!this.materialState.has(material)) {
+            this.materialState.set(material, { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite });
+          }
+          material.transparent = true;
+          material.opacity = 0;
+          material.depthWrite = false;
+          material.needsUpdate = true;
+        }
+      });
+      this.dimmed.add(form.id);
+    }
+  }
+
+  private syncSplatState(): void {
+    if (this.props.quality === "low") {
+      this.restoreDimmed();
+      this.splats?.dispose();
+      this.splats = null;
+      return;
+    }
+    if (!this.needsSpark()) {
+      this.applySplatExperience();
+      return;
+    }
+    if (!this.splats) {
+      this.ensureSplatsIfNeeded();
+      return;
+    }
+    void this.ensureChapterVolumes().then(() => {
+      if (this.disposed) return;
+      this.applySplatExperience();
+      this.splatVisibilityDirty = true;
+      this.invalidate();
+    });
+    this.applySplatExperience();
+  }
+
   private applyQuality() {
     const low = this.props.quality === "low";
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, low ? 1 : 1.6));
@@ -284,6 +462,13 @@ class PortraitRuntime {
     }
     this.scene.environment = low ? null : this.environment?.texture ?? null;
     this.scene.environmentIntensity = 0.42;
+    if (low) {
+      this.restoreDimmed();
+      this.splats?.dispose();
+      this.splats = null;
+    } else {
+      this.splats?.setQuality(this.props.quality);
+    }
     this.renderer.setSize(this.width, this.height, false);
   }
 
@@ -294,6 +479,7 @@ class PortraitRuntime {
       comparison: this.comparison() ? { indices: this.selectedIndices(), positions: this.forms.map((_, index) => this.layout(index, this.props.unfolded)) } : undefined });
     this.world.instrument.setSelection(this.props.selectedSkyBody ?? null, this.props.sky ? null : this.props.sunSign);
     this.world.instrument.setFocused(Boolean(this.props.skyView));
+    this.applySplatExperience();
     const dusk = experience.lighting === "dusk";
     const sky = dusk ? "#233d40" : "#536a60";
     this.renderer.setClearColor(sky);
@@ -329,6 +515,7 @@ class PortraitRuntime {
     if (before.command.serial !== props.command.serial) this.command(before.unfolded !== props.unfolded ? 540 : 420);
     if (props.reducedMotion && this.motion) {
       this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
+      this.splats?.syncTransforms(this.forms);
       this.applyPose(this.motion.to);
       this.motion = null;
       this.save();
@@ -340,6 +527,7 @@ class PortraitRuntime {
       this.resize();
     }
     this.updateEmphasis();
+    this.syncSplatState();
     this.observeLabels();
     this.invalidate();
   }
@@ -367,6 +555,7 @@ class PortraitRuntime {
     });
     if (this.props.reducedMotion) {
       this.forms.forEach((form, index) => form.root.position.copy(goals[index]!));
+      this.splats?.syncTransforms(this.forms);
       this.applyPose(pose);
       this.motion = null;
       this.save();
@@ -415,7 +604,10 @@ class PortraitRuntime {
 
   private stopMotion() {
     // Direct input interrupts camera motion; assembly finishes at its stable destination.
-    if (this.motion) this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
+    if (this.motion) {
+      this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
+      this.splats?.syncTransforms(this.forms);
+    }
     this.motion = null;
   }
   private onOrbitStart = () => { this.stopMotion(); this.orbiting = true; this.renderer.domElement.style.cursor = "grabbing"; };
@@ -477,6 +669,8 @@ class PortraitRuntime {
         }
       });
     });
+    this.splats?.setChapterVolumes(this.props.selectedIds, Boolean(this.props.skyView));
+    this.updateMeshDimming();
   }
 
   private resize = () => {
@@ -661,7 +855,11 @@ class PortraitRuntime {
         this.world?.stations[index]?.position.set(position.x, 0, position.z);
         ring.position.set(position.x, this.world ? 0.56 : 0.005, position.z);
       });
+      this.splats?.syncTransforms(this.forms);
       this.renderer.render(this.scene, this.camera);
+      this.lastSparkPos.copy(this.camera.position);
+      if (this.controls) this.lastSparkTarget.copy(this.controls.target);
+      this.splatVisibilityDirty = false;
       this.projectLabels();
       if (!this.ready) { this.ready = true; this.reportStatus("ready"); }
       if (this.motion || worldMoving) this.invalidate();
@@ -688,6 +886,8 @@ class PortraitRuntime {
     canvas.removeEventListener("webglcontextlost", this.onContextLost);
     document.removeEventListener("visibilitychange", this.onVisibility);
     this.taps.cancel();
+    this.splats?.dispose();
+    this.splats = null;
     this.environment?.dispose();
     this.keyLight?.shadow.dispose();
     if (this.world) disposeModel([this.world.root]);
@@ -739,7 +939,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
           if (!asset && !current.experience) throw new Error("Missing chapter model");
           const folio = (): LoadedForm => {
             const root = createReadingFolio(chapter.id);
-            return { id: chapter.id, root, resources: [root] };
+            return { id: chapter.id, root, resources: [root], artwork: false };
           };
           let form: LoadedForm;
           try { form = asset ? await loadForm(asset, controller.signal) : folio(); }
