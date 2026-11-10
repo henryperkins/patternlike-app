@@ -1526,7 +1526,7 @@ describe("web application shell", () => {
     });
   });
 
-  it("still hands off to Auth0 when Worker revocation is unreachable", async () => {
+  it("stays signed in when Worker revocation is unreachable", async () => {
     const user = userEvent.setup();
     const auth0 = setAuth0();
     mockApiResponses({
@@ -1541,7 +1541,35 @@ describe("web application shell", () => {
     await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
     await user.click(screen.getByRole("button", { name: /Sign out/i }));
 
-    await waitFor(() => expect(auth0.logout).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(capturedFor("/v1/sessions/current")).toHaveLength(2);
+    });
+    expect(auth0.logout).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/still signed in/i);
+    expect(screen.getByRole("button", { name: /Sign out/i })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Sign in/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the signed-out surface when the issuer logout fails after revocation", async () => {
+    const user = userEvent.setup();
+    const auth0 = setAuth0();
+    auth0.logout.mockRejectedValue(new Error("redirect blocked"));
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/sessions/current": { status: 204, body: null },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Sign out/i }));
+
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/sign-in provider could not finish logging out/i);
+    expect(screen.queryByText(/still signed in/i)).not.toBeInTheDocument();
+    expect(auth0.logout).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the Time Travel surface free of detectable structural accessibility violations", async () => {

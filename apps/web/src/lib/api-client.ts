@@ -248,12 +248,32 @@ export function createSession(idToken: string): Promise<SessionResponse> {
   });
 }
 
-/** Log out. Idempotent server-side: an already-invalid session still 204s. */
-export function endSession(): Promise<void> {
-  return requestNoContent("/v1/sessions/current", {
-    method: "DELETE",
-    headers: requestHeaders(),
-  });
+const END_SESSION_ATTEMPTS = 2;
+const END_SESSION_TIMEOUT_MS = 4_000;
+
+/**
+ * Revoke the Worker session.
+ *
+ * One short deadline, then a single retry. A stalled DELETE must not hang
+ * sign-out, and a transport failure must surface to the caller: there is no
+ * other way for this browser to drop the httpOnly session cookie.
+ */
+export async function endSession(timeoutMs = END_SESSION_TIMEOUT_MS): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < END_SESSION_ATTEMPTS; attempt += 1) {
+    try {
+      await requestNoContent("/v1/sessions/current", {
+        method: "DELETE",
+        headers: requestHeaders(),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("The Pattern/Like API could not be reached.");
 }
 
 export function getChart(signal?: AbortSignal): Promise<ChartResponse> {
