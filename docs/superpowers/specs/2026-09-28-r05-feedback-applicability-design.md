@@ -1,6 +1,6 @@
 # R05: exact-edition feedback applicability
 
-Date: September 28, 2026; revised October 1 after review. Status: **design for review; nothing is implemented.** Branch: `feat/r05-feedback-applicability`, stacked on the unmerged `feat/r04-family-aware-reissue` at `21386bd`, so the shared backlog, map, and snapshot pointer do not conflict. Scope: backlog item R05, option A.
+Date: September 28, 2026; revised October 1 after review; rebased November 10, 2026. Status: **design for review; nothing is implemented.** Branch: `feat/r05-feedback-applicability`, stacked on the unmerged `feat/r04-family-aware-reissue` at `cd4fb41`, so the shared backlog, map, and snapshot pointer do not conflict. Scope: backlog item R05, option A.
 
 Owner decisions (September 28):
 
