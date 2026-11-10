@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ChartResponse } from "../lib/api-client.js";
@@ -103,5 +103,37 @@ describe("ChartView location qualifications", () => {
     ])} onUnauthorized={vi.fn()} />);
 
     expect(screen.queryByText(/needs confirmation/i)).not.toBeInTheDocument();
+  });
+
+  it("cross-highlights planetary position rows and wheel bodies across aspects", () => {
+    const value = {
+      ...chart([]),
+      positions: [
+        { body: "sun" as const, longitude_deg: 30, sign: "taurus" as const },
+        { body: "moon" as const, longitude_deg: 150, sign: "virgo" as const },
+        { body: "mars" as const, longitude_deg: 240, sign: "sagittarius" as const },
+      ],
+      aspects: [
+        { id: "asp-1", body_a: "sun" as const, body_b: "moon" as const, aspect: "trine" as const, orb_deg: 0.2, orb_policy_id: "default", orb_policy_version: "1.0.0" },
+      ],
+    };
+    const { container } = render(<ChartView chart={value} onUnauthorized={vi.fn()} />);
+
+    const sunRow = container.querySelector('.position-row[data-body="sun"]')!;
+    const moonRow = container.querySelector('.position-row[data-body="moon"]')!;
+    const marsRow = container.querySelector('.position-row[data-body="mars"]')!;
+    const sunBadge = container.querySelector('.wheel-body[data-body="sun"]')!;
+    const marsBadge = container.querySelector('.wheel-body[data-body="mars"]')!;
+
+    fireEvent.pointerEnter(sunRow);
+    expect(sunRow).toHaveAttribute("data-active", "true");
+    expect(moonRow).toHaveAttribute("data-connected", "true");
+    expect(marsRow).not.toHaveAttribute("data-connected");
+    expect(sunBadge).toHaveAttribute("data-active", "true");
+    expect(marsBadge).toHaveAttribute("data-dimmed", "true");
+
+    fireEvent.pointerLeave(sunRow);
+    expect(sunRow).not.toHaveAttribute("data-active");
+    expect(sunBadge).not.toHaveAttribute("data-active");
   });
 });

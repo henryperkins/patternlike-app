@@ -1,5 +1,5 @@
 import type { LongitudePosition } from "@patternlike/shared";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ChartWheel } from "./ChartWheel.js";
 
@@ -82,5 +82,38 @@ describe("chart wheel labels", () => {
     const radians = ((54.12 - 90) * Math.PI) / 180;
     expect(only.x).toBeCloseTo(260 + Math.cos(radians) * 168, 5);
     expect(only.y).toBeCloseTo(260 + Math.sin(radians) * 168, 5);
+  });
+
+  it("isolates connected aspects and partner bodies on pointer hover", () => {
+    const { container } = render(
+      <ChartWheel
+        positions={positions([
+          ["sun", 30],
+          ["moon", 150],
+          ["mars", 240],
+        ])}
+        aspects={[
+          { id: "asp-1", body_a: "sun", body_b: "moon", aspect: "trine", orb_deg: 0.2, orb_policy_id: "default", orb_policy_version: "1.0.0" },
+          { id: "asp-2", body_a: "moon", body_b: "mars", aspect: "square", orb_deg: 0.4, orb_policy_id: "default", orb_policy_version: "1.0.0" },
+        ]}
+        houseCusps={null}
+      />,
+    );
+
+    const sunBody = container.querySelector('.wheel-body[data-body="sun"]')!;
+    const moonBody = container.querySelector('.wheel-body[data-body="moon"]')!;
+    const marsBody = container.querySelector('.wheel-body[data-body="mars"]')!;
+    const aspects = container.querySelectorAll(".wheel-aspect");
+
+    fireEvent.pointerEnter(sunBody);
+    expect(sunBody).toHaveAttribute("data-active", "true");
+    expect(moonBody).toHaveAttribute("data-connected", "true");
+    expect(marsBody).toHaveAttribute("data-dimmed", "true");
+    expect(aspects[0]).toHaveAttribute("data-active", "true");
+    expect(aspects[1]).toHaveAttribute("data-dimmed", "true");
+
+    fireEvent.pointerLeave(sunBody);
+    expect(sunBody).not.toHaveAttribute("data-active");
+    expect(marsBody).not.toHaveAttribute("data-dimmed");
   });
 });

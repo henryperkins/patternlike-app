@@ -56,6 +56,9 @@ export function validateMeshBundle(manifest: PortraitManifest, bundle: PortraitM
     if (!chapter || !reference || typeof reference.referenceId !== "string" || !reference.referenceId.trim()
       || !isHash(reference.referenceSha256) || reference.referenceSha256.toLowerCase() !== asset.sourceImageSha256.toLowerCase()
       || !assetUrl(reference.imageUrl) || !url || seenUrls.has(url) || asset.sourceText !== chapterSourceText(chapter)) return false;
+    if (asset.splat !== undefined) {
+      if (!asset.splat || typeof asset.splat !== "object" || !isHash(asset.splat.sha256) || !assetUrl(asset.splat.url)) return false;
+    }
     if (bundle.authoring !== "authored-fictional-fixtures") {
       const provenance = asset.provenance;
       if (!provenance || provenance.authoring !== bundle.authoring || provenance.documentRevision !== manifest.revision
