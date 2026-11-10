@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CelestialBody, LongitudePosition, NatalAspect } from "@patternlike/shared";
 
 const BODY_LABELS: Record<CelestialBody, string> = {
@@ -89,11 +90,31 @@ interface ChartWheelProps {
   positions: LongitudePosition[];
   aspects: NatalAspect[];
   houseCusps: number[] | null;
+  activeBody?: CelestialBody | null;
+  onSelectBody?: (body: CelestialBody | null) => void;
 }
 
-export function ChartWheel({ positions, aspects, houseCusps }: ChartWheelProps) {
+export function ChartWheel({ positions, aspects, houseCusps, activeBody, onSelectBody }: ChartWheelProps) {
+  const [internalBody, setInternalBody] = useState<CelestialBody | null>(null);
+  const selectedBody = activeBody !== undefined ? activeBody : internalBody;
+  const selectBody = (body: CelestialBody | null) => {
+    setInternalBody(body);
+    onSelectBody?.(body);
+  };
   const labels = labelAngles(positions);
   const positionByBody = new Map(positions.map((position) => [position.body, position]));
+  const displayedAspects = aspects.slice(0, 32);
+  const connectedBodies = new Set<CelestialBody>();
+  if (selectedBody) {
+    connectedBodies.add(selectedBody);
+    for (const aspect of displayedAspects) {
+      if (!positionByBody.has(aspect.body_a) || !positionByBody.has(aspect.body_b)) continue;
+      if (aspect.body_a === selectedBody || aspect.body_b === selectedBody) {
+        connectedBodies.add(aspect.body_a);
+        connectedBodies.add(aspect.body_b);
+      }
+    }
+  }
 
   return (
     <svg
@@ -153,15 +174,20 @@ export function ChartWheel({ positions, aspects, houseCusps }: ChartWheelProps) 
       })}
 
       <g className="wheel-aspects">
-        {aspects.slice(0, 32).map((aspect) => {
+        {displayedAspects.map((aspect) => {
           const bodyA = positionByBody.get(aspect.body_a);
           const bodyB = positionByBody.get(aspect.body_b);
           if (!bodyA || !bodyB) return null;
           const a = point(bodyA.longitude_deg, 124);
           const b = point(bodyB.longitude_deg, 124);
+          const isConnected =
+            selectedBody !== null &&
+            (aspect.body_a === selectedBody || aspect.body_b === selectedBody);
           return (
             <line
               className={`wheel-aspect wheel-aspect--${aspect.aspect}`}
+              data-active={isConnected ? "true" : undefined}
+              data-dimmed={selectedBody !== null && !isConnected ? "true" : undefined}
               x1={a.x}
               y1={a.y}
               x2={b.x}
@@ -180,8 +206,21 @@ export function ChartWheel({ positions, aspects, houseCusps }: ChartWheelProps) 
           labels.get(position.body) ?? position.longitude_deg,
           LABEL_RADIUS,
         );
+        const isActive = selectedBody === position.body;
+        const isConnected =
+          selectedBody !== null && !isActive && connectedBodies.has(position.body);
+        const isDimmed = selectedBody !== null && !connectedBodies.has(position.body);
         return (
-          <g className="wheel-body" key={position.body}>
+          <g
+            className="wheel-body"
+            key={position.body}
+            data-body={position.body}
+            data-active={isActive ? "true" : undefined}
+            data-connected={isConnected ? "true" : undefined}
+            data-dimmed={isDimmed ? "true" : undefined}
+            onPointerEnter={() => selectBody(position.body)}
+            onPointerLeave={() => selectBody(null)}
+          >
             <line x1={tickInner.x} y1={tickInner.y} x2={tickOuter.x} y2={tickOuter.y} />
             <circle cx={bodyPoint.x} cy={bodyPoint.y} r="4.5" />
             <line

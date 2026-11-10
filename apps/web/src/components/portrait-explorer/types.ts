@@ -11,12 +11,18 @@ export const facets: ReadonlyArray<{ id: Facet; label: string }> = [
 ];
 export type Point3 = [number, number, number];
 export interface CameraBookmark { position: Point3; target: Point3; frameDistance?: number; }
+/** Optional Gaussian splat companion for a verified GLB. Hash is over the exact .spz bytes. */
+export interface PortraitSplatAsset {
+  url: string;
+  sha256: string;
+}
 export interface PortraitMeshAsset {
   chapterId: string;
   url: string;
   sha256: string;
   sourceImageSha256: string;
   sourceText: string;
+  splat?: PortraitSplatAsset;
   provenance?: {
     authoring: "codex-parametric/v1" | "codex-parametric/v2";
     documentRevision: string;

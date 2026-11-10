@@ -55,12 +55,13 @@
 .observatory-explorer .explorer-annotation { max-width:min(240px, calc(100% - 16px)); border-color:var(--forest, #173f35); color:var(--explorer-ink); background:var(--explorer-paper); overflow-wrap:anywhere; }
 .observatory-explorer .explorer-annotation .explorer-label-title { font-size:.8rem; font-weight:600; line-height:1.45; margin-bottom:5px; }
 .explorer-annotation-source { display:block; font-size:.75rem; line-height:1.45; }
-.observatory-explorer .explorer-scene .explorer-annotation:focus-visible { outline-color:var(--cobalt, #234c9f); }
+.observatory-explorer .explorer-scene .explorer-annotation:focus-visible { outline-color:var(--cobalt, #234c9f); border-color:var(--coral, #c76043); background:#f5efe0; }
 .observatory-explorer .explorer-chapters button > span:last-child { min-width:0; overflow-wrap:anywhere; }
 .explorer-passage-caption { display:flex; flex-wrap:wrap; gap:0 12px; margin-bottom:6px; font-family:var(--sans, system-ui, sans-serif); font-size:.75rem; line-height:1.6; color:var(--ink-soft, #4e625b); }
 .explorer-passage-selection { font-weight:600; }
 .explorer-passage[data-active="true"] .explorer-passage-caption { color:var(--forest, #173f35); }
 .observatory-explorer .explorer-passage[data-active="true"] { border-left-color:var(--forest, #173f35); }
+.observatory-explorer .explorer-passage[data-active="true"]:focus-within { border-left-color:var(--coral, #c76043); }
 .observatory-explorer .explorer-scene-top button, .observatory-explorer .explorer-scene-toolbar { background:#153c33f2; border-color:#99aa8f; color:#fffaf0; }
 .observatory-explorer .explorer-scene-top button[aria-pressed="true"] { background:#f0e7d2; color:#17312a; }
 .observatory-explorer .explorer-embedded-bar { margin-bottom:0; }

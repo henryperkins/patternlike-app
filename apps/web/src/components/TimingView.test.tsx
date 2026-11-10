@@ -115,6 +115,14 @@ describe("TimingView", () => {
     expect(
       container.querySelectorAll('.timing-track[aria-hidden="true"]'),
     ).toHaveLength(2);
+    const passRow = activeArticle!.querySelector('.timing-pass[data-pass-index="1"]')!;
+    const passTick = activeArticle!.querySelector('.timing-track__pass[data-pass-index="1"]')!;
+    await userEvent.hover(passRow);
+    expect(passRow).toHaveAttribute("data-active", "true");
+    expect(passTick).toHaveAttribute("data-active", "true");
+    await userEvent.unhover(passRow);
+    expect(passRow).not.toHaveAttribute("data-active");
+    expect(passTick).not.toHaveAttribute("data-active");
   });
 
   it("explains the vocabulary once, in a disclosure that starts closed", async () => {

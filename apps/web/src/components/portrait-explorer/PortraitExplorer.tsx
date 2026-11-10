@@ -402,7 +402,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
       {(!validMeshes || status === "unavailable") && <div className="explorer-scene-message" role="status"><p>{moduleFailed ? "The 3D view could not be loaded." : "The portrait is taking a pause."}</p><p>{moduleFailed ? "Reload the page to fetch the current 3D view. Your saved chapters are still available." : "Your saved chapters are ready to read."}</p><div className="explorer-recovery-actions">{validMeshes && (moduleFailed
         ? <button onClick={() => window.location.reload()}>Reload page for 3D</button>
         : <button onClick={() => { setPortraitScene(() => lazy(loadScene)); setStatus("loading"); setRetry((value) => value + 1); }}>Try 3D again</button>)}<button onClick={readChapter}>Continue reading</button></div></div>}
-      {validMeshes && status === "loading" && <p className="explorer-loading" role="status">Preparing your observatory…</p>}
+      {validMeshes && status === "loading" && <p className="explorer-loading" role="status"><svg className="explorer-loading-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" /><line x1="3" y1="16" x2="29" y2="16" /><line x1="16" y1="3" x2="16" y2="29" /><circle className="explorer-loading-mark__dot" cx="21" cy="11" r="2.2" /></svg>Preparing your observatory…</p>}
       <div className="explorer-scene-toolbar" role="group" aria-label="3D controls" tabIndex={0} onKeyDown={(event) => {
         if (event.target !== event.currentTarget || !graphicsAvailable) return;
         const key = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", "+": "closer", "-": "farther", Home: "reset" }[event.key] as CameraCommand["kind"] | undefined;

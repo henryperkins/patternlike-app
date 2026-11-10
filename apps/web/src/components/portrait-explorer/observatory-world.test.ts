@@ -39,8 +39,12 @@ describe("observatory geometry and navigation", () => {
     expect(world.tick(1)).toBe(false);
     expect(world.desks[0].rotation.x).toBeCloseTo(-1.25);
     expect(world.desks[1].rotation.x).toBe(0);
+    expect(world.lights[0]!.intensity).toBeGreaterThan(world.lights[1]!.intensity);
     expect(world.stations[0].position.toArray()).toEqual(stationPosition(0, true));
     expect(world.roof.visible).toBe(true);
+    world.setState({ roofOpen: true, lighting: "dusk", open: [true, false, false, false], unfolded: false, skyView: true });
+    world.tick(1);
+    expect(world.lights[0]!.intensity).toBeLessThan(10);
     disposeModel([world.root]);
   });
 
