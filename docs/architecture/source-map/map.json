@@ -1526,7 +1526,7 @@
           "leaves": [
             {
               "id": "leaf-operator-generation-and-repair-1",
-              "text": "POST /internal/readings/generate and ordinary /internal/readings/reissue both call the legacy buildGenerationCommand. Reissue requires user_id, an expected still-published reading, and chart_recalculated, consent_revoked, safety_correction, or defect_repair as its reason. It loads predecessor ID, revision, and status without deriving the generation family, then freezes a deterministic V1 successor that requires an active editorial content release. Separate V2 repair paths do not make ordinary published-target reissue family-aware.",
+              "text": "POST /internal/readings/generate and /internal/readings/reissue reserve through enqueueInternalDailyReading and enqueueInternalReissue, which gate on READING_V5_ROLLOUT (internal) and freeze V2 constrained_model commands through enqueueConstrainedReading. Reissue requires user_id, an expected still-published reading, and safety_correction or defect_repair as its reason; it loads predecessor ID, local_date, revision, status, and assembly_mode, and refuses deterministic assembler-published editions as not_replaceable historical records (legacy V1 command assembly remains only for already-frozen or test-seeded V1 commands, which require an active editorial content release).",
               "evidence_ids": [
                 "evidence-b6-reissue-reasons",
                 "evidence-b6-reissue-validation",
@@ -1642,7 +1642,7 @@
             },
             {
               "id": "leaf-committed-production-switches-5",
-              "text": "POST /internal/readings/generate and /internal/readings/reissue build V1 commands, which run on the deterministic executor, pin no model, and pass no READING_V5_ROLLOUT gate; that gate applies only to constrained-model reservations.",
+              "text": "POST /internal/readings/generate and /internal/readings/reissue pass the READING_V5_ROLLOUT (internal) gate and reserve V2 constrained_model commands through enqueueConstrainedReading; the Daily executor branches on command version so V2 claims run generateDailyReadingV5 while any already-frozen V1 claim runs the deterministic generateDailyReading path.",
               "evidence_ids": [
                 "evidence-b6-generate-route-v1",
                 "evidence-b6-generate-v1-builder",
@@ -7888,7 +7888,7 @@
       "kind": "source",
       "path": "apps/api/src/routes/internal-generation.ts",
       "selector": {
-        "text": "const REISSUE_REASONS: readonly RevisionReason[] = [\n  \"chart_recalculated\",\n  \"consent_revoked\",\n  \"safety_correction\",\n  \"defect_repair\",\n];"
+        "text": "const REISSUE_REASONS: readonly OperatorReissueReason[] = [\n  \"safety_correction\",\n  \"defect_repair\",\n];"
       },
       "observed_at": null
     },
@@ -7906,7 +7906,7 @@
       "kind": "source",
       "path": "apps/api/src/services/enqueue.ts",
       "selector": {
-        "text": "if (!predecessor || predecessor.status !== \"published\") {"
+        "text": "  if (!predecessor || predecessor.status !== \"published\") {\n    return {\n      ok: false,\n      reason: \"stale_predecessor\",\n      detail: \"the expected live reading is not published\",\n    };\n  }\n  if (predecessor.assembly_mode !== \"constrained_model\") {\n    return {\n      ok: false,\n      reason: \"not_replaceable\",\n      detail: \"assembler-published readings are historical records and cannot be reissued\",\n    };\n  }"
       },
       "observed_at": null
     },
@@ -7915,7 +7915,7 @@
       "kind": "source",
       "path": "apps/api/src/services/enqueue.ts",
       "selector": {
-        "text": "const build = await buildGenerationCommand(env, userId, {\n    readingId,\n    revision: predecessor.revision + 1,"
+        "text": "  return enqueueConstrainedReading(env, userId, {\n    entry: \"internal\",\n    reservationReason: \"manual_reissue\",\n    targetLocalDate: predecessor.local_date,\n    revision: predecessor.revision + 1,\n    revisionReason,\n    supersedesReadingId: expectedLiveReadingId,\n    now,\n  });"
       },
       "observed_at": null
     },
@@ -8248,7 +8248,7 @@
       "kind": "source",
       "path": "apps/api/src/routes/internal-generation.ts",
       "selector": {
-        "text": "const result = await enqueueDailyReading(c.env, userId);"
+        "text": "  const result = await enqueueInternalReissue(\n    c.env,\n    userId,\n    expected,\n    reason,\n  );"
       },
       "observed_at": null
     },
@@ -8257,7 +8257,7 @@
       "kind": "source",
       "path": "apps/api/src/services/enqueue.ts",
       "selector": {
-        "text": "const build = await buildGenerationCommand(env, userId, {\n    readingId,\n    revision: 1,\n    revisionReason: \"initial\","
+        "text": "export async function enqueueInternalDailyReading(\n  env: Env,\n  userId: string,\n  now = new Date(),\n): Promise<EnqueueOutcome> {\n  const rollout = readReadingV5Rollout(env);\n  if (rollout === null || !rolloutAllows(rollout, \"internal\")) {"
       },
       "observed_at": null
     },
@@ -10930,7 +10930,7 @@
       "kind": "source",
       "path": "apps/api/src/routes/internal-generation.ts",
       "selector": {
-        "text": "const result = await enqueueDailyReading(c.env, userId);"
+        "text": "const result = await enqueueInternalDailyReading(c.env, userId);"
       },
       "observed_at": null
     },
@@ -10939,7 +10939,7 @@
       "kind": "source",
       "path": "apps/api/src/services/enqueue.ts",
       "selector": {
-        "text": "const build = await buildGenerationCommand(env, userId, {\n    readingId,\n    revision: 1,\n    revisionReason: \"initial\","
+        "text": "  return enqueueConstrainedReading(env, userId, {\n    entry: \"internal\",\n    reservationReason: \"internal\",\n    targetLocalDate,\n    now,\n  });"
       },
       "observed_at": null
     },
@@ -10948,7 +10948,7 @@
       "kind": "source",
       "path": "apps/api/src/services/enqueue.ts",
       "selector": {
-        "text": "`SELECT id, revision, status FROM daily_readings WHERE id = ? AND user_id = ?`"
+        "text": "  const predecessor = await env.DB.prepare(\n    `SELECT id, local_date, revision, status, assembly_mode\n     FROM daily_readings\n     WHERE id = ? AND user_id = ?`,\n  )"
       },
       "observed_at": null
     },

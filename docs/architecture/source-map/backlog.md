@@ -25,10 +25,10 @@ These classifications describe source implementation. They do not certify accept
 
 The September 28 reconciliation marked a family-selecting successor as still needed. That direction is withdrawn. A new Daily reading comes from the model configured when the reservation is made. `PUT /v1/readings/today` already reserves a constrained-model reading when `READING_V5_ROLLOUT` admits the entry point. When that rollout does not admit it, Today stops; it does not fall back to the assembler.
 
-Current source still does otherwise on the operator routes: [internal generation](../../../apps/api/src/routes/internal-generation.ts) and [enqueueDailyReading and enqueueReissue](../../../apps/api/src/services/enqueue.ts) call the legacy `buildGenerationCommand` and freeze a deterministic successor. That is the behavior to retire, not a second family to preserve. A repair of a new Daily uses the same configured model. A command already frozen keeps the pin it was created with. An edition the assembler already published stays readable and is not rebuilt by that assembler. The family-aware draft on `feat/r04-family-aware-reissue` is not the landing path.
+Current source now reserves operator generation and reissue through the configured model: [internal generation](../../../apps/api/src/routes/internal-generation.ts) and [enqueueInternalDailyReading and enqueueInternalReissue](../../../apps/api/src/services/enqueue.ts) gate on `READING_V5_ROLLOUT` (`internal`), freeze V2 `constrained_model` commands via `enqueueConstrainedReading`, and refuse to reissue `deterministic` editions (`not_replaceable`). A repair of a new Daily uses the same configured model. A command already frozen keeps the pin it was created with. An edition the assembler already published stays readable and is not rebuilt by that assembler. The family-aware draft on `feat/r04-family-aware-reissue` is not the landing path.
 
 - [x] Withdraw the two-family successor as the next implementation.
-- [ ] Make ordinary internal generation and reissue reserve through the configured model, and leave assembler-published editions as historical records.
+- [x] Make ordinary internal generation and reissue reserve through the configured model, and leave assembler-published editions as historical records.
 
 ### R05 remainder — Exact-edition effect applicability
 
