@@ -2,9 +2,11 @@
 
 Date: September 28, 2026. Baseline: `00299d26b0b27dd5e14887f94287a872a629efb4` on `main`, initially clean. Scope: the maintained architecture map and backlog. This refresh applies the [supplied source reconciliation](2026-09-28-architecture-map-reconciled-corrections.md); its original inspection and verification limits remain unchanged.
 
+November 10, 2026: the maintained backlog supersedes R04. The September result below still describes that day's reconciliation, including the order it recorded then.
+
 ## Documentation result
 
-The [R01–R08 backlog](../architecture/source-map/backlog.md) records R01, R02, R03, and R06 as implemented; R05 and R07 as partial; and R04 and R08 as still needed. Remaining order: R04 → R05 applicability → R07 wider assurance → R08. R07 remains a prerequisite for the corresponding ontology activation, recall-policy change, or expansion.
+On September 28 the [R01–R08 backlog](../architecture/source-map/backlog.md) recorded R01, R02, R03, and R06 as implemented; R05 and R07 as partial; and R04 and R08 as still needed. The remaining order recorded that day was R04 → R05 applicability → R07 wider assurance → R08. R07 remains a prerequisite for the corresponding ontology activation, recall-policy change, or expansion.
 
 The maintained definition adds three claims, revises the text of eight existing claims, and retains all 945 previous selectors while adding 21 owning-source selectors. It makes the existing feedback explanation and its applicability gap explicit, distinguishes ordinary legacy reissue from V2 repair paths, cites release-compiler and public-scope controls, and separates Daily relationship roots from the broader pure resolver and standalone Timing detail.
 

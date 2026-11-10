@@ -11,7 +11,7 @@ These classifications describe source implementation. They do not certify accept
 | R01 — Private-response caching | Implemented | Preserve and verify the outer policy, explicit public exceptions, error paths, and service-worker restrictions. |
 | R02 — Typed Daily uncertainty | Implemented | Preserve and verify the shared disclosure plan, frozen identity, consent, suppression, and validator agreement at the precision retained in storage. |
 | R03 — Artwork state, withdrawal, runner admission | Implemented | Preserve and verify state separation, independent withdrawal, and pre-claim compatibility. Qualify configuration, deployment, and installed-runner evidence separately. |
-| R04 — Generation-family-aware operator repair | Still needed | Add an explicit successor operation or versioned contract that derives the target's generation family. |
+| R04 — Generation-family-aware operator repair | Superseded | Do not add a family-selecting successor. New Daily prose, including operator repair, comes from the model configured at reservation time. Assembler-published editions stay readable historical records. |
 | R05 — Feedback collection versus effect | Partial | Preserve existing activation/category messaging; finish exact-edition effect applicability or explicitly retain collection-only behavior. |
 | R06 — Canonical local release evidence | Implemented | Operate the shared producer/parser and sixteen-lane gate; reconcile each receipt to its source and artifacts. |
 | R07 — Ontology supply assurance | Partial | Preserve the compile-only repair; complete coverage/exclusion decisions, evaluation, required review, and intentional scope-admission policy. |
@@ -19,15 +19,16 @@ These classifications describe source implementation. They do not certify accept
 
 ## Remaining implementation order
 
-**R04 → R05 applicability → R07 wider assurance → R08.** R07 is a prerequisite for any ontology activation, recall-policy change, or expansion of reach it governs. Move that assurance ahead of the other items when such an expansion is imminent. This ordering does not authorize expansion or weaken existing admission controls.
+**R05 applicability → R07 wider assurance → R08.** R07 is a prerequisite for any ontology activation, recall-policy change, or expansion of reach it governs. Move that assurance ahead of the other items when such an expansion is imminent. This ordering does not authorize expansion or weaken existing admission controls.
 
-### R04 — Generation-family-aware operator repair
+### R04 — Generation-family-aware operator repair (superseded November 10, 2026)
 
-Current source: [operator routes](../../../apps/api/src/routes/internal-generation.ts), [enqueueDailyReading and enqueueReissue](../../../apps/api/src/services/enqueue.ts). Both ordinary entry points call the legacy `buildGenerationCommand`. Reissue reads predecessor ID, revision, and status without selecting a builder from its generation family. Calculation-defect invalidation and failed-command replacement already have separate V2-capable paths with different eligibility and lifecycle rules.
+The September 28 reconciliation marked a family-selecting successor as still needed. That direction is withdrawn. A new Daily reading comes from the model configured when the reservation is made. `PUT /v1/readings/today` already reserves a constrained-model reading when `READING_V5_ROLLOUT` admits the entry point. When that rollout does not admit it, Today stops; it does not fall back to the assembler.
 
-- [ ] Specify an additive successor operation or versioned contract binding the expected published target, generation family, supported reason, date scope, idempotency identity, and live authorization.
-- [ ] Derive and validate family from retained target evidence. Preserve legacy route semantics until an intentional migration.
-- [ ] Cover stale predecessors, replay/conflict handling, atomic publication, and attempt/spend ceilings. Keep invalidation distinct from replacement; `consent_revoked` alone must never authorize a new model call.
+Current source still does otherwise on the operator routes: [internal generation](../../../apps/api/src/routes/internal-generation.ts) and [enqueueDailyReading and enqueueReissue](../../../apps/api/src/services/enqueue.ts) call the legacy `buildGenerationCommand` and freeze a deterministic successor. That is the behavior to retire, not a second family to preserve. A repair of a new Daily uses the same configured model. A command already frozen keeps the pin it was created with. An edition the assembler already published stays readable and is not rebuilt by that assembler. The family-aware draft on `feat/r04-family-aware-reissue` is not the landing path.
+
+- [x] Withdraw the two-family successor as the next implementation.
+- [ ] Make ordinary internal generation and reissue reserve through the configured model, and leave assembler-published editions as historical records.
 
 ### R05 remainder — Exact-edition effect applicability
 

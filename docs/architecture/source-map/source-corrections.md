@@ -133,3 +133,15 @@ selects a new capture of the revised definition, with its uncommitted input
 qualification recorded explicitly. Source-map identity checks and any fresh
 local-gate execution are recorded separately from the supplied source-only review;
 neither establishes production or installed-runner state.
+
+## November 10 Daily source direction
+
+The maintained backlog supersedes R04. A new Daily reading, including an
+operator repair, comes from the model configured at reservation time. The
+two-family successor is not the next implementation. Assembler-published
+editions stay readable historical records. The remaining order is R05
+applicability, then R07 wider assurance, then R08. The September 28
+reconciliation above remains the record of that day's inspection. The selected
+source-map snapshot still describes the implemented operator routes, which
+freeze a deterministic command; that description is current source, not the
+direction.
