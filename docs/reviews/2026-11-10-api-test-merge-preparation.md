@@ -2,6 +2,8 @@
 
 Date: 2026-11-10.
 
+**Historical initial result, superseded:** The later [canonical gate investigation](2026-11-10-local-gate-investigation.md) fixes both runner issues and records all 16 lanes passing. The failed receipt and supplemental results below remain unchanged as diagnostic history.
+
 ## Scope and disposition
 
 Reviewed `perf/api-test-setup` at `11eb23a46eec9b41d2225e3963479527b5a95d8c` against `main` at `38acb3ff9c21370c394b785edce054e0c45c57ae`: 11 commits ahead, none behind. The preparation branch preserves that history and adds focused corrections. The API production changes, test split/schema migration proof, web behavior, calculation ambiguity handling, and maintained map were reviewed.
