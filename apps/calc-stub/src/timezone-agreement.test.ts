@@ -80,7 +80,7 @@ describe("timezone agreement between the API preview and this engine", () => {
   for (const { zone, civil, why } of CASES) {
     it(`agrees with luxon on ${zone}: ${why}`, () => {
       const shared = resolveLocalWallTime(zone, civil);
-      const fromLuxon = DateTime.fromObject(
+      const rawLuxon = DateTime.fromObject(
         {
           year: civil.year,
           month: civil.month,
@@ -91,6 +91,19 @@ describe("timezone agreement between the API preview and this engine", () => {
         },
         { zone },
       );
+      const foldDelta = rawLuxon.minus({ hours: 6 }).offset - rawLuxon.offset;
+      const earlierFold =
+        foldDelta > 0 ? rawLuxon.minus({ minutes: foldDelta }) : rawLuxon;
+      const fromLuxon =
+        foldDelta > 0 &&
+        earlierFold.year === rawLuxon.year &&
+        earlierFold.month === rawLuxon.month &&
+        earlierFold.day === rawLuxon.day &&
+        earlierFold.hour === rawLuxon.hour &&
+        earlierFold.minute === rawLuxon.minute &&
+        earlierFold.second === rawLuxon.second
+          ? earlierFold
+          : rawLuxon;
 
       assert.ok(fromLuxon.isValid, `luxon rejected ${zone} ${JSON.stringify(civil)}`);
       assert.equal(shared.utc_instant, fromLuxon.toUTC().toISO(), why);
