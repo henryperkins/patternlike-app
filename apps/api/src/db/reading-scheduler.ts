@@ -539,15 +539,23 @@ export async function recomputeUserNextDueAt(
     now,
     DEFAULT_READING_SCHEDULE_POLICY,
   );
-  // Monotonic. selectReadingScheduleTarget returns today's due time until
-  // tomorrow's pre-generation instant, and that due time is already in the
-  // past for most of the day. An unconditional write re-arms the due lane.
+  // A consumed day must not be re-armed, including terminal failures. For
+  // that case use the next day in the current zone. An unreserved day may
+  // move earlier after a timezone change or restored eligibility.
+  const consumed = await env.DB.prepare(
+    "SELECT 1 AS present FROM daily_readings WHERE user_id = ? AND local_date = ? LIMIT 1",
+  )
+    .bind(userId, selected.targetLocalDate)
+    .first<{ present: number }>();
+  const cursor = consumed ? selected.nextCursor : selected;
   const result = await env.DB.prepare(
     `UPDATE users SET next_due_at = ?
-     WHERE id = ? AND status = 'active'
-       AND (next_due_at IS NULL OR next_due_at < ?)`,
+     WHERE id = ? AND status = 'active' AND timezone = ?
+       AND (next_due_at IS NULL OR next_due_at < ? OR NOT EXISTS (
+         SELECT 1 FROM daily_readings WHERE user_id = ? AND local_date = ?
+       ))`,
   )
-    .bind(selected.dueAt, userId, selected.dueAt)
+    .bind(cursor.dueAt, userId, row.timezone, cursor.dueAt, userId, cursor.targetLocalDate)
     .run();
   if (result.meta.changes !== 1) {
     const current = await env.DB.prepare(
@@ -557,8 +565,8 @@ export async function recomputeUserNextDueAt(
       .first<{ next_due_at: string | null }>();
     return current?.next_due_at ?? null;
   }
-  await recordSkippedDates(env, userId, selected.skippedLocalDates, now);
-  return selected.dueAt;
+  await recordSkippedDates(env, userId, cursor.skippedLocalDates, now);
+  return cursor.dueAt;
 }
 
 export async function seedUserNextDueAt(

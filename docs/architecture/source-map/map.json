@@ -563,7 +563,7 @@
             },
             {
               "id": "leaf-reserve-and-schedule-2",
-              "text": "First open and the scheduler's due lane both reserve through enqueueConstrainedReading, and the reservation batch refuses a second pending or published reading for the same user and local date. The frozen V2 command pins the chart, calculation request and response digests, selected context and prior readings, the AI-consent grant, and publisher settings including prompt, selection, and validation policy versions.",
+              "text": "First open and the scheduler's due lane both reserve through enqueueConstrainedReading, and the reservation batch refuses a second initial reading for the same user and local date, regardless of the existing reading's status. Failed days use replacement rather than another initial reservation. The frozen V2 command pins the chart, calculation request and response digests, selected context and prior readings, the AI-consent grant, and publisher settings including prompt, selection, and validation policy versions.",
               "evidence_ids": [
                 "evidence-b3-first-open-reservation",
                 "evidence-b3-scheduled-reservation",
@@ -2303,7 +2303,7 @@
             },
             {
               "id": "leaf-release-assurance-tooling-3",
-              "text": "release-evidence.mjs gate runs npm run ci:local and records its process exit, complete parsed summary, unchanged source snapshot, artifact hashes, and repository pins, with every deployment field unverified. verify rechecks the receipt against the current checkout. release-reconciliation.mjs accepts only a verified receipt and declares no platform, provider, account, or database calls.",
+              "text": "release-evidence.mjs gate runs npm run ci:local and records its process exit, complete parsed stdout summary, unchanged source snapshot, artifact hashes, and repository pins, with every deployment field unverified. verify rechecks the receipt against the current checkout. release-reconciliation.mjs accepts only a verified receipt and declares no platform, provider, account, or database calls.",
               "evidence_ids": [
                 "evidence-b8-release-evidence-runs-gate",
                 "evidence-b8-release-evidence-receipt-fields",
@@ -2524,7 +2524,7 @@
       "kind": "source",
       "path": "apps/web/src/App.tsx",
       "selector": {
-        "text": "await signOut(async () => {"
+        "text": "await signOut(endSession, auth0Logout);"
       },
       "observed_at": null
     },
@@ -4603,7 +4603,7 @@
       "kind": "source",
       "path": "apps/api/src/db/generation.ts",
       "selector": {
-        "text": "SELECT 1, 'a pending or published reading already exists for this user-day'"
+        "text": "SELECT 1, 'a reading already exists for this user-day'"
       },
       "observed_at": null
     },
@@ -9787,7 +9787,7 @@
       "kind": "source",
       "path": "apps/api/package.json",
       "selector": {
-        "text": "\"check:validators\": \"tsx scripts/generate-worker-validators.ts --check\","
+        "text": "\"check:validators\": \"node --import tsx scripts/generate-worker-validators.ts --check\","
       },
       "observed_at": null
     },
@@ -10399,7 +10399,7 @@
       "kind": "source",
       "path": "scripts/pattern-release/release-evidence.mjs",
       "selector": {
-        "text": "    source_before: sourceBefore,\n    source_after_sha256: sourceAfter.files_sha256,\n    source_unchanged: sourceComparison.ok,\n    source_comparison: sourceComparison,\n    gate: {\n      status: \"observed\", command: \"npm run ci:local\", started_at: startedAt,\n      exit_code: exitCode, output_sha256: outputHash.digest(\"hex\"), summary: parseCiSummary(outputTail, exitCode),\n    },\n    repository_identity: captureRepositoryIdentity(root, sourceAfter),\n    artifacts: captureArtifacts(root),\n    deployment: { ...DEPLOYMENT },"
+        "text": "    source_before: sourceBefore,\n    source_after_sha256: sourceAfter.files_sha256,\n    source_unchanged: sourceComparison.ok,\n    source_comparison: sourceComparison,\n    gate: {\n      status: \"observed\", command: \"npm run ci:local\", started_at: startedAt,\n      exit_code: exitCode, output_sha256: outputHash.digest(\"hex\"), summary: parseCiSummary(stdoutTail, exitCode),\n    },\n    repository_identity: captureRepositoryIdentity(root, sourceAfter),\n    artifacts: captureArtifacts(root),\n    deployment: { ...DEPLOYMENT },"
       },
       "observed_at": null
     },
@@ -10543,7 +10543,7 @@
       "kind": "source",
       "path": "apps/calc-stub/package.json",
       "selector": {
-        "text": "\"test\": \"tsx --test \\\"src/**/*.test.ts\\\"\",\n    \"test:golden\": \"tsx --test src/golden.test.ts src/daily-sky-golden.test.ts\","
+        "text": "\"test\": \"node --import tsx --test \\\"src/**/*.test.ts\\\"\",\n    \"test:golden\": \"node --import tsx --test src/golden.test.ts src/daily-sky-golden.test.ts\","
       },
       "observed_at": null
     },

@@ -8,9 +8,9 @@
  * migration setup, workerd startup) for tests that never touch a binding;
  * in Node they run in parallel in seconds.
  *
- * The two publisher suites are deliberately NOT listed: their hermetic
- * outbound-service seam only exists inside the Workers pool
- * (`test/mock-calc-service.ts`), so they stay in `vitest.config.ts`.
+ * Publisher unit suites listed below mock their own service dependencies.
+ * Their integration suites still use the Workers pool and its hermetic
+ * outbound-service seam (`test/mock-calc-service.ts`).
  *
  * New pure tests should be added here. If a file is listed here but starts
  * using a binding, its Node run fails loudly and it must move back.

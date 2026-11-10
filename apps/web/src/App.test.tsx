@@ -1553,7 +1553,7 @@ describe("web application shell", () => {
   it("shows the signed-out surface when the issuer logout fails after revocation", async () => {
     const user = userEvent.setup();
     const auth0 = setAuth0();
-    auth0.logout.mockRejectedValue(new Error("redirect blocked"));
+    vi.mocked(auth0.logout).mockRejectedValue(new Error("redirect blocked"));
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
       "/v1/sessions/current": { status: 204, body: null },

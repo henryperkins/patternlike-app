@@ -9,6 +9,8 @@
 
 ---
 
+**Merge-preparation follow-up (2026-11-10):** The blanket monotonic H3 cursor guard was too broad: it delayed timezone changes and newly restored eligibility. The merge-preparation correction retains consumed-day protection and the session-activity removal, permits earlier scheduling only for an unreserved target day, and advances consumed days in the current timezone. The original review and its other open findings remain preserved below. See [merge-preparation verification](2026-11-10-api-test-merge-preparation.md) for current evidence and limitations.
+
 ## 1. Scope and method
 
 ### 1.1 System map

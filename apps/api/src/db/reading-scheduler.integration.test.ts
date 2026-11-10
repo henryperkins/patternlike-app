@@ -39,6 +39,7 @@ import {
   replaceFailedCommand,
   resolveV5TargetDate,
 } from "../services/enqueue.js";
+import { DEFAULT_READING_SCHEDULE_POLICY, selectReadingScheduleTarget } from "../services/reading-schedule.js";
 import { runReadingScheduler } from "../services/run-reading-scheduler.js";
 import { claimJob, MAX_COMMAND_GENERATION } from "./generation.js";
 import { ensureTodayReading } from "../services/ensure-today-reading.js";
@@ -617,16 +618,49 @@ describe("bounded ordered repair", () => {
     ]);
   });
 
-  it("does not move a later reading cursor earlier", async () => {
+  it("re-arms an unreserved day after consent restores eligibility", async () => {
     const account = identity(72);
+    await seedSchedulerAccount(account, { consent: false });
+    const envValue = hybridEnv();
+    expect((await runReadingScheduler(envValue, SCHEDULED_AT)).due.reserved).toBe(0);
+    await grantAi(account);
+    const dueAt = await refreshReadingCursorAfterAiConsentChange(envValue, account.userId, SCHEDULED_AT);
+    expect(Date.parse(dueAt!)).toBeLessThan(SCHEDULED_AT.getTime());
+    expect((await runReadingScheduler(envValue, SCHEDULED_AT)).due.reserved).toBe(1);
+  });
+
+  it.each([false, true])("reschedules an eastward timezone change with consumed today=%s", async (consumed) => {
+    const account = identity(73);
+    const now = new Date("2026-08-11T12:00:00.000Z");
+    await seedSchedulerAccount(account);
+    const oldTarget = await selectReadingScheduleTarget(account.userId, "UTC", now, DEFAULT_READING_SCHEDULE_POLICY);
+    await env.DB.prepare("UPDATE users SET timezone = 'UTC', next_due_at = ? WHERE id = ?")
+      .bind(oldTarget.nextCursor.dueAt, account.userId).run();
+    if (consumed) await seedFactualArtifact(account, "published", HEX64);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      expect((await setSchedulingTimezone(hybridEnv(), account.userId, "Asia/Tokyo", "user_confirmed")).ok).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+    const target = await selectReadingScheduleTarget(account.userId, "Asia/Tokyo", now, DEFAULT_READING_SCHEDULE_POLICY);
+    const expected = consumed ? target.nextCursor.dueAt : target.dueAt;
+    expect((await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", account.userId))[0]?.next_due_at).toBe(expected);
+    expect(expected < oldTarget.nextCursor.dueAt).toBe(true);
+    if (consumed) expect(Date.parse(expected)).toBeGreaterThan(now.getTime());
+  });
+
+  it.each(["published", "failed"] as const)("does not re-arm a consumed %s day on recompute", async (status) => {
+    const account = identity(74);
     await seedSchedulerAccount(account, { nextDueAt: FUTURE });
-
+    const readingId = await seedFactualArtifact(account, "published", HEX64);
+    if (status === "failed") {
+      await env.DB.prepare("UPDATE daily_readings SET status = 'failed' WHERE id = ?").bind(readingId).run();
+    }
     const dueAt = await recomputeUserNextDueAt(hybridEnv(), account.userId, SCHEDULED_AT);
-
-    expect(dueAt).toBe(FUTURE);
-    expect(
-      await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", account.userId),
-    ).toEqual([{ next_due_at: FUTURE }]);
+    expect(Date.parse(dueAt!)).toBeGreaterThan(SCHEDULED_AT.getTime());
+    expect((await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", account.userId))[0]?.next_due_at).toBe(dueAt);
   });
 
   it("repairs a pre-generated next-local-day V2 failure", async () => {
@@ -1056,7 +1090,8 @@ describe("bounded ordered repair", () => {
     expect(first.due.evaluated).toBe(0);
     expect(second.repair.factRepairs).toBe(0);
     expect(second.repair.ineligibleOrphansBackedOff).toBe(0);
-    expect(second.due.evaluated).toBe(1);
+    // The invalidated day is already consumed; only the repair lane retries it.
+    expect(second.due.evaluated).toBe(0);
     expect(
       await rows<{ status: string; invalidated_at: string | null }>(
         "SELECT status, invalidated_at FROM daily_readings WHERE id = ?",

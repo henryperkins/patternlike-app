@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 import { REPO_ROOT } from "./candidates.mjs";
 import { CI_LANES as lanes, CI_SUMMARY_PASSED, formatCiSummary } from "./ci-summary.mjs";
@@ -179,7 +180,7 @@ test("the committed CI script carries no double-encoded characters", () => {
   assert.deepEqual(garbled, []);
 });
 
-function prepareGate(root, { mutate = false, partial = false, exit = 0 } = {}) {
+function prepareGate(root, { mutate = false, partial = false, exit = 0, summaryStream = "stdout", trailingStdout = "", trailingStderr = "" } = {}) {
   const files = {
     "package.json": JSON.stringify({ scripts: { "ci:local": "node fixture-gate.cjs" } }),
     "db/d1/MIGRATIONS.json": JSON.stringify({ migrations: [{ file: "0001_fixture.sql" }] }),
@@ -196,7 +197,9 @@ function prepareGate(root, { mutate = false, partial = false, exit = 0 } = {}) {
       }
       ${mutate ? 'fs.writeFileSync("source.ts", "changed after the gate started");' : ""}
       console.log("Private gate output marker");
-      console.log(${JSON.stringify(partial ? summary.replace(`pass\t${lanes[15]}\n`, "") : summary)});
+      process.${summaryStream}.write(${JSON.stringify(partial ? summary.replace(`pass\t${lanes[15]}\n`, "") : summary)});
+      process.stdout.write(${JSON.stringify(trailingStdout)});
+      process.stderr.write(${JSON.stringify(trailingStderr)});
       process.exitCode = ${exit};\n`,
   };
   for (const [path, value] of Object.entries(files)) {
@@ -234,6 +237,28 @@ test("a real child gate binds source, process exit, summary, build artifacts, an
     assert.equal(forged.status, 1);
     assert.match(forged.stdout, /deployment_unverified/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("gate parses stdout only while retaining stderr diagnostics in the observed output", () => {
+  for (const [options, expected] of [
+    [{ trailingStderr: "Synthetic stderr diagnostic after the summary\n" }, true],
+    [{ summaryStream: "stderr" }, false],
+    [{ trailingStdout: "Unexpected trailing stdout\n" }, false],
+  ]) {
+    const root = repository();
+    try {
+      prepareGate(root, options);
+      const result = spawnSync(process.execPath, [executable, "gate", "docs/reviews/gate.json"], { cwd: root, encoding: "utf8" });
+      assert.equal(result.status, expected ? 0 : 1, result.stdout + result.stderr);
+      const receipt = JSON.parse(readFileSync(join(root, "docs/reviews/gate.json"), "utf8"));
+      assert.equal(receipt.gate.exit_code, 0);
+      assert.equal(receipt.gate.summary.passed, expected);
+      assert.equal(receipt.passed, expected);
+      const recordedOutput = result.stdout.slice(0, result.stdout.lastIndexOf('{"passed":'));
+      assert.equal(receipt.gate.output_sha256, createHash("sha256").update(recordedOutput).digest("hex"));
+      if (options.trailingStderr) assert.ok(result.stdout.includes(options.trailingStderr));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });
 
 test("gate refuses source drift, incomplete totals, and a nonzero process exit", () => {
