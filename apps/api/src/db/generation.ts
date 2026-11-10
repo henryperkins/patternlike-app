@@ -168,14 +168,14 @@ function reservationColumns(command: GenerateDailyReadingCommand): {
     : { assemblyMode: "deterministic", releaseVersion: command.release_version };
 }
 
-async function liveReadingId(
+async function existingReadingId(
   env: Env,
   userId: string,
   localDate: string,
 ): Promise<string | null> {
   const row = await env.DB.prepare(
     `SELECT id FROM daily_readings
-     WHERE user_id = ? AND local_date = ? AND status IN ('pending', 'published')
+     WHERE user_id = ? AND local_date = ?
      ORDER BY revision DESC LIMIT 1`,
   )
     .bind(userId, localDate)
@@ -335,16 +335,16 @@ export async function reserveInitial(
             ),
           ]
         : []),
-      // Not merely an optimisation over the partial unique indexes: those would
-      // abort with a constraint error that reads identically to a real fault,
-      // and this names the state so the caller can answer `duplicate` instead of
-      // converting it into an unconditional supersession.
+      // Any row for this user-day blocks a new initial reservation. Failed days
+      // are repaired through replaceFailedCommand, not a second revision 1.
+      // Partial unique indexes cover only pending and published, so without
+      // this probe a failed row fails later as a revision or job-key conflict.
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
-         SELECT 1, 'a pending or published reading already exists for this user-day'
+         SELECT 1, 'a reading already exists for this user-day'
          WHERE EXISTS (
            SELECT 1 FROM daily_readings
-           WHERE user_id = ? AND local_date = ? AND status IN ('pending', 'published')
+           WHERE user_id = ? AND local_date = ?
          )`,
       ).bind(identity.userId, command.target_local_date),
       encryptedJob.insert,
@@ -381,7 +381,7 @@ export async function reserveInitial(
       ),
     ]);
   } catch (err) {
-    const existing = await liveReadingId(env, identity.userId, command.target_local_date);
+    const existing = await existingReadingId(env, identity.userId, command.target_local_date);
     if (existing) return { ok: false, reason: "duplicate", readingId: existing };
     return {
       ok: false,
