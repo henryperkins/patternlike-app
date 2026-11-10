@@ -19,8 +19,11 @@ function receipt(effort: "high" | "xhigh"): DailyPublicationReceiptInput {
   };
 }
 
-describe.each(["fresh", "populated 0028 upgrade"])("0029 %s", (lane) => {
-  const db = lane === "fresh" ? env.DB : env.MIGRATION_UPGRADE_DB;
+// The populated-0028-upgrade lane of this suite lives in
+// `src/db/migrations-upgrade.test.ts`, next to the only code that can seed
+// rows before the migration runs. This file keeps the fresh-apply lane.
+describe("0029 fresh", () => {
+  const db = env.DB;
   it("creates exactly the technical allowlist, indexes, and no foreign keys", async () => {
     expect((await db.prepare("PRAGMA table_info(daily_publication_receipts)").all<{ name: string }>()).results.map(row => row.name)).toEqual(columns);
     expect(columns).not.toContain("user_id");

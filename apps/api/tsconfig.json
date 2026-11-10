@@ -15,6 +15,7 @@
     "src/**/*",
     "test/**/*",
     "vitest.config.ts",
-    "vitest.m3-compat.config.ts"
+    "vitest.m3-compat.config.ts",
+    "vitest.unit.config.ts"
   ]
 }
