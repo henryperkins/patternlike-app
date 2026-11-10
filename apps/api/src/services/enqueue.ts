@@ -538,3 +538,151 @@ export async function enqueueConstrainedReading(
   });
   return { ok: true, readingId: reserved.readingId, jobId: reserved.jobId, dispatched };
 }
+
+export type OperatorReissueReason = Extract<
+  RevisionReasonV2,
+  "safety_correction" | "defect_repair"
+>;
+
+export type ReissueEnqueueOutcome =
+  | EnqueueOutcome
+  | {
+      ok: false;
+      reason: "not_replaceable";
+      detail: string;
+    };
+
+/**
+ * Reserve today's constrained-model reading for one user through the internal
+ * operator route.
+ *
+ * The rollout gate runs before any D1, DEK, or calculation work so `off`
+ * performs no account or dependency reads. Preferences are checked in the same
+ * order as `PUT /v1/readings/today`, and today's local date is resolved under
+ * the pinned timezone database before `enqueueConstrainedReading` freezes a V2
+ * command with `reservation_reason: "internal"`.
+ */
+export async function enqueueInternalDailyReading(
+  env: Env,
+  userId: string,
+  now = new Date(),
+): Promise<EnqueueOutcome> {
+  const rollout = readReadingV5Rollout(env);
+  if (rollout === null || !rolloutAllows(rollout, "internal")) {
+    return {
+      ok: false,
+      reason: "rollout_disabled",
+      detail: "constrained-model generation is not enabled for the internal entry point",
+    };
+  }
+
+  const identity = await loadIdentity(env, userId);
+  if (!identity) {
+    return { ok: false, reason: "chart_not_found", detail: "no active user" };
+  }
+
+  const preferences = await loadPreferences(env, userId);
+  if (!preferences) {
+    return { ok: false, reason: "chart_not_found", detail: "user does not exist" };
+  }
+  if (preferences.timezoneSource === "default_unconfirmed") {
+    return {
+      ok: false,
+      reason: "timezone_confirmation_required",
+      detail: "scheduling timezone is still the unconfirmed server default",
+    };
+  }
+  if (preferences.localeSource === "default_unconfirmed") {
+    return {
+      ok: false,
+      reason: "locale_confirmation_required",
+      detail: "content locale is still the unconfirmed server default",
+    };
+  }
+
+  const targetLocalDate = resolveV5TargetDate(preferences.timezone, now);
+  if (!targetLocalDate) {
+    return {
+      ok: false,
+      reason: "timezone_confirmation_required",
+      detail: "scheduling timezone cannot resolve a local date",
+    };
+  }
+
+  return enqueueConstrainedReading(env, userId, {
+    entry: "internal",
+    reservationReason: "internal",
+    targetLocalDate,
+    now,
+  });
+}
+
+/**
+ * Reserve a constrained-model successor to a named published reading through
+ * the internal operator route.
+ *
+ * Assembler-published (`deterministic`) editions are historical records and are
+ * refused as `not_replaceable` rather than rebuilt through either family.
+ * Published `constrained_model` editions reserve an `r+1` V2 successor on the
+ * predecessor's `local_date` without the automatic-replacement day window, so
+ * an operator can still issue a safety correction or defect repair in History.
+ */
+export async function enqueueInternalReissue(
+  env: Env,
+  userId: string,
+  expectedLiveReadingId: string,
+  revisionReason: OperatorReissueReason,
+  now = new Date(),
+): Promise<ReissueEnqueueOutcome> {
+  const rollout = readReadingV5Rollout(env);
+  if (rollout === null || !rolloutAllows(rollout, "internal")) {
+    return {
+      ok: false,
+      reason: "rollout_disabled",
+      detail: "constrained-model generation is not enabled for the internal entry point",
+    };
+  }
+
+  const identity = await loadIdentity(env, userId);
+  if (!identity) {
+    return { ok: false, reason: "chart_not_found", detail: "no active user" };
+  }
+
+  const predecessor = await env.DB.prepare(
+    `SELECT id, local_date, revision, status, assembly_mode
+     FROM daily_readings
+     WHERE id = ? AND user_id = ?`,
+  )
+    .bind(expectedLiveReadingId, userId)
+    .first<{
+      id: string;
+      local_date: string;
+      revision: number;
+      status: string;
+      assembly_mode: string;
+    }>();
+  if (!predecessor || predecessor.status !== "published") {
+    return {
+      ok: false,
+      reason: "stale_predecessor",
+      detail: "the expected live reading is not published",
+    };
+  }
+  if (predecessor.assembly_mode !== "constrained_model") {
+    return {
+      ok: false,
+      reason: "not_replaceable",
+      detail: "assembler-published readings are historical records and cannot be reissued",
+    };
+  }
+
+  return enqueueConstrainedReading(env, userId, {
+    entry: "internal",
+    reservationReason: "manual_reissue",
+    targetLocalDate: predecessor.local_date,
+    revision: predecessor.revision + 1,
+    revisionReason,
+    supersedesReadingId: expectedLiveReadingId,
+    now,
+  });
+}

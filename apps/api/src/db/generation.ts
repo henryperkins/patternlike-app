@@ -4,6 +4,7 @@ import {
   buildDailyPublicationReceiptInsert,
   type DailyPublicationReceiptInput,
 } from "./daily-publication-receipts.js";
+import { assertExactCurrentAiSynthesisGrant } from "./consents.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
 import { buildReaderRelationshipSupportInsert, type PreparedReaderRelationshipSupport } from "./reader-relationship-supports.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
@@ -307,7 +308,8 @@ export async function reserveInitial(
   identity: UserIdentity,
   command: GenerateDailyReadingCommand,
 ): Promise<ReserveOutcome> {
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
   const jobId = newId("job");
   const columns = reservationColumns(command);
   const encryptedJob = await encryptedJobInsert(
@@ -322,6 +324,17 @@ export async function reserveInitial(
   try {
     await env.DB.batch([
       encryptedJob.fence,
+      ...(isCommandV2(command)
+        ? [
+            assertExactCurrentAiSynthesisGrant(
+              env,
+              identity.userId,
+              command.ai_consent.consent_id,
+              command.ai_consent.policy_version,
+              nowDate,
+            ),
+          ]
+        : []),
       // Not merely an optimisation over the partial unique indexes: those would
       // abort with a constraint error that reads identically to a real fault,
       // and this names the state so the caller can answer `duplicate` instead of
@@ -395,7 +408,8 @@ export async function reserveReissue(
   command: GenerateDailyReadingCommand,
   expectedLiveReadingId: string,
 ): Promise<ReserveOutcome> {
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
   const jobId = newId("job");
   const columns = reservationColumns(command);
 
@@ -423,6 +437,17 @@ export async function reserveReissue(
   try {
     await env.DB.batch([
       encryptedJob.fence,
+      ...(isCommandV2(command)
+        ? [
+            assertExactCurrentAiSynthesisGrant(
+              env,
+              identity.userId,
+              command.ai_consent.consent_id,
+              command.ai_consent.policy_version,
+              nowDate,
+            ),
+          ]
+        : []),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'expected predecessor is no longer the live reading at the expected revision'
