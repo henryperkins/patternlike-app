@@ -1,0 +1,9 @@
+Canonical gate at 1bbf6abac23d85a1127481992b76560d3819f112: exit 1; 8 of 16 lanes passed.
+
+Seven lanes fail before completion because tsx attempts an unavailable Unix IPC listener:
+Error: listen EPERM: operation not permitted /tmp/tsx-1000/<pid>.pipe
+Shared, reading-engine, calc-stub, API pretest, API prebuild, pattern-engine, codex-runner.
+
+The content lane has seven failed fixture assertions. Their child fixture emits a complete passing summary, but runtime UNDICI-EHPA warnings arrive after the END marker. The strict parseCiSummary parser rejects this as gate_summary_incomplete.
+
+The actual gate receipt remains failed. Supplemental checks do not replace it.

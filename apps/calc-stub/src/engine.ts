@@ -355,7 +355,26 @@ export function resolveUtcInstant(req: CalcRequest): UtcInstantParts {
     );
   }
 
-  const utc = dt.toUTC();
+  // Luxon seeds `DateTime.fromObject`'s provisional offset from `Settings.now()`,
+  // so an ambiguous fall-back wall time lands on the first fold when the server
+  // clock is in daylight time and the second fold when the server clock is in
+  // standard time. Step back to the earlier fold when the wall time repeated so
+  // chart calculation is independent of the server's current season and agrees
+  // with `resolveLocalWallTime`.
+  const foldDelta = dt.minus({ hours: 6 }).offset - dt.offset;
+  const earlierFold = foldDelta > 0 ? dt.minus({ minutes: foldDelta }) : dt;
+  const resolved =
+    foldDelta > 0 &&
+    earlierFold.year === dt.year &&
+    earlierFold.month === dt.month &&
+    earlierFold.day === dt.day &&
+    earlierFold.hour === dt.hour &&
+    earlierFold.minute === dt.minute &&
+    earlierFold.second === dt.second
+      ? earlierFold
+      : dt;
+
+  const utc = resolved.toUTC();
   const hourDecimal =
     utc.hour + utc.minute / 60 + utc.second / 3600 + utc.millisecond / 3_600_000;
   const iso = utc.toISO();

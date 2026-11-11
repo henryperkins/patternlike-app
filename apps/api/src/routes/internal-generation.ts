@@ -3,14 +3,12 @@ import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import {
   dispatch,
-  enqueueDailyReading,
-  enqueueReissue,
+  enqueueInternalDailyReading,
+  enqueueInternalReissue,
   replaceFailedCommand,
+  type OperatorReissueReason,
 } from "../services/enqueue.js";
 import { findExpiredLeases, findUndispatched } from "../db/generation.js";
-import type {
-  RevisionReason,
-} from "../services/generation-command.js";
 import {
   isGenerationReplacementReason,
   type GenerationReplacementReason,
@@ -35,9 +33,7 @@ export const internalGenerationRoutes = new Hono<{
   Variables: AppVariables;
 }>();
 
-const REISSUE_REASONS: readonly RevisionReason[] = [
-  "chart_recalculated",
-  "consent_revoked",
+const REISSUE_REASONS: readonly OperatorReissueReason[] = [
   "safety_correction",
   "defect_repair",
 ];
@@ -52,6 +48,8 @@ const CLIENT_ERROR_REASONS = new Set([
   "timezone_confirmation_required",
   "locale_confirmation_required",
   "chart_not_found",
+  "ai_synthesis_consent_required",
+  "skipped_local_date",
   "release_not_active",
   "stale_predecessor",
   "not_replaceable",
@@ -62,7 +60,15 @@ const CLIENT_ERROR_REASONS = new Set([
 
 function statusFor(reason: string): 409 | 424 | 503 {
   if (CLIENT_ERROR_REASONS.has(reason)) return 409;
-  if (reason === "calc_unavailable" || reason === "release_unreadable") return 503;
+  if (
+    reason === "rollout_disabled" ||
+    reason === "publisher_not_configured" ||
+    reason === "calc_unavailable" ||
+    reason === "daily_sky_unavailable" ||
+    reason === "release_unreadable"
+  ) {
+    return 503;
+  }
   return 424;
 }
 
@@ -70,6 +76,10 @@ const PRIVATE_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
   conflict: "The reading operation could not be committed",
   stale_job: "The failed reading changed before it could be replaced",
   calc_unavailable: "The calculation service is unavailable",
+  daily_sky_unavailable: "The daily-sky calculation service is unavailable",
+  publisher_not_configured: "The reading publisher is not configured",
+  policy_unsupported: "The reading command is not supported by the active policy",
+  context_ineligible: "The reading inputs are not eligible for generation",
   release_unreadable: "The active content release is unavailable",
   assembly_failed: "The reading command could not be assembled",
 };
@@ -108,7 +118,7 @@ internalGenerationRoutes.post("/readings/generate", async (c) => {
     );
   }
 
-  const result = await enqueueDailyReading(c.env, userId);
+  const result = await enqueueInternalDailyReading(c.env, userId);
   if (!result.ok) {
     if (result.reason === "duplicate") {
       return c.json({ status: "duplicate", detail: result.detail }, 200);
@@ -141,7 +151,7 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
   const userId = typeof body?.user_id === "string" ? body.user_id : null;
   const expected =
     typeof body?.expected_live_reading_id === "string" ? body.expected_live_reading_id : null;
-  const reason = body?.revision_reason as RevisionReason | undefined;
+  const reason = body?.revision_reason as OperatorReissueReason | undefined;
 
   if (!userId || !expected || !reason || !REISSUE_REASONS.includes(reason)) {
     return c.json(
@@ -156,11 +166,11 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
     );
   }
 
-  const result = await enqueueReissue(
+  const result = await enqueueInternalReissue(
     c.env,
     userId,
     expected,
-    reason as Exclude<RevisionReason, "initial">,
+    reason,
   );
   if (!result.ok) {
     return c.json(

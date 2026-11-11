@@ -14,9 +14,9 @@ import { resetDb, seedUser, IDENTITY_A, USER_A } from "../../test/helpers.js";
  * `reading`/`planner` and `ontology`/`publisher` as a side effect, and neither
  * has an owner, a budget ledger, or a current-owner check behind it.
  *
- * The populated-upgrade lane lives in `test/apply-migrations.ts`, which is the
- * only place that can seed rows *before* the migration runs. What this file
- * asserts about `MIGRATION_UPGRADE_DB` is the result of that lane.
+ * The populated-upgrade lane lives in `test/migration-upgrade.ts`, driven
+ * once per suite run by `src/db/migrations-upgrade.test.ts`, which is the
+ * only place that can seed rows *before* the migration runs.
  */
 
 const HEX32 = "a".repeat(32);
@@ -320,82 +320,6 @@ describe("the codex_provider_jobs coordinate vocabulary", () => {
       .first<{ quick_check: string }>();
     expect(quickCheck?.quick_check).toBe("ok");
     const probe = await env.DB.prepare("SELECT * FROM assertion_probe").all();
-    expect(probe.results).toEqual([]);
-  });
-});
-
-describe("the populated 0017 upgrade", () => {
-  // Seeded and upgraded by test/apply-migrations.ts. Read-only here.
-  const upgradeDb = env.MIGRATION_UPGRADE_DB;
-
-  it("preserves every seeded parent row byte-for-byte", async () => {
-    const { results } = await upgradeDb.prepare(
-      `SELECT id, pipeline, owner_id, user_id, pass, stage_generation,
-              stage_attempt, request_hash, request_object_key,
-              request_envelope_hash, request_ciphertext_hash, request_key_id,
-              request_nonce, request_byte_length, response_hash,
-              response_object_key, response_envelope_hash,
-              response_ciphertext_hash, response_key_id, response_nonce,
-              response_byte_length, model, reasoning_effort, prompt_version,
-              timeout_ms, daily_call_limit, status, lease_token_hash,
-              lease_expires_at, provider_request_id, input_tokens,
-              output_tokens, failure_code, safe_detail_code, available_at,
-              created_at, updated_at, completed_at
-       FROM codex_provider_jobs ORDER BY id`,
-    ).all();
-    const snapshot = await upgradeDb.prepare(
-      "SELECT payload FROM migration_upgrade_snapshot WHERE name = 'codex_provider_jobs'",
-    ).first<{ payload: string }>();
-    expect(snapshot).not.toBeNull();
-    expect(results).toEqual(JSON.parse(snapshot!.payload));
-    // Every lifecycle the widening had to carry through the rebuild.
-    expect(new Set(results.map((row) => (row as { status: string }).status)))
-      .toEqual(new Set(["pending", "leased", "completed", "failed", "cancelled"]));
-  });
-
-  it("preserves every seeded response-upload child row byte-for-byte", async () => {
-    const { results } = await upgradeDb.prepare(
-      `SELECT job_id, lease_token_hash, object_key, created_at
-       FROM codex_provider_response_uploads ORDER BY job_id, lease_token_hash`,
-    ).all();
-    const snapshot = await upgradeDb.prepare(
-      `SELECT payload FROM migration_upgrade_snapshot
-       WHERE name = 'codex_provider_response_uploads'`,
-    ).first<{ payload: string }>();
-    expect(snapshot).not.toBeNull();
-    expect(results).toEqual(JSON.parse(snapshot!.payload));
-    expect(results.length).toBe(2);
-  });
-
-  it("admits the new reading coordinate over live rows", async () => {
-    const id = `cpjob_${"e".repeat(32)}`;
-    await insertProviderJob(upgradeDb, {
-      id,
-      pipeline: "reading",
-      ownerId: "job_upgrade_reading_0001",
-      userId: "usr_99999999999999999999999999999999",
-      pass: "publisher",
-    });
-    const row = await upgradeDb.prepare(
-      "SELECT pipeline, pass FROM codex_provider_jobs WHERE id = ?",
-    ).bind(id).first();
-    expect(row).toEqual({ pipeline: "reading", pass: "publisher" });
-    await upgradeDb.prepare("DELETE FROM codex_provider_jobs WHERE id = ?")
-      .bind(id).run();
-  });
-
-  it("leaves no staging state, no violation, and no armed probe", async () => {
-    const staging = await upgradeDb.prepare(
-      `SELECT name FROM sqlite_master
-       WHERE type = 'table' AND name LIKE 'codex_provider_%staging%'`,
-    ).all();
-    expect(staging.results).toEqual([]);
-    const foreignKeys = await upgradeDb.prepare("PRAGMA foreign_key_check").all();
-    expect(foreignKeys.results).toEqual([]);
-    const quickCheck = await upgradeDb.prepare("PRAGMA quick_check")
-      .first<{ quick_check: string }>();
-    expect(quickCheck?.quick_check).toBe("ok");
-    const probe = await upgradeDb.prepare("SELECT * FROM assertion_probe").all();
     expect(probe.results).toEqual([]);
   });
 });

@@ -154,15 +154,19 @@ async function captureGate(root) {
   const sourceBefore = captureSourceSnapshot(root);
   const startedAt = new Date().toISOString();
   const outputHash = createHash("sha256");
-  let outputTail = "";
+  let stdoutTail = "";
   const exitCode = await new Promise((done) => {
     const child = spawn("npm", ["run", "ci:local"], { cwd: root, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
     const consume = (chunk) => {
       outputHash.update(chunk);
-      outputTail = (outputTail + chunk.toString("utf8")).slice(-131072);
       process.stdout.write(chunk);
     };
-    child.stdout.on("data", consume);
+    // The canonical summary is a stdout protocol. Preserve both streams in the
+    // log and hash, but do not mistake asynchronous stderr diagnostics for it.
+    child.stdout.on("data", (chunk) => {
+      stdoutTail = (stdoutTail + chunk.toString("utf8")).slice(-131072);
+      consume(chunk);
+    });
     child.stderr.on("data", consume);
     child.on("error", () => done(null));
     child.on("close", (code) => done(code));
@@ -179,7 +183,7 @@ async function captureGate(root) {
     source_comparison: sourceComparison,
     gate: {
       status: "observed", command: "npm run ci:local", started_at: startedAt,
-      exit_code: exitCode, output_sha256: outputHash.digest("hex"), summary: parseCiSummary(outputTail, exitCode),
+      exit_code: exitCode, output_sha256: outputHash.digest("hex"), summary: parseCiSummary(stdoutTail, exitCode),
     },
     repository_identity: captureRepositoryIdentity(root, sourceAfter),
     artifacts: captureArtifacts(root),

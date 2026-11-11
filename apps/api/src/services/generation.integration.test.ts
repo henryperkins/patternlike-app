@@ -40,6 +40,8 @@ import {
   dispatch,
   enqueueConstrainedReading,
   enqueueDailyReading,
+  enqueueInternalDailyReading,
+  enqueueInternalReissue,
   enqueueReissue,
   replaceFailedCommand,
   resolveV5TargetDate,
@@ -1601,6 +1603,97 @@ describe("reissue", () => {
     expect(
       await enqueueReissue(env, USER_A, "rdg_not_a_real_reading", "defect_repair"),
     ).toMatchObject({ ok: false, reason: "stale_predecessor" });
+  });
+
+  it("reserves operator initial and reissue readings through the configured V2 model and leaves assembler editions untouched", async () => {
+    await grantAiSynthesis();
+    const v5Env = enabledV5Env() as typeof env;
+    const now = new Date("2026-08-09T18:00:00.000Z");
+
+    for (const rollout of ["off", "invalid_mode"]) {
+      const disabledEnv = { ...v5Env, READING_V5_ROLLOUT: rollout };
+      expect(await enqueueInternalDailyReading(disabledEnv, USER_A, now)).toMatchObject({
+        ok: false,
+        reason: "rollout_disabled",
+      });
+      expect(
+        await enqueueInternalReissue(
+          disabledEnv,
+          USER_A,
+          "rdg_any_published_01",
+          "safety_correction",
+          now,
+        ),
+      ).toMatchObject({
+        ok: false,
+        reason: "rollout_disabled",
+      });
+    }
+
+    const initial = await enqueueInternalDailyReading(v5Env, USER_A, now);
+    expect(initial.ok).toBe(true);
+    if (!initial.ok) throw new Error(`operator initial failed: ${initial.reason}`);
+
+    const initialClaim = await claimJob(v5Env, initial.jobId);
+    expect(initialClaim?.command).toMatchObject({
+      command_version: "v2",
+      reservation_reason: "internal",
+      revision: 1,
+      revision_reason: "initial",
+      target_local_date: "2026-08-09",
+    });
+    expect(await dispatchGeneration(v5Env, initialClaim!)).toMatchObject({
+      ok: false,
+      reason: "publisher_pending",
+    });
+    const providerJob = await claimReadingJob();
+    if (!providerJob) throw new Error("provider job missing");
+    await completeReadingJob(providerJob, JSON.stringify(candidateFor(providerJob.packet)));
+    expect(await dispatchGeneration(v5Env, initialClaim!)).toMatchObject({
+      ok: true,
+      readingId: initial.readingId,
+    });
+
+    const reissued = await enqueueInternalReissue(
+      v5Env,
+      USER_A,
+      initial.readingId,
+      "safety_correction",
+      now,
+    );
+    expect(reissued.ok).toBe(true);
+    if (!reissued.ok) throw new Error(`operator reissue failed: ${reissued.reason}`);
+
+    const reissueClaim = await claimJob(v5Env, reissued.jobId);
+    expect(reissueClaim?.command).toMatchObject({
+      command_version: "v2",
+      reservation_reason: "manual_reissue",
+      revision: 2,
+      revision_reason: "safety_correction",
+      supersedes_reading_id: initial.readingId,
+      target_local_date: "2026-08-09",
+    });
+
+    // Publish an earlier assembler-published reading on another day and verify operator reissue refuses it.
+    const assemblerDay = await enqueueDailyReading(
+      env,
+      USER_A,
+      new Date("2026-08-01T18:00:00.000Z"),
+    );
+    if (!assemblerDay.ok) throw new Error(`V1 enqueue failed: ${assemblerDay.reason}`);
+    await deliver([{ job_id: assemblerDay.jobId, reading_id: assemblerDay.readingId }]);
+    expect(
+      await enqueueInternalReissue(
+        v5Env,
+        USER_A,
+        assemblerDay.readingId,
+        "defect_repair",
+        now,
+      ),
+    ).toMatchObject({
+      ok: false,
+      reason: "not_replaceable",
+    });
   });
 });
 

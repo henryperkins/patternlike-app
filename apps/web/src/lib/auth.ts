@@ -61,6 +61,14 @@ export class SignInError extends Error {
   }
 }
 
+/** The Worker cookie is already revoked. The issuer logout is what failed. */
+export class SignOutError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "SignOutError";
+  }
+}
+
 /** Exchange the SDK-cached raw ID token once for the Worker session cookie. */
 export async function completeSignIn(
   getIdTokenClaims: GetIdTokenClaims,
@@ -79,16 +87,27 @@ export async function completeSignIn(
   }
 }
 
-/** Revoke the Worker session before clearing the Auth0 session. */
+/**
+ * Revoke the Worker session, then clear the Auth0 session.
+ *
+ * Auth0 logout runs only after revocation resolves. The product cookie is
+ * httpOnly, and this DELETE is the only call that clears it. Logging out of
+ * the issuer first leaves that cookie live, so the next page load signs the
+ * previous person back in.
+ */
 export async function signOut(
   endWorkerSession: () => Promise<void>,
   auth0Logout: Auth0Logout,
 ): Promise<void> {
+  await endWorkerSession();
   try {
-    await endWorkerSession();
-  } finally {
     await auth0Logout({
       logoutParams: { returnTo: window.location.origin },
     });
+  } catch (error) {
+    throw new SignOutError(
+      "The account session ended, but the sign-in provider could not finish logging out.",
+      { cause: error },
+    );
   }
 }

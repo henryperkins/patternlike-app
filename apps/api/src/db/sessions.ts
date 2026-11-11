@@ -2,7 +2,6 @@ import { newId, sha256Hex } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
 import type { AccountStatus, UserIdentity } from "./users.js";
-import { recomputeUserNextDueAt } from "./reading-scheduler.js";
 
 /**
  * 30 days, absolute — not sliding. A sliding window on a bearer that unlocks
@@ -47,8 +46,10 @@ export async function createSession(
       now.toISOString(),
     )
     .run();
-  await recomputeUserNextDueAt(env, userId, now);
-
+  // Login does not schedule a reading. Today's due time is already in the past
+  // for most of the day, and writing it here re-arms the due lane for a day
+  // that may already have a row. The null-cursor lane and the account,
+  // preference, consent, and chart writers own next_due_at.
   return { token, expiresAt };
 }
 
@@ -96,8 +97,10 @@ export const SESSION_ACTIVITY_TOUCH_INTERVAL_MS = 60 * 60 * 1000;
 /**
  * Persist qualifying activity at most once per hour per session.
  *
- * The cursor recompute happens only when the guarded write lands, so a hot API
- * session cannot turn every authenticated request into two extra D1 writes.
+ * The guard is only about last_seen_at. It does not move users.next_due_at.
+ * Today's due time is already in the past for most of the day, so recomputing
+ * it from a request would re-arm the scheduler for a day whose reading already
+ * exists.
  */
 export async function touchSessionActivity(
   env: Env,
@@ -115,9 +118,7 @@ export async function touchSessionActivity(
   )
     .bind(now.toISOString(), sessionId, userId, now.toISOString(), cutoff)
     .run();
-  if (result.meta.changes !== 1) return false;
-  await recomputeUserNextDueAt(env, userId, now);
-  return true;
+  return result.meta.changes === 1;
 }
 
 export async function revokeSession(env: Env, sessionId: string): Promise<void> {

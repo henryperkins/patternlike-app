@@ -10,6 +10,7 @@ import {
   setTopicExclusions,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
+import { Icon } from "./icons.js";
 
 const TOPIC_LABELS: Record<ExcludableLifeDomain, string> = {
   self: "Self",
@@ -38,6 +39,7 @@ export function TopicExclusionsPanel() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const key = useRef<string | null>(null);
 
   useEffect(() => {
@@ -48,9 +50,13 @@ export function TopicExclusionsPanel() {
         if (controller.signal.aborted) return;
         setSelected(current.excluded_topics);
         setSavedAt(current.updated_at);
+        setProblem(null);
         setLoaded(true);
       } catch (error) {
         if (controller.signal.aborted) return;
+        setSelected([]);
+        setSavedAt(null);
+        setLoaded(false);
         setProblem(
           withRequestId(
             error instanceof Error
@@ -59,11 +65,10 @@ export function TopicExclusionsPanel() {
             error instanceof ApiError ? error.requestId : null,
           ),
         );
-        setLoaded(true);
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [loadAttempt]);
 
   const toggle = (id: string) => {
     setSelected((current) =>
@@ -71,9 +76,15 @@ export function TopicExclusionsPanel() {
     );
   };
 
+  const retryLoad = () => {
+    setProblem(null);
+    setLoaded(false);
+    setLoadAttempt((attempt) => attempt + 1);
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !loaded) return;
     setBusy(true);
     setProblem(null);
     key.current ??= newIdempotencyKey("web-topic-exclusions");
@@ -138,6 +149,17 @@ export function TopicExclusionsPanel() {
             </button>
           </div>
         </form>
+      ) : problem ? (
+        <>
+          <div className="form-error" role="alert">
+            {problem} The saved exclusions were not loaded, so they cannot be changed from here.
+          </div>
+          <div className="topic-exclusions__footer">
+            <button className="button button--secondary" type="button" onClick={retryLoad}>
+              Try again <Icon name="refresh" />
+            </button>
+          </div>
+        </>
       ) : (
         <p>Loading…</p>
       )}

@@ -14,7 +14,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "//test": "Glob QUOTED so node expands it rather than sh — see the note in packages/shared/package.json.",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "generate:allowlist": "python scripts/generate_source_allowlist.py"
   },
   "//dependencies": "TYPE-ONLY. @patternlike/shared owns the M5 wire types this package compiles against; importing them keeps one declaration of ReadingGenerationRequest rather than a structurally identical copy that drifts. The direction is safe for LICENSING.md: apps/calc-stub imports shared, shared does not import this package, and ranking, eligibility, selection, prompt, and validation policy all stay here.",

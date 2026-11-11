@@ -3,6 +3,7 @@ import {
   ApiError,
   deleteGeneratedPattern,
   createBirthProfile,
+  endSession,
   ensureTodayReading,
   getAccountProcessingConsent,
   getPatternPortrait,
@@ -532,6 +533,51 @@ describe("getTiming", () => {
     };
 
     expect(filters).toEqual({ domain: "work" });
+  });
+});
+
+describe("endSession", () => {
+  it("retries a failed revocation once and then resolves", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await endSession();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe("/v1/sessions/current");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE", credentials: "include" });
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("stops after one retry when revocation never succeeds", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(endSession()).rejects.toThrow(/could not be reached/i);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts a stalled revocation and tries once more", async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error("sign-out has no deadline"));
+          return;
+        }
+        signal.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        }, { once: true });
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(endSession(20)).rejects.toThrow(/could not be reached/i);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

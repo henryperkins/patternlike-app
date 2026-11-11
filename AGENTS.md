@@ -17,6 +17,7 @@ Run commands from the repository root with the Node 22 pinned by `.nvmrc` (the p
 - `npm run test:contracts` and `npm run calc:golden` run focused verification lanes.
 - After a `contracts/` change, run `npm run generate:validators -w @patternlike/api`.
 - After editing a file listed in `apps/api/pattern-creation-sources.json`, run `npm run generate:pattern-source -w @patternlike/api`. API `pretest` and `prebuild` reject stale generated artifacts.
+- After adding or editing a `db/d1/` migration, run `npm run generate:test-schema -w @patternlike/api`. The API Workers-pool tests seed D1 from the generated `apps/api/test/schema-dump.sql`, and API `pretest` rejects a stale dump.
 
 ## Coding Style & Naming Conventions
 

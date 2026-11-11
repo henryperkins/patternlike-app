@@ -15,6 +15,7 @@ import {
   findStalePublishedCandidates,
   invalidatedOrphanDiscoverySql,
   INVALIDATED_ORPHAN_BACKOFF_MS,
+  recomputeUserNextDueAt,
 } from "./reading-scheduler.js";
 import { createSession, touchSessionActivity } from "./sessions.js";
 import {
@@ -38,8 +39,9 @@ import {
   replaceFailedCommand,
   resolveV5TargetDate,
 } from "../services/enqueue.js";
+import { DEFAULT_READING_SCHEDULE_POLICY, selectReadingScheduleTarget } from "../services/reading-schedule.js";
 import { runReadingScheduler } from "../services/run-reading-scheduler.js";
-import { claimJob } from "./generation.js";
+import { claimJob, MAX_COMMAND_GENERATION } from "./generation.js";
 import { ensureTodayReading } from "../services/ensure-today-reading.js";
 import { dispatchGeneration } from "../services/generate-daily-reading.js";
 import type { GenerateDailyReadingCommandV2 } from "../services/generation-command-v2.js";
@@ -324,7 +326,7 @@ describe("scheduler eligibility and cursor lifecycle", () => {
     expect(cursorRows.find((row) => row.id === identity(13).userId)?.next_due_at).toBeNull();
   });
 
-  it("maintains cursors after account, preference, consent, chart, and throttled session activity changes", async () => {
+  it("maintains cursors after account, preference, consent, and chart changes, not session activity", async () => {
     const linked = await linkIdentity(hybridEnv(), "https://issuer.example.com", "subject-scheduler");
     expect((await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", linked.userId))[0]?.next_due_at).toBeTruthy();
 
@@ -347,7 +349,7 @@ describe("scheduler eligibility and cursor lifecycle", () => {
     expect(await touchSessionActivity(hybridEnv(), sessionRow[0]!.id, linked.userId, new Date("2026-08-11T10:30:00.000Z"))).toBe(false);
     expect((await rows<{ next_due_at: string | null }>("SELECT next_due_at FROM users WHERE id = ?", linked.userId))[0]?.next_due_at).toBeNull();
     expect(await touchSessionActivity(hybridEnv(), sessionRow[0]!.id, linked.userId, new Date("2026-08-11T11:01:00.000Z"))).toBe(true);
-    expect((await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", linked.userId))[0]?.next_due_at).toBeTruthy();
+    expect((await rows<{ next_due_at: string | null }>("SELECT next_due_at FROM users WHERE id = ?", linked.userId))[0]?.next_due_at).toBeNull();
 
     await seedUser(IDENTITY_A);
     await env.DB.prepare("UPDATE users SET next_due_at = NULL WHERE id = ?").bind(USER_A).run();
@@ -482,6 +484,183 @@ describe("bounded ordered repair", () => {
 
     expect(summary.repair.failedReplacements).toBe(1);
     expect(reading).toEqual({ status: "pending", command_generation: 2 });
+  });
+
+  it("does not reserve a second row for a day whose replacement budget is spent", async () => {
+    const account = identity(70);
+    await seedSchedulerAccount(account, { nextDueAt: OLD });
+    const envValue = hybridEnv();
+    const localDate = resolveV5TargetDate(ZONE, SCHEDULED_AT)!;
+    const reserved = await enqueueConstrainedReading(envValue, account.userId, {
+      entry: "scheduled",
+      reservationReason: "scheduled",
+      targetLocalDate: localDate,
+      now: SCHEDULED_AT,
+    });
+    expect(reserved.ok).toBe(true);
+    if (!reserved.ok) return;
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE daily_readings
+         SET status = 'failed', command_generation = ?, updated_at = ?
+         WHERE id = ?`,
+      ).bind(MAX_COMMAND_GENERATION, "2026-08-11T08:00:00.000Z", reserved.readingId),
+      env.DB.prepare(
+        `UPDATE jobs
+         SET status = 'failed', result_class = 'calc_unavailable', attempts = 4, finished_at = ?
+         WHERE id = ?`,
+      ).bind("2026-08-11T08:00:00.000Z", reserved.jobId),
+    ]);
+
+    const again = await enqueueConstrainedReading(envValue, account.userId, {
+      entry: "scheduled",
+      reservationReason: "scheduled",
+      targetLocalDate: localDate,
+      now: SCHEDULED_AT,
+    });
+    expect(again).toMatchObject({
+      ok: false,
+      reason: "duplicate",
+      detail: expect.stringContaining(reserved.readingId),
+    });
+
+    const summary = await runReadingScheduler(envValue, SCHEDULED_AT);
+
+    expect(summary.due.reserved).toBe(0);
+    expect(summary.repair.failedReplacements).toBe(0);
+    expect(
+      await rows<{
+        id: string;
+        status: string;
+        command_generation: number;
+        revision: number;
+      }>(
+        `SELECT id, status, command_generation, revision
+         FROM daily_readings WHERE user_id = ?`,
+        account.userId,
+      ),
+    ).toEqual([
+      {
+        id: reserved.readingId,
+        status: "failed",
+        command_generation: MAX_COMMAND_GENERATION,
+        revision: 1,
+      },
+    ]);
+    expect(await rows("SELECT id FROM jobs WHERE user_id = ?", account.userId)).toHaveLength(1);
+  });
+
+  it("keeps one exhausted row when session activity is followed by a cron run", async () => {
+    const account = identity(71);
+    await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+    const envValue = hybridEnv();
+    const localDate = resolveV5TargetDate(ZONE, SCHEDULED_AT)!;
+    const reserved = await enqueueConstrainedReading(envValue, account.userId, {
+      entry: "scheduled",
+      reservationReason: "scheduled",
+      targetLocalDate: localDate,
+      now: SCHEDULED_AT,
+    });
+    expect(reserved.ok).toBe(true);
+    if (!reserved.ok) return;
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE daily_readings
+         SET status = 'failed', command_generation = ?, updated_at = ?
+         WHERE id = ?`,
+      ).bind(MAX_COMMAND_GENERATION, "2026-08-11T08:00:00.000Z", reserved.readingId),
+      env.DB.prepare(
+        `UPDATE jobs
+         SET status = 'failed', result_class = 'calc_unavailable', attempts = 4, finished_at = ?
+         WHERE id = ?`,
+      ).bind("2026-08-11T08:00:00.000Z", reserved.jobId),
+    ]);
+
+    const activityAt = new Date("2026-08-11T18:00:00.000Z");
+    await createSession(envValue, account.userId, activityAt);
+    const [sessionRow] = await rows<{ id: string }>(
+      "SELECT id FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+      account.userId,
+    );
+    expect(
+      await touchSessionActivity(
+        envValue,
+        sessionRow!.id,
+        account.userId,
+        new Date("2026-08-11T19:30:00.000Z"),
+      ),
+    ).toBe(true);
+    expect(
+      (await rows<{ next_due_at: string }>(
+        "SELECT next_due_at FROM users WHERE id = ?",
+        account.userId,
+      ))[0]?.next_due_at,
+    ).toBe(FUTURE);
+
+    const summary = await runReadingScheduler(
+      envValue,
+      new Date("2026-08-11T19:30:00.000Z"),
+    );
+
+    expect(summary.due.reserved).toBe(0);
+    expect(
+      await rows<{ id: string; status: string; command_generation: number }>(
+        "SELECT id, status, command_generation FROM daily_readings WHERE user_id = ? AND local_date = ?",
+        account.userId,
+        localDate,
+      ),
+    ).toEqual([
+      {
+        id: reserved.readingId,
+        status: "failed",
+        command_generation: MAX_COMMAND_GENERATION,
+      },
+    ]);
+  });
+
+  it("re-arms an unreserved day after consent restores eligibility", async () => {
+    const account = identity(72);
+    await seedSchedulerAccount(account, { consent: false });
+    const envValue = hybridEnv();
+    expect((await runReadingScheduler(envValue, SCHEDULED_AT)).due.reserved).toBe(0);
+    await grantAi(account);
+    const dueAt = await refreshReadingCursorAfterAiConsentChange(envValue, account.userId, SCHEDULED_AT);
+    expect(Date.parse(dueAt!)).toBeLessThan(SCHEDULED_AT.getTime());
+    expect((await runReadingScheduler(envValue, SCHEDULED_AT)).due.reserved).toBe(1);
+  });
+
+  it.each([false, true])("reschedules an eastward timezone change with consumed today=%s", async (consumed) => {
+    const account = identity(73);
+    const now = new Date("2026-08-11T12:00:00.000Z");
+    await seedSchedulerAccount(account);
+    const oldTarget = await selectReadingScheduleTarget(account.userId, "UTC", now, DEFAULT_READING_SCHEDULE_POLICY);
+    await env.DB.prepare("UPDATE users SET timezone = 'UTC', next_due_at = ? WHERE id = ?")
+      .bind(oldTarget.nextCursor.dueAt, account.userId).run();
+    if (consumed) await seedFactualArtifact(account, "published", HEX64);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      expect((await setSchedulingTimezone(hybridEnv(), account.userId, "Asia/Tokyo", "user_confirmed")).ok).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+    const target = await selectReadingScheduleTarget(account.userId, "Asia/Tokyo", now, DEFAULT_READING_SCHEDULE_POLICY);
+    const expected = consumed ? target.nextCursor.dueAt : target.dueAt;
+    expect((await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", account.userId))[0]?.next_due_at).toBe(expected);
+    expect(expected < oldTarget.nextCursor.dueAt).toBe(true);
+    if (consumed) expect(Date.parse(expected)).toBeGreaterThan(now.getTime());
+  });
+
+  it.each(["published", "failed"] as const)("does not re-arm a consumed %s day on recompute", async (status) => {
+    const account = identity(74);
+    await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+    const readingId = await seedFactualArtifact(account, "published", HEX64);
+    if (status === "failed") {
+      await env.DB.prepare("UPDATE daily_readings SET status = 'failed' WHERE id = ?").bind(readingId).run();
+    }
+    const dueAt = await recomputeUserNextDueAt(hybridEnv(), account.userId, SCHEDULED_AT);
+    expect(Date.parse(dueAt!)).toBeGreaterThan(SCHEDULED_AT.getTime());
+    expect((await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", account.userId))[0]?.next_due_at).toBe(dueAt);
   });
 
   it("repairs a pre-generated next-local-day V2 failure", async () => {
@@ -911,7 +1090,8 @@ describe("bounded ordered repair", () => {
     expect(first.due.evaluated).toBe(0);
     expect(second.repair.factRepairs).toBe(0);
     expect(second.repair.ineligibleOrphansBackedOff).toBe(0);
-    expect(second.due.evaluated).toBe(1);
+    // The invalidated day is already consumed; only the repair lane retries it.
+    expect(second.due.evaluated).toBe(0);
     expect(
       await rows<{ status: string; invalidated_at: string | null }>(
         "SELECT status, invalidated_at FROM daily_readings WHERE id = ?",
