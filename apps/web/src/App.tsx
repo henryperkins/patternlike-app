@@ -348,7 +348,11 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
       await signOut(endSession, auth0Logout);
     } catch (error) {
       if (error instanceof SignOutError) {
-        setHasValidatedSession(false);
+        // The Worker cookie is already revoked, so this is a real sign-out.
+        // Reset everything a 401 resets: without the generation bump, a chart
+        // read started outside the mount effect could resolve afterwards and
+        // put the previous reader's chart back on screen.
+        handleSignedOut();
         setAuthState({ status: "signed-out", error: error.message });
         return;
       }

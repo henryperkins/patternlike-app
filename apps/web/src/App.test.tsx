@@ -1572,6 +1572,61 @@ describe("web application shell", () => {
     expect(auth0.logout).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores a chart read that resolves after the issuer logout fails", async () => {
+    const user = userEvent.setup();
+    const auth0 = setAuth0();
+    vi.mocked(auth0.logout).mockRejectedValue(new Error("redirect blocked"));
+    const patternStateGate = deferred();
+    const chartRefreshGate = deferred();
+    const responses: Record<string, MockResponse> = {
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/sessions/current": { status: 204, body: null },
+      // A Pattern state naming another chart makes the Pattern view ask the
+      // shell to reload the chart. That read carries no abort signal, so only
+      // the request generation can retire it.
+      "GET /v1/pattern-state": {
+        status: 200,
+        gate: patternStateGate.promise,
+        body: {
+          schema_version: "0.9.0",
+          state: "consent_required",
+          chart: {
+            chart_id: "cht_web_test_0002",
+            effective_accuracy: "exact",
+            feature_policy_version: "1.0.0",
+          },
+          consent: null,
+          generation: null,
+          pattern: null,
+          regeneration: null,
+        },
+      },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
+    };
+    mockApiResponses(responses);
+
+    render(<App />);
+    await screen.findAllByRole("link", { name: "Privacy" });
+    expect(capturedFor("/v1/chart")).toHaveLength(1);
+
+    responses["/v1/chart"] = { status: 200, body: chart, gate: chartRefreshGate.promise };
+    patternStateGate.release();
+    await waitFor(() => expect(capturedFor("/v1/chart")).toHaveLength(2));
+
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Sign out/i }));
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+
+    await act(async () => {
+      chartRefreshGate.release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
+  });
+
   it("keeps the Time Travel surface free of detectable structural accessibility violations", async () => {
     const user = userEvent.setup();
     mockApiResponses({
