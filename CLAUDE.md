@@ -25,14 +25,19 @@ npm run web:dev            # Vite PWA          :5173 (proxies /v1 → :8787); op
 
 npm run generate:validators -w @patternlike/api      # after any contracts/ change (see Generated Worker validators)
 npm run generate:pattern-source -w @patternlike/api  # after editing any file listed in apps/api/pattern-creation-sources.json
+npm run generate:test-schema -w @patternlike/api     # after adding or editing a db/d1 migration (see Tests)
 ```
 
 Single tests:
 
 ```bash
-npx vitest run src/routes/birth.test.ts   # from apps/api; also -t "name". NOT `npm test -w @patternlike/api -- <file>`:
-                                          # that script is a && chain, so npm appends the file to its LAST command
-                                          # (a node:test script), and pretest still runs both check:* gates first
+npx vitest run src/db/encrypted-columns.test.ts   # from apps/api, a Workers-pool file; also -t "name"
+npx vitest run --config vitest.unit.config.ts src/routes/birth.test.ts   # from apps/api, a file listed in
+                                          # test/unit-test-files.ts: the default config excludes those, so without
+                                          # --config it answers "No test files found"
+                                          # NOT `npm test -w @patternlike/api -- <file>` for either kind: that script
+                                          # is a && chain, so npm appends the file to its LAST command (a node:test
+                                          # script), and pretest still runs all three check:* gates first
 npx vitest run --config vitest.m3-compat.config.ts   # from apps/api: the pre-0003 compatibility lane
 npm test -w @patternlike/web -- src/components/Onboarding.test.tsx   # plain `vitest run`, so this one works
 npx tsx --test src/aspects.test.ts        # from apps/calc-stub or packages/shared (node:test)
@@ -41,7 +46,7 @@ npm run calc:golden                        # Swiss Ephemeris golden fingerprints
 
 `@patternlike/calc-stub`'s `pretest` runs `scripts/download-ephe.mjs`, which fetches ephemeris data pinned by commit + SHA-256 in `apps/calc-stub/ephemeris.lock.json`. It re-verifies every existing file by digest and fetches only what is missing or stale, so a checkout that already holds the pinned files tests offline, and a fresh checkout needs network on its first calc-stub test run no matter what: `ci:local --skip-ephe` skips only the script's own explicit download step, and the calc-stub test step's `pretest` runs the downloader regardless (`--clean` does a full `npm ci` like Workers Builds).
 
-`@patternlike/api`'s `pretest` and `prebuild` run `check:pattern-source` and `check:validators`, so a stale generated file fails every API lane before a single test runs. `test:contracts` invokes bare `python` (not `python3`); the `.venv` bootstrap in `AGENTS.md` provides it.
+`@patternlike/api`'s `pretest` and `prebuild` run `check:pattern-source` and `check:validators`, so a stale generated file fails every API lane before a single test runs. `pretest` also runs `check:test-schema`, which fails when `apps/api/test/schema-dump.sql` no longer matches the `db/d1/` chain (see Tests). `test:contracts` invokes bare `python` (not `python3`); the `.venv` bootstrap in `AGENTS.md` provides it.
 
 There is no linter or formatter — `npm run typecheck` is the only mechanical style gate.
 
@@ -295,9 +300,9 @@ rm -rf apps/api/.wrangler/state/v3/d1 && npm run db:local -w @patternlike/api
 
 ### Tests
 
-`apps/api` runs inside workerd via `@cloudflare/vitest-pool-workers`: `SELF.fetch()` drives the real Hono app against a real local D1 seeded from `db/d1/` by `test/apply-migrations.ts`. All outbound fetches — including `invokeCalc` — are intercepted by `test/mock-calc-service.ts`, so tests are hermetic. `test/hermetic-bindings.ts` overrides every binding a developer's `.dev.vars` could leak in: Daily (`READING_V5_ROLLOUT=off`) and the ontology pipeline stay off, but Pattern carries the complete Codex posture because it has no rollout switch and an incomplete configuration is a `checkSecureConfig` refusal on every request. The config also bundles `apps/ontology-signer` into a second miniflare worker so the `ONTOLOGY_SIGNER` service binding is real. Files run serially (`fileParallelism: false`) because storage is **not** isolated per test in this pool version; `resetDb()` in `test/helpers.ts` deletes from an explicit FK-ordered `TABLES` list, and a table missing from that list leaks rows between suites. Portrait tables, `reading_saves`, `daily_publication_receipts`, and the two `runtime_health_*` tables are on it; `reader_relationship_supports` and `reading_feedback_events` are deliberately absent because both `ON DELETE CASCADE` from `daily_readings`/`pattern_documents`. Keep new user-owned tables in the same commit as the migration and `deletion-manifest.ts`.
+`apps/api` has two Vitest projects. The files listed in `test/unit-test-files.ts` need no binding and run in plain Node, in parallel, under `vitest.unit.config.ts`; the default `vitest.config.ts` excludes exactly that list, and a listed file that starts using a binding fails loudly in Node and must move back. Everything else runs inside workerd via `@cloudflare/vitest-pool-workers`: `SELF.fetch()` drives the real Hono app against a real local D1. `test/apply-migrations.ts` seeds that D1 from `test/schema-dump.sql`, the final schema the `db/d1/` chain produces, instead of replaying every migration per test file. The dump is generated (`npm run generate:test-schema -w @patternlike/api`), never hand-edited, and a new or edited migration is not in the test database until it is regenerated; `src/db/migrations-upgrade.test.ts` proves once per run that the dump equals the real chain and that populated older databases upgrade through it. All outbound fetches — including `invokeCalc` — are intercepted by `test/mock-calc-service.ts`, so tests are hermetic. `test/hermetic-bindings.ts` overrides every binding a developer's `.dev.vars` could leak in: Daily (`READING_V5_ROLLOUT=off`) and the ontology pipeline stay off, but Pattern carries the complete Codex posture because it has no rollout switch and an incomplete configuration is a `checkSecureConfig` refusal on every request. The config also bundles `apps/ontology-signer` into a second miniflare worker so the `ONTOLOGY_SIGNER` service binding is real. Files run serially (`fileParallelism: false`) because storage is **not** isolated per test in this pool version; `resetDb()` in `test/helpers.ts` deletes from an explicit FK-ordered `TABLES` list, and a table missing from that list leaks rows between suites. Portrait tables, `reading_saves`, `daily_publication_receipts`, and the two `runtime_health_*` tables are on it; `reader_relationship_supports` and `reading_feedback_events` are deliberately absent because both `ON DELETE CASCADE` from `daily_readings`/`pattern_documents`. Keep new user-owned tables in the same commit as the migration and `deletion-manifest.ts`.
 
-`npm test -w @patternlike/api` is a chain: the main vitest lane, then `vitest.m3-compat.config.ts` (only `test/m3-rollout-compat.test.ts`, against migrations `0001`+`0002` alone with `READING_V5_ROLLOUT=off`, proving a pre-`0003` database still serves), then the `node:test` suites under `apps/api/scripts/` that neither vitest include pattern reaches. `apps/web` tests run under jsdom with `src/test/setup.ts` (Testing Library, jest-dom, axe-core); `apps/ontology-signer` also uses the Workers pool.
+`npm test -w @patternlike/api` is a chain: the Node unit project (`vitest.unit.config.ts`), the main Workers-pool lane, then `vitest.m3-compat.config.ts` (only `test/m3-rollout-compat.test.ts`, against migrations `0001`+`0002` alone with `READING_V5_ROLLOUT=off`, proving a pre-`0003` database still serves), then the `node:test` suites under `apps/api/scripts/` that neither vitest include pattern reaches. `apps/web` tests run under jsdom with `src/test/setup.ts` (Testing Library, jest-dom, axe-core); `apps/ontology-signer` also uses the Workers pool.
 
 Because `X-User-Id` names a user rather than creating one, every API test must `seedUser()` first — the `users` row, its `identities` row, and its wrapped DEK land together. `confirmPreferences()`, `seedChart()`, and `seedActiveRelease()` supply the rest of what generation needs; a test that skips `confirmPreferences` gets a correct `timezone_confirmation_required` refusal rather than a reading.
 
