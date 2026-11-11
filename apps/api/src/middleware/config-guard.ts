@@ -621,7 +621,7 @@ export function checkSecureConfig(
 export async function configGuard(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
-) {
+): Promise<Response | void> {
   const failure = checkSecureConfig(c.env) ??
     (c.req.path.startsWith("/admin/") || c.req.path === "/admin"
       ? checkAdminAccessConfig(c.env)

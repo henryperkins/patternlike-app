@@ -24,7 +24,7 @@ async function credentialsMatch(expected: string, presented: string): Promise<bo
 export async function cryptoOperatorAuth(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
-) {
+): Promise<Response | void> {
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
   const expected = c.env.CRYPTO_OPERATOR_TOKEN?.trim() ?? "";

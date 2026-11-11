@@ -108,7 +108,7 @@ async function mintAdminSession(
   });
 }
 
-export async function adminAuth(c: AdminContext, next: Next) {
+export async function adminAuth(c: AdminContext, next: Next): Promise<Response | void> {
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
   const assertion = c.req.header("cf-access-jwt-assertion");
