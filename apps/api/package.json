@@ -29,7 +29,7 @@
     "test:ontology-release-verify": "node --import tsx --test scripts/verify-active-ontology-bundle.test.ts",
     "test:wrangler-config": "node --import tsx --test scripts/wrangler-config.test.ts",
     "//test": "The serial and pre-0003 compatibility Worker suites, followed by operator-script and generated-validator checks. Script tests live outside both Vitest include patterns, so they must be chained here.",
-    "pretest": "npm run check:pattern-source && npm run check:validators",
+    "pretest": "npm run check:pattern-source && npm run check:validators && npm run check:test-schema",
     "test": "vitest run --config vitest.unit.config.ts && vitest run && vitest run --config vitest.m3-compat.config.ts && npm run test:pattern-source && npm run test:pattern-model-verify && npm run test:ontology-corpus-prepare && npm run test:ontology-release-verify && npm run test:wrangler-config && npm run test:validators",
     "db:local": "wrangler d1 migrations apply patternlike-ops --local",
     "//deploy": "Ships apps/web/dist as static assets. Prefer `npm run deploy:api` from the repository root, which builds the web app first.",

@@ -9805,7 +9805,7 @@
       "kind": "source",
       "path": "apps/api/package.json",
       "selector": {
-        "text": "\"pretest\": \"npm run check:pattern-source && npm run check:validators\","
+        "text": "\"pretest\": \"npm run check:pattern-source && npm run check:validators && npm run check:test-schema\","
       },
       "observed_at": null
     },
