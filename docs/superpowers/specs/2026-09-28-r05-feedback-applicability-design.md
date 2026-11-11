@@ -1,6 +1,6 @@
 # R05: exact-edition feedback applicability
 
-Date: September 28, 2026; revised October 1 after review; rebased November 10, 2026. Status: **design for review; nothing is implemented.** Branch: `feat/r05-feedback-applicability`, stacked on the unmerged `feat/r04-family-aware-reissue` at `cd4fb41`, so the shared backlog, map, and snapshot pointer do not conflict. Scope: backlog item R05, option A.
+Date: September 28, 2026; revised October 1 after review; restacked onto `main` and re-verified November 11, 2026. Status: **design for review; nothing is implemented.** Branch: `feat/r05-feedback-applicability`, based on `main` at `3e51753`. Earlier drafts were stacked on the R04 family-aware reissue branch. That direction was superseded on November 10, and its history is kept at the tags `archive/r04-family-aware-reissue` and `archive/r04-family-aware-reissue-2026-09-28`. Scope: backlog item R05, option A.
 
 Owner decisions (September 28):
 
@@ -30,7 +30,7 @@ Unchanged:
 
 ## Verified baseline
 
-Checked against source on this branch. R04 changed two files cited here: `apps/api/src/db/consents.ts` gained a reservation guard (`loadAiSynthesisGrant` behaves identically), and `contracts/validate_schemas.py` gained its package registration. Every feedback file is unchanged from `00299d2`.
+Checked against `main` at `3e51753` on November 11, 2026. Two files cited here changed since `00299d2`: `apps/api/src/db/consents.ts` gained a reservation guard (`loadAiSynthesisGrant` is byte-identical), and `apps/api/src/services/enqueue.ts` gained configured-model operator generation and reissue (`replaceFailedCommand` is unchanged). `contracts/validate_schemas.py` and every feedback file are unchanged from `00299d2`.
 
 - **Theme ranking cannot apply.** [`supportedTargets`](../../../apps/api/src/db/reading-feedback-events.ts) stores the edition's retained fact IDs and always an empty `theme_ids`. V5 evidence retains `fact_refs`; no retained evidence format carries theme IDs. The [compiler](../../../apps/api/src/services/reading-feedback-compiler.ts) returns `null` for `not_relevant_today` without themes, and always for `unclear`.
 - **`repetitive` compiles with or without fact targets.** It needs only the category, a live window, and the live grant it was recorded under.
@@ -229,7 +229,7 @@ Fixtures:
   - an extra key
   - a wrong embedded receipt version
 
-Register the package in [`contracts/validate_schemas.py`](../../../contracts/validate_schemas.py) at every point R04 used:
+Register the package in [`contracts/validate_schemas.py`](../../../contracts/validate_schemas.py) at every point `reading-feedback-v1` is registered:
 
 - the path constant and base URL
 - the `load_registry` tuple
@@ -348,14 +348,14 @@ The test must pass unchanged after the refactor. Then add one test per refusal c
 - assessing at a second clock reading instead of the request's instant
 - removing the client clock downgrade
 
-**Documentation and gate.** Same discipline as R04:
+**Documentation and gate.** The discipline every additive contract package follows:
 
 - Update the R05 backlog section; record theme ranking as retained collection-only, and finding 7 as an activation prerequisite outside R05.
 - Refresh the categorical-feedback map leaves 1, 4, and 5, the compile-context leaf 3 wording on refusal types, and the contracts package list.
 - Add a `CLAUDE.md` sentence and a README index line.
 - Capture a clean snapshot, run all sixteen `npm run ci:local` lanes, and write the snapshot-bound receipt and review record.
 
-Expected size: slightly smaller than R04.
+Expected size: one additive contract package, a compiler refactor, one new Worker service module, two route projections, and the card changes. That is slightly smaller than the archived R04 implementation.
 
 ## Out of scope
 
@@ -364,7 +364,7 @@ Expected size: slightly smaller than R04.
 - **A USR-12 withdrawal control.** No route exists; see open question 2.
 - **Finding 7's fix.** It changes frozen-command or guard behavior; it is an activation prerequisite, not part of R05.
 - **The resonance card ("Say how it landed overall").** Its permission copy has the same reader-level gap as finding 1. The context compiler offers resonance records to the engine under both selection policies, and the engine admits them only with an active USR-12 grant and the `reading_feedback` AI-synthesis category. Submitting a categorical response creates or renews that same grant. That path is unchanged.
-- **The legacy `POST /internal/readings/reissue` decision from R04.**
+- **Operator generation and reissue.** Since November 10 both reserve through the configured model, and reissue refuses an assembler-published edition (backlog R04, superseded). R05 does not touch them.
 
 ## Open questions for review
 
