@@ -59,7 +59,7 @@ export function readSessionToken(c: Context): string | null {
 export async function authenticate(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
-) {
+): Promise<Response | void> {
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
 
@@ -118,7 +118,7 @@ function recoveryRouteAllowed(path: string): boolean {
 export async function accountStateGate(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
-) {
+): Promise<Response | void> {
   const status = c.get("accountStatus");
   const recoveryRoute = recoveryRouteAllowed(c.req.path);
   const lifecycleAllowed = status === "active" || (status === "frozen" && recoveryRoute);
@@ -155,7 +155,7 @@ export async function accountStateGate(
 export async function serviceAuth(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
-) {
+): Promise<Response | void> {
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
   const expected = c.env.SERVICE_AUTH_TOKEN;

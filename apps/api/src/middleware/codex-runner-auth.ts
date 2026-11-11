@@ -43,7 +43,7 @@ function error(
 export async function codexRunnerAuth(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
-) {
+): Promise<Response | void> {
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
   const expected = c.env.CODEX_RUNNER_TOKEN?.trim() ?? "";

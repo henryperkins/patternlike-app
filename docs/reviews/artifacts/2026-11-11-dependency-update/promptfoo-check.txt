@@ -1,0 +1,31 @@
+
+> @patternlike/evals-promptfoo@0.1.0 check
+> node scripts/check.mjs
+
+wrapper: cancellation guard
+  ok   daily refuses --no-write before loading promptfoo
+  ok   validators refuses --no-write before loading promptfoo
+
+source 7fc88e1963477b393697d4fb947d2cca759748d9
+pin {"provider":"codex","model":"gpt-5.6-sol","reasoning_effort":"xhigh","prompt_version":"1.1.0","output_schema":"daily-reading-v5","selection_policy_version":"1.5.0","validation_policy_version":"1.2.0","max_output_tokens":4000,"context_max_bytes":98304}
+corpus 1.3.0
+
+daily lane: prompt function
+  ok   exact_saturn_square    exact_time           invocation sha256:7bdbefc35a6816ad
+  ok   approximate_window     approximate_time     invocation sha256:0aeb1f97e0243db4
+  ok   unknown_time           unknown_time         invocation sha256:df86c0294afd2d6d
+  ok   zero_cycle_day         zero_cycle_day       invocation sha256:91f16ab2aa28c431
+  ok   collective_only_day    collective_only_day  invocation sha256:167681d0758244de
+  ok   injected_user_text     injected_user_text   invocation sha256:008bd13ff37c2bbc
+  ok   exact_full_packet      exact_time           invocation sha256:ed4ecc3bf36eb5ce
+  ok   unknown_full_packet    unknown_time         invocation sha256:ad790fb453db1f41
+  ok   hard gate rejects non-JSON output (schema_shape.not_json)
+
+validators lane: corpus agreement
+  38/38 cases agree with the corpus
+
+daily lane: output schema assertion (Worker validator)
+  8/8 accept cases are schema-valid; 0 reject cases fail at the schema layer
+  ok   schema assertion rejects non-JSON output (not_json)
+
+CHECK PASSED (no provider invoked)
