@@ -21,10 +21,13 @@ async function encryptedColumnsInSchema(): Promise<Set<string>> {
   const found = new Set<string>();
   for (const table of results) {
     // Column definitions only: a REFERENCES clause or a CHECK can mention a
-    // column name without declaring one.
-    for (const line of table.sql.split("\n")) {
-      const match = /^\s{2}([a-z_]+_enc)\s+BLOB/.exec(line);
-      if (match) found.add(`${table.name}.${match[1]}`);
+    // column name without declaring one. Anchoring on the opening parenthesis
+    // of the definition list, a comma, or a line start keeps that property
+    // while tolerating both the migration chain's multi-line DDL and the test
+    // schema dump's one-statement-per-line form (see test/apply-migrations.ts),
+    // where a table's first column follows `(` on the same line.
+    for (const match of table.sql.matchAll(/(?:^|[,(\n])\s*([a-z_]+_enc)\s+BLOB/g)) {
+      found.add(`${table.name}.${match[1]}`);
     }
   }
   return found;

@@ -15,11 +15,15 @@ export function AccountAccessRecovery({
   consent,
   onRestored,
   onSignOut,
+  signOutProblem = null,
+  signOutPending = false,
   onDeletionAccepted,
 }: {
   consent: AccountProcessingConsentDocument;
   onRestored: () => void;
   onSignOut: () => void;
+  signOutProblem?: string | null;
+  signOutPending?: boolean;
   onDeletionAccepted: () => void;
 }) {
   const [current, setCurrent] = useState(consent);
@@ -175,9 +179,17 @@ export function AccountAccessRecovery({
           <p className="kicker">Session</p>
           <h2 id="recovery-session-heading">Leave this account?</h2>
           <p>Sign out remains available while ordinary product routes are paused.</p>
+          {signOutProblem ? (
+            <div className="form-error" role="alert">{signOutProblem}</div>
+          ) : null}
         </div>
-        <button className="button button--secondary" type="button" onClick={onSignOut}>
-          Sign out <Icon name="arrow" />
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={onSignOut}
+          disabled={signOutPending}
+        >
+          {signOutPending ? "Signing out…" : "Sign out"} <Icon name="arrow" />
         </button>
       </section>
     </main>

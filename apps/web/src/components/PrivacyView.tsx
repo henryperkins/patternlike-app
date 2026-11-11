@@ -758,6 +758,8 @@ export function PrivacyView({
   hasChart,
   chartId = null,
   onSignOut,
+  signOutProblem = null,
+  signOutPending = false,
   onDeletionAccepted,
   onCorrectBirth,
   onProcessingFrozen,
@@ -766,6 +768,8 @@ export function PrivacyView({
   hasChart: boolean;
   chartId?: string | null;
   onSignOut: () => void;
+  signOutProblem?: string | null;
+  signOutPending?: boolean;
   onDeletionAccepted: () => void;
   onCorrectBirth?: () => void;
   onProcessingFrozen: (consent: AccountProcessingConsentDocument) => void;
@@ -870,9 +874,17 @@ export function PrivacyView({
           <p className="kicker">Session</p>
           <h2 id="session-heading">Finished on this device?</h2>
           <p>Sign out to end this browser session and protect your account on a shared device.</p>
+          {signOutProblem ? (
+            <div className="form-error" role="alert">{signOutProblem}</div>
+          ) : null}
         </div>
-        <button className="button button--secondary" type="button" onClick={onSignOut}>
-          Sign out <Icon name="arrow" />
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={onSignOut}
+          disabled={signOutPending}
+        >
+          {signOutPending ? "Signing out…" : "Sign out"} <Icon name="arrow" />
         </button>
       </section>
     </div>

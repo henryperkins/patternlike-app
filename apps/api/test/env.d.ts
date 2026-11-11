@@ -12,6 +12,10 @@ declare global {
       TEST_MIGRATIONS: D1Migration[];
       /** Isolated D1 binding for populated forward-migration probes. */
       MIGRATION_UPGRADE_DB: D1Database;
+      /** Reference D1 that receives the real migration chain once per run. */
+      SCHEMA_REFERENCE_DB: D1Database;
+      /** Final-schema dump injected by vitest.config.ts (test/schema-dump.sql). */
+      TEST_SCHEMA_DUMP: string;
       /** Public half of the ephemeral auxiliary signer test key. */
       TEST_ONTOLOGY_SIGNER_KEY_ID: string;
       TEST_ONTOLOGY_SIGNER_PUBLIC_KEY: string;

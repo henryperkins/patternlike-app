@@ -31,8 +31,10 @@ import {
 import {
   clearAuth0CallbackParams,
   completeSignIn,
+  SignOutError,
   signOut,
 } from "./lib/auth.js";
+import { withRequestId } from "./lib/api-status.js";
 import { isAccountProcessingConsentResponse } from "./lib/account-processing-consent.js";
 import {
   DevicePreferenceSynchronizer,
@@ -96,6 +98,8 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   const [hasValidatedSession, setHasValidatedSession] = useState(false);
   const [preferenceSyncRevision, setPreferenceSyncRevision] = useState(0);
   const [correctingBirth, setCorrectingBirth] = useState(false);
+  const [signOutProblem, setSignOutProblem] = useState<string | null>(null);
+  const [signOutPending, setSignOutPending] = useState(false);
   const isDeletionStatus = view === "deletion-status";
   const shouldLoadAccount = !isDeletionStatus && authState.status !== "signed-out";
 
@@ -337,15 +341,31 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   }, []);
 
   const endSessionAndSignOut = async () => {
-    await signOut(async () => {
-      try {
-        await endSession();
-      } catch {
-        // A failed revoke must not strand the user in a session they asked to
-        // leave. Auth0's logout still runs (signOut calls it from `finally`),
-        // and the cookie is cleared server-side on the next resolve attempt.
+    if (signOutPending) return;
+    setSignOutPending(true);
+    setSignOutProblem(null);
+    try {
+      await signOut(endSession, auth0Logout);
+    } catch (error) {
+      if (error instanceof SignOutError) {
+        // The Worker cookie is already revoked, so this is a real sign-out.
+        // Reset everything a 401 resets: without the generation bump, a chart
+        // read started outside the mount effect could resolve afterwards and
+        // put the previous reader's chart back on screen.
+        handleSignedOut();
+        setAuthState({ status: "signed-out", error: error.message });
+        return;
       }
-    }, auth0Logout);
+      const detail = error instanceof Error
+        ? error.message
+        : "Sign-out could not be completed.";
+      setSignOutProblem(withRequestId(
+        `Sign-out did not complete. This browser is still signed in. ${detail}`,
+        error instanceof ApiError ? error.requestId : null,
+      ));
+    } finally {
+      setSignOutPending(false);
+    }
   };
 
   const submitBirthProfile = async (
@@ -443,6 +463,8 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
           void load();
         }}
         onSignOut={() => void endSessionAndSignOut()}
+        signOutProblem={signOutProblem}
+        signOutPending={signOutPending}
         onDeletionAccepted={showDeletionStatus}
       />
     );
@@ -464,13 +486,17 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
           <div>
             <p className="kicker">Session</p>
             <h2 id="unavailable-session-heading">Leave this account?</h2>
+            {signOutProblem ? (
+              <div className="form-error" role="alert">{signOutProblem}</div>
+            ) : null}
           </div>
           <button
             className="button button--secondary"
             type="button"
             onClick={() => void endSessionAndSignOut()}
+            disabled={signOutPending}
           >
-            Sign out <Icon name="arrow" />
+            {signOutPending ? "Signing out…" : "Sign out"} <Icon name="arrow" />
           </button>
         </section>
       </main>
@@ -521,6 +547,8 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         hasChart={chart !== null}
         chartId={chart?.id ?? null}
         onSignOut={() => void endSessionAndSignOut()}
+        signOutProblem={signOutProblem}
+        signOutPending={signOutPending}
         onUnauthorized={handleSignedOut}
         onDeletionAccepted={showDeletionStatus}
         onCorrectBirth={chart ? () => setCorrectingBirth(true) : undefined}

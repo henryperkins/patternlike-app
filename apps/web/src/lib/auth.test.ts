@@ -154,7 +154,7 @@ describe("signOut", () => {
     });
   });
 
-  it("still invokes Auth0 logout when Worker revocation throws", async () => {
+  it("leaves the issuer session in place when Worker revocation throws", async () => {
     const auth0Logout = vi.fn().mockResolvedValue(undefined);
 
     await expect(
@@ -162,6 +162,16 @@ describe("signOut", () => {
         throw new Error("network");
       }, auth0Logout),
     ).rejects.toThrow("network");
+
+    expect(auth0Logout).not.toHaveBeenCalled();
+  });
+
+  it("reports an issuer failure only after the Worker session was revoked", async () => {
+    const auth0Logout = vi.fn().mockRejectedValue(new Error("redirect blocked"));
+
+    await expect(signOut(async () => undefined, auth0Logout)).rejects.toThrow(
+      /sign-in provider could not finish logging out/i,
+    );
 
     expect(auth0Logout).toHaveBeenCalledTimes(1);
   });
